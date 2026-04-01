@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>Agent Team</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Draggable title bar -->
+<div class="titlebar">
+  <span id="health-text">Agent Team</span>
+  <div class="titlebar-actions">
+    <button class="titlebar-btn" id="btn-toggle-panel">Bounties</button>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+
+  <!-- Left: Terminal panel -->
+  <div class="main-panel">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tabs" id="tabs"></div>
+      <div class="tab-actions">
+        <select id="role-select">
+          <option value="be">BE</option>
+          <option value="fe">FE</option>
+          <option value="ops">OPS</option>
+          <option value="arch">ARCH</option>
+          <option value="design">DESIGN</option>
+          <option value="qa">QA</option>
+          <option value="debug">DEBUG</option>
+          <option value="pm">PM</option>
+        </select>
+        <select id="repo-select">
+          <option value="">-- repo --</option>
+        </select>
+        <button class="btn btn-create" id="btn-create">+</button>
+      </div>
+    </div>
+
+    <!-- Terminal output -->
+    <div class="terminal" id="terminal">
+      <div class="terminal-welcome">
+        <div class="welcome-title">Agent Team Supervisor</div>
+        <div class="welcome-hint">Select a role and press <span class="kbd">+</span> to create an agent</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Bounty/Repo sidebar (toggleable) -->
+  <div class="side-panel" id="side-panel" style="display:none">
+
+    <!-- Side tab bar -->
+    <div class="side-tab-bar">
+      <button class="side-tab side-tab-active" data-side-tab="bounties">Bounties</button>
+      <button class="side-tab" data-side-tab="repos">Repos</button>
+      <button class="side-tab" data-side-tab="settings">Settings</button>
+      <button class="btn-icon" id="btn-refresh-tracker" title="Refresh" style="margin-left:auto">&#8635;</button>
+    </div>
+
+    <!-- Tab: Bounties -->
+    <div class="side-content" id="side-tab-bounties">
+      <div class="side-section">
+        <div class="side-summary" id="bounties-summary"></div>
+        <div id="bounties-list" class="side-list">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Tab: Repos -->
+    <div class="side-content" id="side-tab-repos" style="display:none">
+      <div class="side-section" id="repos-list">Loading...</div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div class="side-content" id="side-tab-settings" style="display:none">
+      <div class="side-section">
+        <div class="side-field">
+          <label>Bounty Board API URL</label>
+          <input type="text" id="input-api-url" placeholder="http://localhost:8000">
+        </div>
+        <div class="side-field">
+          <label>GitHub Personal Access Token</label>
+          <div class="token-row">
+            <input type="password" id="input-gh-token" placeholder="ghp_...">
+            <button class="btn btn-sm" id="btn-save-token">Save</button>
+          </div>
+          <div class="side-hint">Required for PR/issue details. Stored locally in ~/.agent-team/tracker.json</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const api = window.bridge;
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let activeAgentId = null;
+let agents = {};
+let logBuffers = {};
+let autoScroll = true;
+let trackerState = null;
+let sidePanelOpen = false;
+
+// ---------------------------------------------------------------------------
+// Terminal rendering
+// ---------------------------------------------------------------------------
+
+function renderTabs() {
+  const tabsEl = document.getElementById('tabs');
+  const agentList = Object.values(agents);
+
+  tabsEl.innerHTML = agentList.map(a => {
+    const isActive = a.agent_id === activeAgentId;
+    const dot = statusDot(a.status);
+    const repoShort = (a.repo || '').split('/')[1] || '';
+    const label = `${a.role.toUpperCase()} ${repoShort} #${a.cycle || 0}`;
+    return `
+      <div class="tab ${isActive ? 'tab-active' : ''} ${a.status === 'dead' ? 'tab-dead' : ''}"
+           data-agent-id="${a.agent_id}">
+        <span class="tab-dot ${dot}">&bull;</span>
+        <span class="tab-label">${label}</span>
+        <span class="tab-id">${a.agent_id.split('-').slice(-1)[0]}</span>
+        <button class="tab-close" data-close-agent="${a.agent_id}">&times;</button>
+      </div>
+    `;
+  }).join('');
+
+  tabsEl.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) return;
+      selectAgent(tab.dataset.agentId);
+    });
+  });
+  tabsEl.querySelectorAll('.tab-close').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopAgent(btn.dataset.closeAgent);
+    });
+  });
+}
+
+function statusDot(status) {
+  if (['polling', 'working', 'sleeping'].includes(status)) return 'dot-ok';
+  if (status === 'starting' || status === 'restarting') return 'dot-info';
+  if (status === 'rate_limited') return 'dot-warn';
+  if (status === 'error') return 'dot-error';
+  return 'dot-dead';
+}
+
+function renderTerminal() {
+  const terminal = document.getElementById('terminal');
+
+  if (!activeAgentId || !logBuffers[activeAgentId] || logBuffers[activeAgentId].length === 0) {
+    terminal.innerHTML = `
+      <div class="terminal-welcome">
+        <div class="welcome-title">Agent Team Supervisor</div>
+        <div class="welcome-hint">Select a role and press <span class="kbd">+</span> to create an agent</div>
+      </div>`;
+    return;
+  }
+
+  const logs = logBuffers[activeAgentId];
+  terminal.innerHTML = logs.map(entry => {
+    const time = new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false });
+    const cls = `log-${entry.type}`;
+    const prefix = logPrefix(entry.type);
+    const text = escapeHtml(entry.text);
+    return `<div class="log-line ${cls}"><span class="log-time">${time}</span><span class="log-prefix">${prefix}</span><span class="log-text">${text}</span></div>`;
+  }).join('');
+
+  if (autoScroll) terminal.scrollTop = terminal.scrollHeight;
+}
+
+function logPrefix(type) {
+  switch (type) {
+    case 'system':      return '  SYS';
+    case 'assistant':   return '   AI';
+    case 'tool_call':   return '  RUN';
+    case 'tool_result': return '  OUT';
+    case 'status':      return ' STAT';
+    case 'error':       return '  ERR';
+    default:            return '     ';
+  }
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updateHealthBar() {
+  const ht = document.getElementById('health-text');
+  const agentList = Object.values(agents);
+  const alive = agentList.filter(a => !['dead','restarting'].includes(a.status)).length;
+  const total = agentList.length;
+  const cost = agentList.reduce((s, a) => s + (a.cost_usd || 0), 0);
+
+  const parts = [];
+  if (total > 0) parts.push(`${alive}/${total} alive`);
+  if (cost > 0) parts.push(`$${cost.toFixed(2)}`);
+  if (trackerState && trackerState.bounties) {
+    const ready = trackerState.bounties.filter(b => b.status === 'ready').length;
+    if (ready > 0) parts.push(`${ready} bounties ready`);
+  }
+  ht.textContent = parts.length > 0 ? parts.join(' · ') : 'Agent Team';
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar rendering
+// ---------------------------------------------------------------------------
+
+function renderSidebar() {
+  if (!trackerState) return;
+
+  // Settings tab
+  const urlInput = document.getElementById('input-api-url');
+  if (!urlInput.dataset.userEdited) {
+    urlInput.value = trackerState.api_url || 'http://localhost:8000';
+  }
+  const tokenInput = document.getElementById('input-gh-token');
+  if (trackerState.github_token && !tokenInput.dataset.userEdited) {
+    tokenInput.placeholder = '••••••••  (saved)';
+  }
+
+  renderBountiesTab();
+  renderReposTab();
+}
+
+function renderBountiesTab() {
+  if (!trackerState) return;
+
+  // Summary
+  const summaryEl = document.getElementById('bounties-summary');
+  const bounties = trackerState.bounties || [];
+  const ready = bounties.filter(b => b.status === 'ready').length;
+  const blocked = bounties.filter(b => b.status === 'blocked').length;
+  const review = bounties.filter(b => b.status === 'review').length;
+  summaryEl.innerHTML = `
+    <span class="badge badge-green">${ready} ready</span>
+    <span class="badge badge-yellow">${blocked} blocked</span>
+    <span class="badge badge-blue">${review} review</span>
+    <span class="side-muted">${bounties.length} total</span>
+  `;
+
+  // List
+  const bountiesEl = document.getElementById('bounties-list');
+  if (bounties.length > 0) {
+    const sorted = [...bounties].sort((a, b) => {
+      const order = { ready: 0, claimed: 1, blocked: 2, review: 3 };
+      return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+    });
+    bountiesEl.innerHTML = sorted.slice(0, 40).map(b => {
+      const statusCls = { ready: 'badge-green', blocked: 'badge-yellow', review: 'badge-blue', claimed: 'badge-purple' }[b.status] || '';
+      const repo = (b._repo || '').split('/')[1] || '';
+      const ghUrl = b._repo ? `https://github.com/${b._repo}/issues/${b.number}` : '';
+      return `
+        <a class="side-item side-link" href="${ghUrl}" target="_blank">
+          <div class="side-item-title">#${b.number} ${escapeHtml(b.title || '')}</div>
+          <div class="side-item-meta">
+            <span class="badge ${statusCls}">${b.status}</span>
+            <span class="badge">${b.agent_type}</span>
+            <span class="side-muted">${repo}</span>
+          </div>
+        </a>
+      `;
+    }).join('');
+  } else if (trackerState.error) {
+    bountiesEl.innerHTML = `<div class="side-muted">Error: ${escapeHtml(trackerState.error)}</div>`;
+  } else {
+    bountiesEl.innerHTML = '<div class="side-muted">No bounties</div>';
+  }
+}
+
+function renderReposTab() {
+  if (!trackerState) return;
+
+  const reposEl = document.getElementById('repos-list');
+  const statuses = trackerState.repo_statuses || [];
+
+  if (statuses.length === 0) {
+    reposEl.innerHTML = trackerState.error
+      ? `<div class="side-section"><div class="side-muted">Error: ${escapeHtml(trackerState.error)}</div></div>`
+      : '<div class="side-section"><div class="side-muted">No repos registered</div></div>';
+    return;
+  }
+
+  reposEl.innerHTML = statuses.map(r => {
+    const name = r.slug.split('/')[1] || r.slug;
+    const ghBase = `https://github.com/${r.slug}`;
+
+    // Bounties summary row
+    const bountyHtml = r.bounties.total > 0
+      ? `<div class="side-item-meta">
+          <span class="badge badge-green">${r.bounties.ready} ready</span>
+          ${r.bounties.blocked > 0 ? `<span class="badge badge-yellow">${r.bounties.blocked} blocked</span>` : ''}
+          ${r.bounties.review > 0 ? `<span class="badge badge-blue">${r.bounties.review} review</span>` : ''}
+        </div>`
+      : '';
+
+    // Issues + PRs counts with links
+    const linksHtml = `
+      <div class="repo-links">
+        <a class="repo-link" href="${ghBase}" target="_blank">${name}</a>
+        <a class="repo-link" href="${ghBase}/issues" target="_blank">${r.issues_open} issues</a>
+        <a class="repo-link" href="${ghBase}/pulls" target="_blank">${r.prs_open || r.prs.length} PRs</a>
+      </div>
+    `;
+
+    // PRs list
+    let prsHtml = '';
+    if (r.prs.length > 0) {
+      prsHtml = '<div class="repo-prs">' + r.prs.map(pr => {
+        const isAgent = pr.head.startsWith('agent/');
+        return `
+          <a class="side-item side-link" href="${pr.url}" target="_blank">
+            <div class="side-item-title">${isAgent ? '🤖 ' : ''}#${pr.number} ${escapeHtml(pr.title)}</div>
+            <div class="side-item-meta">
+              <span class="side-muted">${pr.author}</span>
+              <span class="side-muted">${pr.head}</span>
+            </div>
+          </a>
+        `;
+      }).join('') + '</div>';
+    }
+
+    // Issues list
+    let issuesHtml = '';
+    if (r.issues && r.issues.length > 0) {
+      issuesHtml = '<div class="repo-issues">' + r.issues.slice(0, 10).map(i => {
+        const labelHtml = i.labels.map(l => {
+          const cls = l.startsWith('agent:') ? 'badge-purple' : '';
+          return `<span class="badge ${cls}">${escapeHtml(l)}</span>`;
+        }).join('');
+        return `
+          <a class="side-item side-link" href="${i.url}" target="_blank">
+            <div class="side-item-title">#${i.number} ${escapeHtml(i.title)}</div>
+            <div class="side-item-meta">${labelHtml}</div>
+          </a>
+        `;
+      }).join('') + '</div>';
+    }
+
+    return `
+      <div class="side-section repo-section">
+        ${linksHtml}
+        ${bountyHtml}
+        ${prsHtml ? '<div class="repo-sub-header">Open PRs</div>' + prsHtml : ''}
+        ${issuesHtml ? '<div class="repo-sub-header">Open Issues</div>' + issuesHtml : ''}
+        ${!prsHtml && !issuesHtml && !r.bounties.total ? '<div class="side-muted">No GitHub data — add token in Settings</div>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
+async function selectAgent(id) {
+  activeAgentId = id;
+  if (!logBuffers[id]) {
+    logBuffers[id] = await api.getAgentLogs(id);
+  }
+  renderTabs();
+  renderTerminal();
+}
+
+async function createAgent() {
+  const role = document.getElementById('role-select').value;
+  const repo = document.getElementById('repo-select').value;
+  if (!repo) {
+    alert('Select a repo first');
+    return;
+  }
+  try {
+    const result = await api.createAgent(role, repo);
+    if (result.ok) {
+      setTimeout(async () => {
+        await refreshAgents();
+        selectAgent(result.agent_id);
+      }, 300);
+    }
+  } catch (err) {
+    console.error('createAgent error:', err);
+  }
+}
+
+async function populateRepoSelect() {
+  try {
+    const tracker = await api.getTracker();
+    const select = document.getElementById('repo-select');
+    const repos = tracker.repos || [];
+    select.innerHTML = '<option value="">-- repo --</option>' +
+      repos.map(r => `<option value="${r.slug}">${r.slug.split('/')[1] || r.slug}</option>`).join('');
+  } catch { /* ignore */ }
+}
+
+async function stopAgent(id) {
+  await api.stopAgent(id);
+  delete logBuffers[id];
+  delete agents[id];
+  if (activeAgentId === id) {
+    const remaining = Object.keys(agents);
+    activeAgentId = remaining.length > 0 ? remaining[0] : null;
+  }
+  await refreshAgents();
+  renderTabs();
+  renderTerminal();
+}
+
+async function refreshAgents() {
+  const list = await api.getAgents();
+  agents = {};
+  for (const a of list) agents[a.agent_id] = a;
+  updateHealthBar();
+  renderTabs();
+}
+
+function toggleSidePanel() {
+  sidePanelOpen = !sidePanelOpen;
+  document.getElementById('side-panel').style.display = sidePanelOpen ? 'flex' : 'none';
+  document.getElementById('btn-toggle-panel').classList.toggle('active', sidePanelOpen);
+  if (sidePanelOpen && trackerState) renderSidebar();
+}
+
+function switchSideTab(tabName) {
+  document.querySelectorAll('.side-tab').forEach(t => t.classList.remove('side-tab-active'));
+  document.querySelectorAll('.side-content').forEach(c => c.style.display = 'none');
+  document.querySelector(`.side-tab[data-side-tab="${tabName}"]`)?.classList.add('side-tab-active');
+  const content = document.getElementById(`side-tab-${tabName}`);
+  if (content) content.style.display = 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Real-time events
+// ---------------------------------------------------------------------------
+
+api.onLogEntry((agentId, entry) => {
+  if (!logBuffers[agentId]) logBuffers[agentId] = [];
+  logBuffers[agentId].push(entry);
+  if (logBuffers[agentId].length > 2000) {
+    logBuffers[agentId].splice(0, logBuffers[agentId].length - 2000);
+  }
+  if (agentId === activeAgentId) renderTerminal();
+});
+
+api.onStatusUpdate((agentId, data) => {
+  if (data) {
+    agents[agentId] = data;
+    if (!activeAgentId) selectAgent(agentId);
+  }
+  updateHealthBar();
+  renderTabs();
+});
+
+api.onTrackerUpdate((state) => {
+  trackerState = state;
+  updateHealthBar();
+  populateRepoSelect();
+  if (sidePanelOpen) renderSidebar();
+});
+
+document.getElementById('terminal').addEventListener('scroll', (e) => {
+  const el = e.target;
+  autoScroll = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+});
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
+document.getElementById('btn-create').addEventListener('click', createAgent);
+document.getElementById('btn-toggle-panel').addEventListener('click', toggleSidePanel);
+
+document.getElementById('btn-save-token').addEventListener('click', () => {
+  const token = document.getElementById('input-gh-token').value.trim();
+  api.setGitHubToken(token);
+  document.getElementById('input-gh-token').value = '';
+  document.getElementById('input-gh-token').placeholder = '••••••••  (saved)';
+});
+
+document.getElementById('input-api-url').addEventListener('change', (e) => {
+  e.target.dataset.userEdited = 'true';
+  api.setApiUrl(e.target.value.trim());
+});
+
+document.getElementById('input-gh-token').addEventListener('focus', (e) => {
+  e.target.dataset.userEdited = 'true';
+});
+
+document.getElementById('btn-refresh-tracker').addEventListener('click', () => {
+  api.refreshTracker();
+});
+
+document.querySelectorAll('.side-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchSideTab(tab.dataset.sideTab));
+});
+
+refreshAgents();
+populateRepoSelect();
+api.getTracker().then(state => {
+  trackerState = state;
+  updateHealthBar();
+  populateRepoSelect();
+});
+setInterval(refreshAgents, 10_000);
+</script>
+
+</body>
+</html>
