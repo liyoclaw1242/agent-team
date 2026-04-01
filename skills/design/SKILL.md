@@ -30,11 +30,14 @@ Follow `workflow/design.md`:
 
 ## Rules
 
-| Rule | File |
-|------|------|
-| Accessibility | `rules/accessibility.md` |
-| Code Quality | `rules/code-quality.md` |
-| Git Hygiene | `rules/git.md` |
+| Rule | File | What it catches |
+|------|------|-----------------|
+| AI Design Audit | `rules/ai-design-audit.md` | AI's predictable visual errors: font overuse, low-contrast gray, center-everything, nested cards, flat buttons |
+| Accessibility | `rules/accessibility.md` | WCAG AA, semantic HTML, keyboard nav |
+| Code Quality | `rules/code-quality.md` | Lint, naming, dead code |
+| Git Hygiene | `rules/git.md` | Branch naming, commit format |
+
+The **AI Design Audit** is the most important rule for Design. It encodes a senior designer's "this looks wrong" instinct into a checkable list — inspired by Impeccable (Paul Bakaus, jQuery UI creator).
 
 ## Visual Review Checklist (Mode B)
 
