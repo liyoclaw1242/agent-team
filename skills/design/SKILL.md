@@ -49,6 +49,43 @@ When reviewing another agent's PR:
 | **Consistency** | Matches design system, same style across similar elements |
 | **Dark mode** | Intentional, not just inverted (if applicable) |
 
+## Inspiration Research
+
+Before implementing a non-trivial UI task, research current design trends and patterns. Human designers do this naturally — you should too.
+
+### Reference Sites
+
+| Site | URL | Best for |
+|------|-----|----------|
+| **Awwwards** | `https://www.awwwards.com/directory/` | Award-winning site design, cutting-edge layouts, interaction patterns |
+| **Mobbin** | `https://mobbin.com/discover/sites/latest` | Real-world UI patterns, component-level inspiration, latest trends |
+| **Variant Community** | `https://variant.com/community` | Design system patterns, community-shared components |
+
+### When to Research
+
+- **New page layout** — browse Awwwards for layout inspiration in the same domain
+- **New component** — check Mobbin for how real products implement the same pattern
+- **Design system decisions** — check Variant for community patterns
+
+### How to Research
+
+Use `WebFetch` to browse these sites. Look for:
+1. Visual patterns relevant to your task (e.g., "dashboard layout", "settings page", "card grid")
+2. Color and spacing approaches in similar products
+3. Interaction patterns (hover states, transitions, micro-animations)
+
+**Do NOT copy designs verbatim.** Extract principles: spacing ratios, color relationships, typography hierarchy, layout structure. Then apply them within the project's design system.
+
+### Research → Decision Record
+
+When inspiration leads to a design decision, record it in `design-decisions.md`:
+```markdown
+## Card Layout (2026-04-02)
+Inspired by: [site name] dashboard pattern
+Decision: 3-column grid with featured card spanning 2 columns
+Reason: Creates visual hierarchy without adding complexity
+```
+
 ## Design Techniques
 
 - Ring borders (not solid) for subtle containers

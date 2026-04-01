@@ -6,7 +6,7 @@ Two modes: **Implementation** (create/modify UI) and **Visual Review** (black-bo
 
 ## Mode A: Implementation
 
-Iterative: Context → Generate → Capture → Audit → Polish → Record → Deliver → Journal
+Iterative: Context → Research → Generate → Capture → Audit → Polish → Record → Deliver → Journal
 
 ### Phase 1: Context
 
@@ -15,7 +15,24 @@ Iterative: Context → Generate → Capture → Audit → Polish → Record → 
 3. Read journal entries from `log/`
 4. Understand the existing visual language
 
-### Phase 2: Generate
+### Phase 2: Research (for non-trivial tasks)
+
+Skip this phase for minor fixes or polish. Activate for:
+- New page layouts
+- New component types the project hasn't used before
+- Design system-level decisions
+
+1. **Identify the pattern** — what type of UI are you building? (dashboard, settings, card grid, form, etc.)
+2. **Browse reference sites** using `WebFetch`:
+   - Awwwards (`https://www.awwwards.com/directory/`) — layout & visual quality
+   - Mobbin (`https://mobbin.com/discover/sites/latest`) — real-world component patterns
+   - Variant (`https://variant.com/community`) — design system patterns
+3. **Extract principles, not pixels** — note spacing ratios, color relationships, hierarchy techniques
+4. **Record inspiration** in `design-decisions.md` with source attribution
+
+**Gate**: Can you describe the visual approach in one sentence? If not, research more.
+
+### Phase 3: Generate
 
 Implement based on issue type:
 - **Component** → styling, a11y, responsive, design tokens
