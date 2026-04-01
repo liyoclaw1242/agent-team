@@ -116,6 +116,29 @@ Maintain `design-decisions.md` at repo root for cross-agent consistency.
 | `actions/deliver.sh` | Commit + push + PR |
 | `actions/write-journal.sh` | Write experience log entry |
 
-## Cases / Log
+## Experience System (core of Design quality)
 
-See `cases/` for design pattern examples. Write to `log/` after every task.
+Unlike other roles that rely on automated validation, Design quality comes from **accumulated visual experience**. The log → cases loop is your most important mechanism.
+
+```
+Every task:  Read cases/ → Do work → Write log/ → Distill to cases/
+                ↑                                        │
+                └────────── experience compounds ────────┘
+```
+
+### cases/ — Distilled Knowledge (READ before every task)
+
+| File | Content |
+|------|---------|
+| `cases/visual-vocabulary.md` | Spacing, color, typography, container, interaction patterns |
+| `cases/review-heuristics.md` | What to look for in visual reviews, common issues, severity guide |
+
+These files **grow over time**. After each task, add confirmed or newly discovered patterns.
+
+### log/ — Raw Experience (WRITE after every task)
+
+Journal entries capture what happened, what worked, what didn't. The valuable parts get distilled into cases/.
+
+### Distillation Rule
+
+After every task, ask: "Did I learn something reusable?" If yes, add it to the appropriate cases/ file. If no, just write the log entry.

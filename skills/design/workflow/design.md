@@ -92,7 +92,38 @@ Fix issues found. Recapture + re-audit. Max 2 rounds.
 
 Update `design-decisions.md` with choices made.
 
-### Phase 7: Deliver + Journal
+### Phase 7: Deliver
+
+### Phase 8: Journal + Distill
+
+This is the most important phase for Design. Your quality grows from accumulated experience.
+
+1. **Write journal entry** to `log/` via `actions/write-journal.sh`
+2. **Distill to cases** — if you discovered or confirmed a reusable visual pattern:
+   - Add it to `cases/visual-vocabulary.md` under the right section
+   - If it's a review insight, add it to `cases/review-heuristics.md`
+3. **Update design-decisions.md** in the repo itself (project-specific)
+
+```
+log/2026-04-02-issue-69.md         ← raw experience (what happened)
+        │
+        ▼ distill
+cases/visual-vocabulary.md          ← reusable patterns (what we learned)
+cases/review-heuristics.md          ← review instincts (what to look for)
+        │
+        ▼ apply
+Next task reads cases/ first        ← experience compounds
+```
+
+**What to distill**:
+- A spacing/color/typography pattern that worked well → visual-vocabulary.md
+- A visual issue you almost missed in review → review-heuristics.md
+- A project-specific design choice → design-decisions.md (in repo)
+
+**What NOT to distill** (keep in log only):
+- Task-specific details ("I changed the button color on the settings page")
+- Temporary workarounds
+- Things that are already well-documented in cases/
 
 ---
 
@@ -198,6 +229,12 @@ gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
 
 If rejected: close PR, post feedback on the issue, reset status to `ready`.
 
-### Phase 5: Journal
+### Phase 5: Journal + Distill
 
-Record what visual patterns you observed in this repo.
+Same as Mode A Phase 8:
+
+1. Write journal entry — what you reviewed, what you found, what you approved/rejected
+2. Distill recurring visual issues to `cases/review-heuristics.md`
+3. If a PR introduced a good visual pattern, capture it in `cases/visual-vocabulary.md`
+
+Over time, your reviews get sharper because you're learning from every PR you see.
