@@ -71,7 +71,9 @@ export interface TrackerState {
 // ---------------------------------------------------------------------------
 
 export class Tracker extends EventEmitter {
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private fallbackTimer: ReturnType<typeof setInterval> | null = null;
+  private sseRequest: http.ClientRequest | null = null;
+  private sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _state: TrackerState = {
     api_url: "http://localhost:8000",
     github_token: null,
@@ -114,7 +116,6 @@ export class Tracker extends EventEmitter {
     this._state.github_token = token || null;
     this.saveConfig();
     this.emit("update");
-    // Refresh immediately with new token
     this.refresh();
   }
 
@@ -122,6 +123,9 @@ export class Tracker extends EventEmitter {
     this._state.api_url = url;
     this.saveConfig();
     this.emit("update");
+    // Reconnect SSE to new URL
+    this.disconnectSSE();
+    this.connectSSE();
     this.refresh();
   }
 
@@ -131,14 +135,106 @@ export class Tracker extends EventEmitter {
 
   start(): void {
     this.refresh();
-    this.timer = setInterval(() => this.refresh(), 30_000);
+    this.connectSSE();
+    // Fallback poll every 5 minutes (in case SSE drops silently)
+    this.fallbackTimer = setInterval(() => this.refresh(), 5 * 60_000);
   }
 
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer);
+      this.fallbackTimer = null;
     }
+    this.disconnectSSE();
+  }
+
+  // -----------------------------------------------------------------------
+  // SSE connection
+  // -----------------------------------------------------------------------
+
+  private connectSSE(): void {
+    const url = `${this._state.api_url}/events`;
+    const client = url.startsWith("https") ? https : http;
+
+    try {
+      this.sseRequest = client.get(url, { timeout: 0 }, (res) => {
+        if (res.statusCode !== 200) {
+          res.destroy();
+          this.scheduleSSEReconnect();
+          return;
+        }
+
+        let buffer = "";
+        res.setEncoding("utf-8");
+
+        res.on("data", (chunk: string) => {
+          buffer += chunk;
+          // Process complete SSE messages (double newline separated)
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() ?? "";
+          for (const part of parts) {
+            this.handleSSEMessage(part);
+          }
+        });
+
+        res.on("end", () => {
+          this.scheduleSSEReconnect();
+        });
+
+        res.on("error", () => {
+          this.scheduleSSEReconnect();
+        });
+      });
+
+      this.sseRequest.on("error", () => {
+        this.scheduleSSEReconnect();
+      });
+
+      this.sseRequest.on("timeout", () => {
+        this.sseRequest?.destroy();
+        this.scheduleSSEReconnect();
+      });
+    } catch {
+      this.scheduleSSEReconnect();
+    }
+  }
+
+  private disconnectSSE(): void {
+    if (this.sseReconnectTimer) {
+      clearTimeout(this.sseReconnectTimer);
+      this.sseReconnectTimer = null;
+    }
+    if (this.sseRequest) {
+      this.sseRequest.destroy();
+      this.sseRequest = null;
+    }
+  }
+
+  private scheduleSSEReconnect(): void {
+    this.sseRequest = null;
+    if (this.sseReconnectTimer) return; // Already scheduled
+    this.sseReconnectTimer = setTimeout(() => {
+      this.sseReconnectTimer = null;
+      this.connectSSE();
+    }, 5_000);
+  }
+
+  private handleSSEMessage(raw: string): void {
+    // Parse SSE format: "event: xxx\ndata: yyy"
+    let event = "";
+    let data = "";
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("event: ")) event = line.slice(7);
+      else if (line.startsWith("data: ")) data = line.slice(6);
+      else if (line.startsWith(": ")) continue; // comment / ping
+    }
+
+    if (event === "connected") return;
+    if (!event || !data) return;
+
+    // Any bounty board event → trigger a full refresh
+    // This is simpler and more reliable than incremental updates
+    this.refresh();
   }
 
   // -----------------------------------------------------------------------

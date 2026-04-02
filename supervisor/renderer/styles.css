@@ -34,6 +34,8 @@ body {
 
 .titlebar-actions {
   -webkit-app-region: no-drag;
+  display: flex;
+  gap: 4px;
 }
 
 .titlebar-btn {
@@ -48,15 +50,60 @@ body {
 }
 
 .titlebar-btn:hover { background: #333; color: #ccc; }
-.titlebar-btn.active { background: #1a2a1a; color: #4ade80; border-color: #2a3a2a; }
 
-/* ─── Layout ─── */
+/* ─── Layout: Bounties (left) | Terminal (center) | Repos (right) ─── */
 
 .layout {
   flex: 1;
   display: flex;
   overflow: hidden;
 }
+
+/* ─── Bounty panel (left, always visible) ─── */
+
+.bounty-panel {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #121212;
+  border-right: 1px solid #2a2a2a;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  font-weight: 600;
+}
+
+.bounty-summary {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-bottom: 1px solid #1e1e1e;
+  flex-shrink: 0;
+}
+
+.bounty-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* ─── Terminal (center) ─── */
 
 .main-panel {
   flex: 1;
@@ -65,367 +112,6 @@ body {
   overflow: hidden;
   min-width: 0;
 }
-
-/* ─── Side panel ─── */
-
-.side-panel {
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: #121212;
-  border-left: 1px solid #2a2a2a;
-  overflow: hidden;
-}
-
-.side-tab-bar {
-  display: flex;
-  align-items: center;
-  background: #181818;
-  border-bottom: 1px solid #2a2a2a;
-  height: 30px;
-  flex-shrink: 0;
-  padding: 0 4px;
-  gap: 2px;
-}
-
-.side-tab {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 10px;
-  font-family: inherit;
-  padding: 4px 10px;
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.side-tab:hover { color: #aaa; background: #222; }
-.side-tab-active { color: #e0e0e0; background: #2a2a2a; }
-
-.side-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.side-section {
-  padding: 12px;
-  border-bottom: 1px solid #1e1e1e;
-}
-
-.side-summary {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  align-items: center;
-}
-
-.side-header {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #555;
-  font-weight: 500;
-  margin-bottom: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.side-hint {
-  font-size: 9px;
-  color: #444;
-  margin-top: 4px;
-}
-
-/* Repo detail sections */
-
-.repo-section { padding: 10px 12px; }
-
-.repo-links {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 8px;
-  align-items: baseline;
-}
-
-.repo-link {
-  font-size: 11px;
-  color: #60a5fa;
-  text-decoration: none;
-}
-
-.repo-link:first-child {
-  font-weight: 600;
-  font-size: 12px;
-  color: #ccc;
-}
-
-.repo-link:hover { text-decoration: underline; }
-
-.repo-sub-header {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #444;
-  margin: 8px 0 4px 0;
-}
-
-.repo-prs, .repo-issues {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-/* Clickable items */
-
-.side-link {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  cursor: pointer;
-}
-
-.side-link:hover {
-  border-color: #444;
-  background: #1e1e1e;
-}
-
-.side-field {
-  margin-bottom: 8px;
-}
-
-.side-field label {
-  display: block;
-  font-size: 10px;
-  color: #555;
-  margin-bottom: 3px;
-}
-
-.side-field input {
-  width: 100%;
-  background: #1a1a1a;
-  color: #ccc;
-  border: 1px solid #2a2a2a;
-  padding: 4px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-family: inherit;
-  outline: none;
-}
-
-.side-field input:focus { border-color: #444; }
-
-.token-row {
-  display: flex;
-  gap: 4px;
-}
-
-.token-row input { flex: 1; }
-
-.side-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.side-item {
-  padding: 6px 8px;
-  background: #181818;
-  border-radius: 4px;
-  border: 1px solid #1e1e1e;
-}
-
-.side-item:hover { border-color: #2a2a2a; }
-
-.side-item-title {
-  font-size: 11px;
-  color: #ccc;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.side-item-meta {
-  display: flex;
-  gap: 4px;
-  margin-top: 3px;
-  flex-wrap: wrap;
-}
-
-.side-muted {
-  font-size: 10px;
-  color: #555;
-}
-
-.badge {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-weight: 600;
-}
-
-.badge-green  { background: #0a2e1a; color: #4ade80; }
-.badge-yellow { background: #2e2a0a; color: #facc15; }
-.badge-blue   { background: #0a1a2e; color: #60a5fa; }
-.badge-purple { background: #1a0a2e; color: #c084fc; }
-
-.btn-icon {
-  background: none;
-  border: none;
-  color: #555;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0 2px;
-}
-
-.btn-icon:hover { color: #ccc; }
-
-/* ─── Tab bar ─── */
-
-.tab-bar {
-  display: flex;
-  align-items: center;
-  background: #181818;
-  border-bottom: 1px solid #2a2a2a;
-  height: 34px;
-  flex-shrink: 0;
-  overflow-x: auto;
-  position: relative;
-  z-index: 10;
-}
-
-.tabs {
-  display: flex;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tabs::-webkit-scrollbar { display: none; }
-
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 34px;
-  cursor: pointer;
-  border-right: 1px solid #222;
-  white-space: nowrap;
-  font-size: 11px;
-  color: #888;
-  transition: background 0.1s;
-  flex-shrink: 0;
-}
-
-.tab:hover { background: #222; }
-
-.tab-active {
-  background: #0e0e0e;
-  color: #e0e0e0;
-  border-bottom: 2px solid #4ade80;
-}
-
-.tab-dead { opacity: 0.5; }
-
-.tab-dot { font-size: 16px; line-height: 1; }
-.dot-ok { color: #4ade80; }
-.dot-info { color: #60a5fa; }
-.dot-warn { color: #facc15; }
-.dot-error { color: #f87171; }
-.dot-dead { color: #555; }
-
-.tab-health {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.health-alive {
-  background: #4ade80;
-  box-shadow: 0 0 4px #4ade80;
-  animation: pulse-health 2s ease-in-out infinite;
-}
-
-.health-dead {
-  background: #555;
-}
-
-@keyframes pulse-health {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.tab-label { font-weight: 600; }
-.tab-uptime { color: #666; font-size: 10px; font-variant-numeric: tabular-nums; }
-.tab-id { color: #555; font-size: 10px; }
-
-.tab-close {
-  background: none;
-  border: none;
-  color: #555;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  border-radius: 2px;
-}
-
-.tab-close:hover { background: #333; color: #f87171; }
-
-.tab-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-}
-
-select {
-  background: #222;
-  color: #ccc;
-  border: 1px solid #333;
-  padding: 3px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-}
-
-select:hover { border-color: #444; }
-
-.btn { cursor: pointer; font-family: inherit; }
-
-.btn-create {
-  background: #1a2e1a;
-  color: #4ade80;
-  border: 1px solid #2a3a2a;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.btn-create:hover { background: #2a3a2a; color: #6afe90; }
-
-.btn-sm {
-  background: #222;
-  color: #888;
-  border: 1px solid #333;
-  padding: 3px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-}
-
-.btn-sm:hover { background: #333; color: #ccc; }
-
-/* ─── Terminal ─── */
 
 .terminal {
   flex: 1;
@@ -461,7 +147,454 @@ select:hover { border-color: #444; }
   color: #4ade80;
 }
 
-/* Log lines */
+/* ─── Repos + Agents panel (right, accordion) ─── */
+
+.repos-panel {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #161616;
+  border-left: 1px solid #2a2a2a;
+  overflow: hidden;
+  order: 3; /* Ensure it stays on the right */
+}
+
+.repos-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+/* ─── Repo group (accordion item) ─── */
+
+.repo-group {
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.repo-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.repo-group-header:hover { background: #1e1e1e; }
+
+.repo-group-chevron {
+  font-size: 9px;
+  color: #555;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.repo-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.repo-group-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.repo-group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-group-summary {
+  font-size: 9px;
+  color: #555;
+}
+
+.repo-group-add {
+  background: none;
+  border: none;
+  color: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.repo-group-header:hover .repo-group-add { color: #555; }
+.repo-group-add:hover { color: #4ade80 !important; background: #1a2e1a; }
+
+.repo-group-body {
+  padding: 0 0 6px 0;
+}
+
+.repo-group-empty {
+  padding: 4px 10px 4px 24px;
+  font-size: 10px;
+  color: #333;
+  font-style: italic;
+}
+
+/* Repo detail links */
+
+.repo-detail-links {
+  display: flex;
+  gap: 8px;
+  padding: 2px 10px 4px 24px;
+}
+
+.repo-detail-links a {
+  font-size: 10px;
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.repo-detail-links a:hover { text-decoration: underline; }
+
+/* Repo detail section titles */
+
+.repo-detail-section-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #444;
+  padding: 6px 10px 2px 24px;
+}
+
+/* Repo detail items (issues) */
+
+.repo-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 24px;
+  font-size: 11px;
+  color: #888;
+}
+
+.repo-detail-item:hover { background: #1e1e1e; }
+
+.repo-detail-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Agent tab (within repo accordion) ─── */
+
+.agent-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 24px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #888;
+  border-left: 2px solid transparent;
+  transition: background 0.1s;
+  position: relative;
+}
+
+.agent-tab:hover { background: #1e1e1e; }
+
+.agent-tab-active {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border-left-color: #4ade80;
+}
+
+.agent-tab-dead { opacity: 0.45; }
+
+.agent-tab-health {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-alive {
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade80;
+  animation: pulse-health 2s ease-in-out infinite;
+}
+
+.health-dead {
+  background: #555;
+}
+
+@keyframes pulse-health {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.agent-tab-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.agent-tab-role {
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-tab-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  color: #555;
+}
+
+.agent-tab-id {
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
+
+.agent-tab-uptime {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.agent-tab-status {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dot-ok { color: #4ade80; }
+.dot-info { color: #60a5fa; }
+.dot-warn { color: #facc15; }
+.dot-error { color: #f87171; }
+.dot-dead { color: #555; }
+
+.agent-tab-close {
+  background: none;
+  border: none;
+  color: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  border-radius: 2px;
+  position: absolute;
+  right: 6px;
+}
+
+.agent-tab:hover .agent-tab-close { color: #555; }
+.agent-tab-close:hover { background: #333; color: #f87171 !important; }
+
+/* ─── Shared item styles ─── */
+
+.side-item {
+  padding: 5px 8px;
+  margin: 1px 6px;
+  background: #181818;
+  border-radius: 4px;
+  border: 1px solid #1e1e1e;
+}
+
+.side-item:hover { border-color: #2a2a2a; background: #1c1c1c; }
+
+.side-item-title {
+  font-size: 11px;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-item-meta {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.side-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  cursor: pointer;
+}
+
+.side-muted {
+  font-size: 10px;
+  color: #555;
+}
+
+.badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.badge-green  { background: #0a2e1a; color: #4ade80; }
+.badge-yellow { background: #2e2a0a; color: #facc15; }
+.badge-blue   { background: #0a1a2e; color: #60a5fa; }
+.badge-purple { background: #1a0a2e; color: #c084fc; }
+
+.btn { cursor: pointer; font-family: inherit; }
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.btn-icon:hover { color: #ccc; }
+
+.btn-sm {
+  background: #222;
+  color: #888;
+  border: 1px solid #333;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.btn-sm:hover { background: #333; color: #ccc; }
+
+/* ─── Settings fields ─── */
+
+.side-field {
+  margin-bottom: 8px;
+}
+
+.side-field label {
+  display: block;
+  font-size: 10px;
+  color: #555;
+  margin-bottom: 3px;
+}
+
+.side-field input {
+  width: 100%;
+  background: #1a1a1a;
+  color: #ccc;
+  border: 1px solid #2a2a2a;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+
+.side-field input:focus { border-color: #444; }
+
+.token-row {
+  display: flex;
+  gap: 4px;
+}
+
+.token-row input { flex: 1; }
+
+.side-hint {
+  font-size: 9px;
+  color: #444;
+  margin-top: 4px;
+}
+
+/* ─── Settings modal ─── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.modal-body {
+  padding: 14px;
+}
+
+/* ─── Role picker popup ─── */
+
+.role-picker {
+  position: fixed;
+  z-index: 100;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.role-picker-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  margin-bottom: 6px;
+  padding: 0 2px;
+}
+
+.role-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.role-picker-btn {
+  background: #252525;
+  color: #aaa;
+  border: 1px solid #333;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.role-picker-btn:hover { background: #1a2e1a; color: #4ade80; border-color: #2a3a2a; }
+
+/* ─── Log lines ─── */
 
 .log-line { display: flex; padding: 0 12px; min-height: 20px; }
 .log-line:hover { background: #151515; }
