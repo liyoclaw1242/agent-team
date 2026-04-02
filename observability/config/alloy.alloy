@@ -1,0 +1,42 @@
+// Grafana Alloy — Faro receiver for frontend observability
+// Replaces Sentry: receives browser errors, web vitals, traces
+
+faro.receiver "frontend" {
+  server {
+    listen_address = "0.0.0.0"
+    listen_port    = 12347
+
+    cors_allowed_origins = [env("FARO_CORS_ALLOWED_ORIGINS")]
+
+    rate_limiting {
+      rate = 100
+    }
+  }
+
+  sourcemaps {
+    download = false
+  }
+
+  output {
+    logs   = [loki.write.faro.receiver]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// Forward Faro logs → Loki
+loki.write "faro" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// Forward Faro traces → Tempo via OTel Collector
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "otel-collector:4317"
+
+    tls {
+      insecure = true
+    }
+  }
+}
