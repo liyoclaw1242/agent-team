@@ -19,8 +19,39 @@ Each phase has a gate. Do not skip ahead.
 2. Determine test strategy — what exists, what's needed.
 3. Check for blockers (missing deps, unclear spec).
 4. Ambiguous spec → conservative interpretation + comment.
+5. **Spec feasibility check** — does the spec conflict with:
+   - Existing DB schema or API contracts?
+   - Performance rules? (e.g. spec implies N+1 pattern)
+   - Security rules? (e.g. spec exposes data without auth check)
+   - An existing module that already does this? (extend vs create new)
 
-**Gate**: Clear list of files + tests?
+### If spec has problems → feedback to ARCH
+
+You know the codebase deeper than ARCH. If the spec's approach conflicts with what exists or violates your rules, feed back:
+
+```bash
+# 1. Comment with technical insight
+gh issue comment {N} --repo {REPO_SLUG} \
+  --body "## Technical Feedback from \`{AGENT_ID}\`
+
+### Conflict
+{what the spec asks} vs {what the codebase actually has/needs}.
+
+### Suggestion
+{your recommended approach}
+
+### Affected
+{which parts of the spec need revision}"
+
+# 2. Hand back to ARCH
+curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "arch"}'
+```
+
+Move on to next task. Don't wait.
+
+**Gate**: Spec is feasible. If not, feed back and move on.
 
 ## Phase 3: Implement
 

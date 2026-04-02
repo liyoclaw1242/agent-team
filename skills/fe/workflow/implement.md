@@ -50,8 +50,39 @@ grep -rn "ComponentName" --include="*.tsx" --include="*.ts" src/
    - Are there integration tests that need updating?
 3. **Check for blockers** — missing API endpoints, unclear design spec, dependency on other tasks.
 4. **Conservative scope** — if the spec says "add a button", add a button. Don't redesign the page.
+5. **Spec feasibility check** — does the spec conflict with:
+   - The project's tech stack constraints? (e.g. Server Components can't use client-side APIs)
+   - Existing code that the spec didn't account for? (e.g. an API already exists)
+   - Your role's rules? (e.g. visual-logic-separation violated by the spec's design)
+   - A better approach you know from your codebase knowledge?
 
-**Gate**: Clear file list + test plan. No ambiguity.
+### If spec has problems → feedback to ARCH
+
+Don't force an implementation that contradicts what you know. You understand the codebase deeper than ARCH does. Feed back:
+
+```bash
+# 1. Comment with your technical insight
+gh issue comment {N} --repo {REPO_SLUG} \
+  --body "## Technical Feedback from \`{AGENT_ID}\`
+
+### Conflict
+{what the spec asks} conflicts with {what you know about the codebase}.
+
+### Suggestion
+{your recommended approach, with reasoning}
+
+### Affected
+{which parts of the spec need to change}"
+
+# 2. Hand back to ARCH for re-evaluation
+curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "arch"}'
+```
+
+Then move on to your next task. Don't wait for ARCH — they'll update the spec and it will come back to you.
+
+**Gate**: Spec is feasible with your tech stack. If not, feed back and move on.
 
 ---
 
