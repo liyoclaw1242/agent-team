@@ -6,7 +6,7 @@ set -e
 REPO_SLUG="${1:?Repo slug required}"
 ISSUE_N="${2:?Issue number required}"
 AGENT_ID="${3:?Agent ID required}"
-ROLE="${4:-be}"
+ROLE="${4:-fe}"
 
 JOURNAL_DIR="$HOME/.agent-team/journal/$(echo "$REPO_SLUG" | tr '/' '-')"
 mkdir -p "$JOURNAL_DIR"

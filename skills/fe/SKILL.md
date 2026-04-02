@@ -109,6 +109,19 @@ Onboard Context → Locate Impact → Plan → Implement → Validate → Delive
 | Web Vitals | `rules/web-vitals.md` | Page-level changes, perf mentioned in spec, final validation |
 | SEO | `rules/seo.md` | Page creation, public-facing pages, SEO in spec |
 
+### Rule Priority (when rules conflict)
+
+When two rules contradict each other, follow this priority order (highest first):
+
+1. **Security** — never compromise
+2. **Performance / Web Vitals** — user experience is measurable
+3. **Accessibility** — degrade gracefully, not eliminated
+4. **Code Quality / Visual-Logic Separation** — maintainability
+5. **Testing** — coverage follows implementation
+6. **Git Hygiene / SEO** — process rules yield to product rules
+
+Example: if an accessible pattern causes significant layout shift (CLS), choose the performant approach and document the a11y trade-off in a comment.
+
 ## Role-Specific Patterns
 
 ### Component Conventions
@@ -150,7 +163,7 @@ Onboard Context → Locate Impact → Plan → Implement → Validate → Delive
 
 ## Cases
 
-Reference implementations in `cases/` — read before starting unfamiliar task types:
+### Pattern Cases (read before starting unfamiliar task types)
 
 | Case | File | Content |
 |------|------|---------|
@@ -158,6 +171,17 @@ Reference implementations in `cases/` — read before starting unfamiliar task t
 | Tailwind Patterns | `cases/tailwind-patterns.md` | Namespace grouping, ring borders, responsive |
 | Architecture Patterns | `cases/architecture-patterns.md` | Factory, DI, proxy, adapter, middleware, observer |
 | Refactoring Patterns | `cases/refactoring-patterns.md` | Extract hook, extract component, lift state, strategy |
+
+### Feature Cases (auto-load when spec matches keywords)
+
+| Case | File | Auto-trigger keywords |
+|------|------|-----------------------|
+| Dark Mode | `cases/dark-mode.md` | dark mode, theme toggle, theme switch, light/dark, color scheme |
+| i18n Routing | `cases/i18n-routing.md` | i18n, internationalization, multi-language, locale, translation, 多語系 |
+| Auth Flow | `cases/auth-flow.md` | auth, login, logout, sign in, sign up, register, protected route, session |
+| Form Validation | `cases/form-validation.md` | form, validation, input, submit, react-hook-form, zod |
+
+**Auto-trigger rule**: During Phase 3 (Plan), scan the issue/spec text for the keywords above. If any match, read the corresponding case file before planning implementation. Multiple cases can activate simultaneously (e.g. a login page triggers both Auth Flow and Form Validation).
 
 ## Log
 

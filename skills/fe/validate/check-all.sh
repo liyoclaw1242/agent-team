@@ -18,7 +18,11 @@ fi
 # 2. Lint
 echo "── Lint ──"
 if [ -f "package.json" ] && grep -q '"lint"' package.json 2>/dev/null; then
-  pnpm lint 2>&1 || npm run lint 2>&1 || { echo "FAIL: Lint failed"; FAILURES=$((FAILURES+1)); }
+  if command -v pnpm &>/dev/null && [ -f "pnpm-lock.yaml" ]; then
+    pnpm lint 2>&1 || { echo "FAIL: Lint failed"; FAILURES=$((FAILURES+1)); }
+  else
+    npm run lint 2>&1 || { echo "FAIL: Lint failed"; FAILURES=$((FAILURES+1)); }
+  fi
 else
   echo "SKIP: No lint script"
 fi
@@ -26,7 +30,11 @@ fi
 # 3. Tests
 echo "── Tests ──"
 if [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
-  pnpm test 2>&1 || npm test 2>&1 || { echo "FAIL: Tests failed"; FAILURES=$((FAILURES+1)); }
+  if command -v pnpm &>/dev/null && [ -f "pnpm-lock.yaml" ]; then
+    pnpm test 2>&1 || { echo "FAIL: Tests failed"; FAILURES=$((FAILURES+1)); }
+  else
+    npm test 2>&1 || { echo "FAIL: Tests failed"; FAILURES=$((FAILURES+1)); }
+  fi
 else
   echo "SKIP: No test script"
 fi
@@ -91,9 +99,12 @@ echo "── Git ──"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 echo "Branch: $BRANCH"
 
-git log origin/main..HEAD --format="%s" 2>/dev/null | while read msg; do
-  echo "$msg" | grep -qE "^(feat|fix|docs|design|test|chore):" || echo "FAIL: Bad commit message: $msg"
-done
+BAD_COMMITS=$(git log origin/main..HEAD --format="%s" 2>/dev/null | grep -cvE "^(feat|fix|docs|design|test|chore):" || true)
+if [ "$BAD_COMMITS" -gt 0 ] 2>/dev/null; then
+  echo "FAIL: $BAD_COMMITS commit(s) with bad message format:"
+  git log origin/main..HEAD --format="%s" 2>/dev/null | grep -vE "^(feat|fix|docs|design|test|chore):"
+  FAILURES=$((FAILURES+1))
+fi
 
 echo "═══ Results: $FAILURES failure(s) ═══"
 exit $FAILURES

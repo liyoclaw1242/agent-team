@@ -82,6 +82,14 @@ curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
 
 Then move on to your next task. Don't wait for ARCH — they'll update the spec and it will come back to you.
 
+6. **Auto-load Feature Cases** — scan the issue/spec text for these keywords:
+   - dark mode, theme toggle, theme switch, light/dark, color scheme → read `cases/dark-mode.md`
+   - i18n, internationalization, multi-language, locale, translation, 多語系 → read `cases/i18n-routing.md`
+   - auth, login, logout, sign in, sign up, register, protected route, session → read `cases/auth-flow.md`
+   - form, validation, input, submit, react-hook-form, zod → read `cases/form-validation.md`
+
+   Multiple cases can activate simultaneously (e.g. a login page triggers both Auth Flow and Form Validation). Use the case as your implementation baseline, then adapt to the project's existing patterns.
+
 **Gate**: Spec is feasible with your tech stack. If not, feed back and move on.
 
 ---

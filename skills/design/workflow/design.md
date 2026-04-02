@@ -5,6 +5,8 @@ Three modes:
 - **Mode B: Code-Direct** — implement directly in code (minor changes, design already decided)
 - **Mode C: Visual Review** — black-box validation of other agents' PRs
 
+See `SKILL.md` → Mode Routing for how to choose.
+
 ---
 
 ## Mode A: Design-First (new pages, layouts, major UI changes)
@@ -17,14 +19,15 @@ Canvas sketch → Visual review → Code implementation
 2. Read `design-decisions.md` if it exists
 3. Read journal entries from `log/`
 4. Read `cases/visual-vocabulary.md` for established patterns
+5. Scan spec for auto-trigger keywords (see `SKILL.md` → Cases → Auto-trigger Rule)
 
 ### Phase 2: Research (for non-trivial tasks)
 
 1. Identify the pattern type (dashboard, settings, card grid, form, etc.)
 2. Browse reference sites using `WebFetch`:
-   - Awwwards — layout & visual quality
-   - Mobbin — real-world component patterns
-   - Variant — design system patterns
+   - Awwwards (`https://www.awwwards.com/directory/`) — layout & visual quality
+   - Mobbin (`https://mobbin.com/discover/sites/latest`) — real-world component patterns
+   - Variant (`https://variant.com/community`) — design system patterns
 3. Extract principles, not pixels
 4. Record inspiration in `design-decisions.md`
 
@@ -65,7 +68,7 @@ Now translate the approved sketch into React/Tailwind:
 
 1. Create branch: `actions/setup-branch.sh`
 2. Implement following the sketch as your visual target
-3. Apply design techniques (ring borders, spacing scale, etc.)
+3. Apply patterns from `cases/visual-vocabulary.md` (ring borders, spacing scale, etc.)
 4. Handle all component states (loading, error, empty)
 
 ### Phase 5: Capture + Compare
@@ -79,16 +82,26 @@ Now translate the approved sketch into React/Tailwind:
    - Does the implementation match the sketch?
    - Any details lost in translation?
 
-### Phase 6: Audit
+### Phase 6: Validate
 
-Review screenshots against:
-- `rules/ai-design-audit.md` checklist
-- Accessibility rules
-- Visual quality (shadows, spacing, typography hierarchy)
+Run the design checklist gate:
+
+```bash
+bash validate/check-all.sh implement
+```
+
+Review every item. Fix failures against:
+- `rules/ai-design-audit.md`
+- `rules/accessibility.md`
+- `rules/responsive.md`
+
+Max 2 fix-and-revalidate rounds.
+
+**Gate**: All checklist items confirmed.
 
 ### Phase 7: Polish
 
-Fix issues. Recapture. Max 2 rounds.
+Fix remaining issues from validation. Recapture screenshots to confirm.
 
 ### Phase 8: Record
 
@@ -97,9 +110,17 @@ Fix issues. Recapture. Max 2 rounds.
 
 ### Phase 9: Deliver
 
+1. Run `actions/deliver.sh` — commit + push + open PR
+2. Update bounty status:
+   ```bash
+   curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
+     -H "Content-Type: application/json" -d '{"status": "review"}'
+   curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
+   ```
+
 ### Phase 10: Journal + Distill
 
-1. Write journal entry to `log/`
+1. Write journal entry to `log/` via `actions/write-journal.sh`
 2. Distill reusable patterns to `cases/visual-vocabulary.md`
 3. Distill review insights to `cases/review-heuristics.md`
 
@@ -107,12 +128,16 @@ Fix issues. Recapture. Max 2 rounds.
 
 ## Mode B: Code-Direct (minor changes, tweaks, polish)
 
-For tasks where the design is already decided (bug fixes, spacing adjustments, color changes):
+For tasks where the design is already decided (bug fixes, spacing adjustments, color changes).
 
 Skip Pencil. Go straight to code:
-Context → Implement → Capture → Audit → Polish → Deliver → Journal
 
-Same as Mode A phases 4-10, without the sketch step.
+1. **Context** — same as Mode A Phase 1
+2. **Implement** — same as Mode A Phase 4 (create branch, code, handle states)
+3. **Capture** — screenshot at 3 breakpoints
+4. **Validate** — run `bash validate/check-all.sh implement`, review all items
+5. **Deliver** — same as Mode A Phase 9
+6. **Journal** — same as Mode A Phase 10
 
 ---
 
@@ -138,16 +163,22 @@ gh pr diff {PR_NUMBER} --repo {REPO_SLUG} | grep -E 'app/.*page\.(tsx|ts)' | hea
 bash actions/capture-screenshots.sh http://localhost:3000 /tmp/design-review / /route1 /route2
 ```
 
-### Phase 3: Visual Review
+### Phase 3: Validate
 
-Read each screenshot and evaluate:
+Run the review checklist gate:
+
+```bash
+bash validate/check-all.sh review
+```
+
+Read each screenshot and confirm every item in the checklist:
 
 - **Layout**: hierarchy, spacing, alignment, responsive
 - **Typography**: heading scale, readability, line-height
 - **Color**: palette cohesion, contrast, interactive distinction
 - **Interaction**: buttons clickable, links distinguishable, disabled states
 - **Consistency**: matches design system, no one-off styling
-- **Dark mode**: intentional, not inverted
+- **Dark mode**: intentional, not inverted (if applicable)
 
 ### Phase 4: Corrective Sketch (if rejecting)
 
@@ -162,7 +193,7 @@ pencil --out /tmp/correction.pen \
 pencil --in /tmp/correction.pen --export /tmp/should-look-like.png --export-scale 2
 ```
 
-Attach both the "current" screenshot and the "should look like" export in your review comment. This gives the FE agent a concrete visual target.
+Attach both the "current" screenshot and the "should look like" export in your review comment.
 
 ### Phase 5: Verdict
 
