@@ -6,6 +6,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
 <title>Agent Team</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="xterm.css">
+<script src="xterm.js"></script>
+<script src="addon-fit.js"></script>
 </head>
 <body>
 
@@ -105,48 +108,73 @@ const api = window.bridge;
 // ---------------------------------------------------------------------------
 let activeAgentId = null;
 let agents = {};
-let logBuffers = {};
-let autoScroll = true;
 let trackerState = null;
 let sidePanelOpen = false;
+
+// xterm.js instances per agent
+const terminals = {};  // agentId -> { term, fitAddon }
 
 // ---------------------------------------------------------------------------
 // Terminal rendering
 // ---------------------------------------------------------------------------
 
+function formatUptime(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return `${h}h${rm > 0 ? rm + 'm' : ''}`;
+}
+
+let lastTabKey = '';
+
 function renderTabs() {
   const tabsEl = document.getElementById('tabs');
   const agentList = Object.values(agents);
+
+  // Only rebuild DOM when structure actually changes (new/removed agent, status change, cycle change, active switch)
+  const tabKey = agentList.map(a => `${a.agent_id}:${a.status}:${a.cycle}`).join(',') + '|' + activeAgentId;
+  if (tabKey === lastTabKey) return;
+  lastTabKey = tabKey;
 
   tabsEl.innerHTML = agentList.map(a => {
     const isActive = a.agent_id === activeAgentId;
     const dot = statusDot(a.status);
     const repoShort = (a.repo || '').split('/')[1] || '';
     const label = `${a.role.toUpperCase()} ${repoShort} #${a.cycle || 0}`;
+    const alive = !['dead', 'error'].includes(a.status);
+    const healthClass = alive ? 'health-alive' : 'health-dead';
+    const uptime = a.created_at ? formatUptime(Date.now() - a.created_at) : '';
     return `
       <div class="tab ${isActive ? 'tab-active' : ''} ${a.status === 'dead' ? 'tab-dead' : ''}"
            data-agent-id="${a.agent_id}">
+        <span class="tab-health ${healthClass}"></span>
         <span class="tab-dot ${dot}">&bull;</span>
         <span class="tab-label">${label}</span>
+        <span class="tab-uptime">${uptime}</span>
         <span class="tab-id">${a.agent_id.split('-').slice(-1)[0]}</span>
         <button class="tab-close" data-close-agent="${a.agent_id}">&times;</button>
       </div>
     `;
   }).join('');
 
-  tabsEl.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-      if (e.target.classList.contains('tab-close')) return;
-      selectAgent(tab.dataset.agentId);
-    });
-  });
-  tabsEl.querySelectorAll('.tab-close').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      stopAgent(btn.dataset.closeAgent);
-    });
-  });
 }
+
+// Event delegation for tabs — bind once, survives re-renders
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const closeBtn = e.target.closest('[data-close-agent]');
+  if (closeBtn) {
+    e.stopPropagation();
+    const agentId = closeBtn.dataset.closeAgent;
+    console.log('[tabs] close clicked:', agentId);
+    stopAgent(agentId);
+    return;
+  }
+  const tab = e.target.closest('.tab');
+  if (tab) selectAgent(tab.dataset.agentId);
+});
 
 function statusDot(status) {
   if (['polling', 'working', 'sleeping'].includes(status)) return 'dot-ok';
@@ -156,11 +184,42 @@ function statusDot(status) {
   return 'dot-dead';
 }
 
-function renderTerminal() {
-  const terminal = document.getElementById('terminal');
+function getOrCreateTerminal(agentId) {
+  if (terminals[agentId]) return terminals[agentId];
 
-  if (!activeAgentId || !logBuffers[activeAgentId] || logBuffers[activeAgentId].length === 0) {
-    terminal.innerHTML = `
+  const term = new window.Terminal({
+    theme: {
+      background: '#0e0e0e',
+      foreground: '#e0e0e0',
+      cursor: '#4ade80',
+      selectionBackground: '#4ade8033',
+    },
+    fontSize: 12,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    cursorBlink: true,
+    scrollback: 5000,
+    convertEol: true,
+  });
+
+  const fitAddon = new window.FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+
+  // Forward keyboard input to PTY
+  term.onData((data) => {
+    api.writeAgentInput(agentId, data);
+  });
+
+  terminals[agentId] = { term, fitAddon };
+  return terminals[agentId];
+}
+
+function renderTerminal() {
+  const container = document.getElementById('terminal');
+
+  if (!activeAgentId) {
+    // Hide all xterm instances, show welcome
+    Object.values(terminals).forEach(t => { if (t.term.element) t.term.element.parentElement.style.display = 'none'; });
+    container.innerHTML = `
       <div class="terminal-welcome">
         <div class="welcome-title">Agent Team Supervisor</div>
         <div class="welcome-hint">Select a role and press <span class="kbd">+</span> to create an agent</div>
@@ -168,28 +227,35 @@ function renderTerminal() {
     return;
   }
 
-  const logs = logBuffers[activeAgentId];
-  terminal.innerHTML = logs.map(entry => {
-    const time = new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false });
-    const cls = `log-${entry.type}`;
-    const prefix = logPrefix(entry.type);
-    const text = escapeHtml(entry.text);
-    return `<div class="log-line ${cls}"><span class="log-time">${time}</span><span class="log-prefix">${prefix}</span><span class="log-text">${text}</span></div>`;
-  }).join('');
+  // Remove welcome if present
+  const welcome = container.querySelector('.terminal-welcome');
+  if (welcome) welcome.remove();
 
-  if (autoScroll) terminal.scrollTop = terminal.scrollHeight;
-}
+  const { term, fitAddon } = getOrCreateTerminal(activeAgentId);
 
-function logPrefix(type) {
-  switch (type) {
-    case 'system':      return '  SYS';
-    case 'assistant':   return '   AI';
-    case 'tool_call':   return '  RUN';
-    case 'tool_result': return '  OUT';
-    case 'status':      return ' STAT';
-    case 'error':       return '  ERR';
-    default:            return '     ';
+  // Hide all other terminals
+  Object.entries(terminals).forEach(([id, t]) => {
+    if (t.term.element && t.term.element.parentElement) {
+      t.term.element.parentElement.style.display = id === activeAgentId ? '' : 'none';
+    }
+  });
+
+  // Mount if not yet attached
+  if (!term.element) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'xterm-wrapper';
+    wrapper.dataset.agentId = activeAgentId;
+    container.appendChild(wrapper);
+    term.open(wrapper);
+    fitAddon.fit();
+  } else if (!term.element.parentElement.parentElement) {
+    // Re-attach if removed
+    container.appendChild(term.element.parentElement);
   }
+
+  term.element.parentElement.style.display = '';
+  fitAddon.fit();
+  term.focus();
 }
 
 function escapeHtml(text) {
@@ -366,9 +432,6 @@ function renderReposTab() {
 
 async function selectAgent(id) {
   activeAgentId = id;
-  if (!logBuffers[id]) {
-    logBuffers[id] = await api.getAgentLogs(id);
-  }
   renderTabs();
   renderTerminal();
 }
@@ -405,7 +468,13 @@ async function populateRepoSelect() {
 
 async function stopAgent(id) {
   await api.stopAgent(id);
-  delete logBuffers[id];
+  if (terminals[id]) {
+    const wrapper = terminals[id].term.element?.parentElement;
+    terminals[id].term.dispose();
+    if (wrapper) wrapper.remove();
+    delete terminals[id];
+  }
+  lastTabKey = ''; // Force tab rebuild
   delete agents[id];
   if (activeAgentId === id) {
     const remaining = Object.keys(agents);
@@ -443,13 +512,10 @@ function switchSideTab(tabName) {
 // Real-time events
 // ---------------------------------------------------------------------------
 
-api.onLogEntry((agentId, entry) => {
-  if (!logBuffers[agentId]) logBuffers[agentId] = [];
-  logBuffers[agentId].push(entry);
-  if (logBuffers[agentId].length > 2000) {
-    logBuffers[agentId].splice(0, logBuffers[agentId].length - 2000);
-  }
-  if (agentId === activeAgentId) renderTerminal();
+// PTY data → xterm
+api.onPtyData((agentId, data) => {
+  const t = getOrCreateTerminal(agentId);
+  t.term.write(data);
 });
 
 api.onStatusUpdate((agentId, data) => {
@@ -468,10 +534,12 @@ api.onTrackerUpdate((state) => {
   if (sidePanelOpen) renderSidebar();
 });
 
-document.getElementById('terminal').addEventListener('scroll', (e) => {
-  const el = e.target;
-  autoScroll = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
-});
+// Resize xterm when terminal container resizes
+new ResizeObserver(() => {
+  if (activeAgentId && terminals[activeAgentId]) {
+    terminals[activeAgentId].fitAddon.fit();
+  }
+}).observe(document.getElementById('terminal'));
 
 // ---------------------------------------------------------------------------
 // Init
@@ -512,6 +580,19 @@ api.getTracker().then(state => {
   populateRepoSelect();
 });
 setInterval(refreshAgents, 10_000);
+// Tick uptime every second — only update text, don't rebuild DOM
+setInterval(() => {
+  document.querySelectorAll('.tab-uptime').forEach(el => {
+    const tab = el.closest('.tab');
+    if (!tab) return;
+    const agentId = tab.dataset.agentId;
+    const a = agents[agentId];
+    if (a && a.created_at) {
+      el.textContent = formatUptime(Date.now() - a.created_at);
+    }
+  });
+}, 1000);
+
 </script>
 
 </body>

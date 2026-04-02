@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import * as pty from "node-pty";
 
 const LOG_DIR = path.join(os.homedir(), ".agent-team", "logs");
 
@@ -55,6 +56,7 @@ export interface AgentAPI {
   restart_count: number;
   last_activity_seconds_ago: number;
   session_id: string | null;
+  created_at: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +78,7 @@ class ManagedAgent {
     public repoSlug: string,
     onUpdate: () => void,
     onLog: (agentId: string, entry: LogEntry) => void,
+    private onPtyData: (agentId: string, data: string) => void,
   ) {
     this.onUpdate = onUpdate;
     this.onLog = onLog;
@@ -106,23 +109,12 @@ class ManagedAgent {
     this.onLog(this.agentId, entry);
   }
 
+  private ptyProcess: pty.IPty | null = null;
+
   async start(): Promise<void> {
     console.log(`[AGENT] start() called for ${this.agentId}`);
 
-    let query: any;
-    try {
-      const sdk = await import("@anthropic-ai/claude-agent-sdk");
-      query = sdk.query;
-      console.log(`[AGENT] SDK imported, query type: ${typeof query}`);
-    } catch (importErr: any) {
-      console.error(`[AGENT] SDK import failed:`, importErr.message);
-      this.pushLog("error", `SDK import failed: ${importErr.message}`);
-      this.state.status = "dead";
-      this.onUpdate();
-      return;
-    }
-
-    this.abortController = new AbortController();
+    const claudePath = process.env.CLAUDE_PATH || "/Users/liyoclaw/.local/bin/claude";
 
     const prompt = [
       `You are agent \`${this.agentId}\`.`,
@@ -138,47 +130,95 @@ class ManagedAgent {
     this.pushLog("system", "─".repeat(60));
     this.onUpdate();
 
-    try {
-      console.log(`[SDK] Calling query() for ${this.agentId}...`);
-      const stream = query({
-        prompt,
-        options: {
-          allowedTools: [
-            "Read", "Edit", "Write", "Bash", "Glob", "Grep",
-            "Agent", "Skill",
-          ],
-          permissionMode: "acceptEdits",
-          pathToClaudeCodeExecutable: process.env.CLAUDE_PATH || "claude",
-        },
-      } as any);
-      console.log(`[SDK] Got stream for ${this.agentId}:`, typeof stream);
+    return new Promise<void>((resolve) => {
+      const proc = pty.spawn(claudePath, [
+        "--verbose",
+        "--dangerously-skip-permissions",
+      ], {
+        name: "xterm-256color",
+        cols: 120,
+        rows: 40,
+        cwd: os.homedir(),
+        env: { ...process.env, HOME: os.homedir() } as Record<string, string>,
+      });
 
-      for await (const message of stream) {
-        const msg = message as any;
+      this.ptyProcess = proc;
+      console.log(`[AGENT] Spawned claude PTY pid=${proc.pid} for ${this.agentId}`);
+
+      let trustConfirmed = false;
+      let promptSent = false;
+
+      proc.onData((data: string) => {
         this.state.last_activity = Date.now();
 
-        this.parseMessage(msg);
+        // Forward raw PTY data to renderer for xterm.js
+        this.onPtyData(this.agentId, data);
+
+        // Strip ANSI for status inference only
+        const clean = data
+          .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+          .replace(/\x1b\][^\x07]*\x07/g, "")
+          .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, "")
+          .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
+
+        // Auto-confirm workspace trust dialog
+        if (!trustConfirmed && clean.includes("trust this folder")) {
+          trustConfirmed = true;
+          console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust`);
+          proc.write("\r");
+          return;
+        }
+
+        // Send initial prompt once we see the input prompt (❯)
+        if (!promptSent && trustConfirmed && clean.includes("❯")) {
+          promptSent = true;
+          console.log(`[AGENT:${this.agentId}] Sending initial prompt`);
+          proc.write(prompt + "\r");
+        }
+
+        // Infer status from cleaned text
+        const lines = clean.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) this.inferStatus(trimmed);
+        }
 
         this.onUpdate();
-      }
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        this.pushLog("system", "Session stopped by supervisor.");
-      } else {
-        this.state.error = err.message ?? String(err);
-        this.pushLog("error", `CRASH: ${this.state.error}`);
-        const logFile = path.join(LOG_DIR, `${this.agentId}.log`);
-        fs.appendFileSync(logFile, `[${new Date().toISOString()}] crashed: ${this.state.error}\n`);
-      }
-    }
+      });
 
-    this.state.status = "dead";
-    this.pushLog("status", `Agent ${this.agentId} is now DEAD`);
-    this.onUpdate();
+      proc.onExit(({ exitCode }) => {
+        console.log(`[AGENT] claude PTY exited code=${exitCode} for ${this.agentId}`);
+        this.ptyProcess = null;
+
+        if (exitCode === 0) {
+          this.state.end_reason = "success";
+        } else {
+          this.state.end_reason = "error_during_execution";
+          this.state.error = `CLI exited with code ${exitCode}`;
+          this.pushLog("error", `CRASH: CLI exited with code ${exitCode}`);
+          const logFile = path.join(LOG_DIR, `${this.agentId}.log`);
+          fs.appendFileSync(logFile, `[${new Date().toISOString()}] crashed: exit code ${exitCode}\n`);
+        }
+
+        this.state.status = "dead";
+        this.pushLog("status", `Agent ${this.agentId} is now DEAD`);
+        this.onUpdate();
+        resolve();
+      });
+    });
+  }
+
+  writeInput(data: string): void {
+    if (this.ptyProcess) {
+      this.ptyProcess.write(data);
+    }
   }
 
   stop(): void {
-    this.abortController?.abort();
+    if (this.ptyProcess) {
+      this.ptyProcess.kill();
+      this.ptyProcess = null;
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -361,6 +401,7 @@ export class Supervisor extends EventEmitter {
       repoSlug,
       () => this.emit("agent:update", agentId),
       (id, entry) => this.emit("agent:log", id, entry),
+      (id, data) => this.emit("agent:pty-data", id, data),
     );
     this.agents.set(agentId, managed);
     managed.start().then(() => {
@@ -451,6 +492,11 @@ export class Supervisor extends EventEmitter {
     return null;
   }
 
+  writeToAgent(agentId: string, data: string): void {
+    const managed = this.agents.get(agentId);
+    if (managed) managed.writeInput(data);
+  }
+
   // -----------------------------------------------------------------------
   // Stale detection
   // -----------------------------------------------------------------------
@@ -510,6 +556,7 @@ export class Supervisor extends EventEmitter {
       restart_count: m.state.restart_count,
       last_activity_seconds_ago: Math.round((now - m.state.last_activity) / 1000),
       session_id: m.state.session_id,
+      created_at: m.state.created_at,
     }));
   }
 
@@ -529,6 +576,7 @@ export class Supervisor extends EventEmitter {
       restart_count: managed.state.restart_count,
       last_activity_seconds_ago: Math.round((Date.now() - managed.state.last_activity) / 1000),
       session_id: managed.state.session_id,
+      created_at: managed.state.created_at,
     };
   }
 

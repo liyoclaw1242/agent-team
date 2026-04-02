@@ -292,6 +292,8 @@ body {
   height: 34px;
   flex-shrink: 0;
   overflow-x: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .tabs {
@@ -335,7 +337,30 @@ body {
 .dot-error { color: #f87171; }
 .dot-dead { color: #555; }
 
+.tab-health {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-alive {
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade80;
+  animation: pulse-health 2s ease-in-out infinite;
+}
+
+.health-dead {
+  background: #555;
+}
+
+@keyframes pulse-health {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .tab-label { font-weight: 600; }
+.tab-uptime { color: #666; font-size: 10px; font-variant-numeric: tabular-nums; }
 .tab-id { color: #555; font-size: 10px; }
 
 .tab-close {
@@ -404,11 +429,14 @@ select:hover { border-color: #444; }
 
 .terminal {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
+  overflow: hidden;
   background: #0e0e0e;
-  font-size: 12px;
-  line-height: 1.6;
+  position: relative;
+}
+
+.xterm-wrapper {
+  width: 100%;
+  height: 100%;
 }
 
 .terminal-welcome {

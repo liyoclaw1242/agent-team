@@ -6,7 +6,7 @@ const common = {
   target: "es2022",
   format: "cjs",
   sourcemap: true,
-  external: ["electron"],
+  external: ["electron", "node-pty"],
 };
 
 // Main process

@@ -20,6 +20,10 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
     return { ok: !err, error: err };
   });
 
+  ipcMain.on("write-agent-input", (_e, id: string, data: string) => {
+    supervisor.writeToAgent(id, data);
+  });
+
   // --- Tracker handlers ---
   ipcMain.handle("get-tracker", () => tracker.getState());
   ipcMain.handle("set-github-token", (_e, token: string) => {
@@ -39,6 +43,12 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
   supervisor.on("agent:log", (agentId: string, entry: LogEntry) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send("agent-log", agentId, entry);
+    }
+  });
+
+  supervisor.on("agent:pty-data", (agentId: string, data: string) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send("agent-pty-data", agentId, data);
     }
   });
 

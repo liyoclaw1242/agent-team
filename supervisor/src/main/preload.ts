@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("bridge", {
   createAgent: (role: string, repo: string) => ipcRenderer.invoke("create-agent", role, repo),
   stopAgent: (id: string) => ipcRenderer.invoke("stop-agent", id),
   restartAgent: (id: string) => ipcRenderer.invoke("restart-agent", id),
+  writeAgentInput: (id: string, data: string) => ipcRenderer.send("write-agent-input", id, data),
 
   // Tracker
   getTracker: () => ipcRenderer.invoke("get-tracker"),
@@ -25,5 +26,8 @@ contextBridge.exposeInMainWorld("bridge", {
   },
   onTrackerUpdate: (cb: (state: any) => void) => {
     ipcRenderer.on("tracker-update", (_e, state) => cb(state));
+  },
+  onPtyData: (cb: (agentId: string, data: string) => void) => {
+    ipcRenderer.on("agent-pty-data", (_e, agentId, data) => cb(agentId, data));
   },
 });

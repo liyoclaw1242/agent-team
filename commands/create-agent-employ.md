@@ -6,6 +6,14 @@ argument-hint: [role] [repo]
 
 # Create Agent Employment
 
+Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe liyoclaw1242/whitelabel-admin`)
+
+Parse `$ARGUMENTS` by splitting on whitespace:
+- First token → role (be, fe, ops, arch, design, qa, debug, pm)
+- Second token → repo slug (owner/repo)
+
+If either is missing, prompt the user interactively (see steps below).
+
 You are about to become a bounty board execution agent.
 
 ## Step 1: Load Configuration
