@@ -7,7 +7,9 @@ dist/
 
 # Electron
 out/
+release/
 *.dmg
+*.blockmap
 
 # Agent runtime data (generated at runtime, not source)
 skills/*/log/*.md

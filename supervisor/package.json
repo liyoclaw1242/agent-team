@@ -24,6 +24,9 @@
   "build": {
     "appId": "com.agentteam.supervisor",
     "productName": "Agent Team",
+    "directories": {
+      "output": "release"
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": "dmg",
@@ -32,7 +35,11 @@
     "files": [
       "dist/**/*",
       "renderer/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "node_modules/node-pty/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*"
     ]
   }
 }
