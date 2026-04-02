@@ -170,12 +170,30 @@ All verification steps passed.
 Full report: \`test-plans/{ISSUE_N}-verify-report.md\`"
 ```
 
-For non-frontend PRs → merge:
+**Merge or route to Design?** Check the issue title, body, and PR diff to classify:
+
+| Signal | Classification | Action |
+|--------|---------------|--------|
+| Non-frontend PR (BE, OPS, ARCH, etc.) | — | Merge |
+| Frontend — title/body contains `fix`, `bug`, `broken`, `missing`, `repair`, `restore`; diff restores existing behavior or adds spec-defined elements that were missing | **Bug fix** | Merge |
+| Frontend — title/body contains `add`, `new`, `redesign`, `restyle`, `layout change`; diff introduces new components, pages, or visual changes not previously spec'd | **New/changed visual** | Route to Design visual review. Do NOT merge. |
+
+If ambiguous, check: "Does this PR change what the user **sees** in a way that wasn't already defined?" If yes → Design. If no → merge.
+
+**Action: Merge** (non-frontend or bug fix):
 ```bash
 gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
 ```
+Verdict line: `**Code: APPROVED** | **Visual: N/A** (bug fix — restores expected behavior)`
 
-For frontend PRs → leave for Design visual review. Do NOT merge.
+**Action: Route to Design** (new/changed visual):
+```bash
+# Hand off to Design agent by changing agent_type
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_type": "design"}'
+```
+Verdict line: `**Code: APPROVED** | **Visual: PENDING** (new visual work — routed to Design)`
 
 ### FAIL — Any step red
 
@@ -212,6 +230,22 @@ curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
 ### BLOCKED — Cannot verify
 
 Report the blocker clearly. Do NOT approve or reject.
+
+### Post-verdict validation gate
+
+After executing the verdict action (merge / route / reset), run the routing validation script:
+
+```bash
+# VERDICT is one of: pass-merge, pass-design, fail
+bash validate/check-all.sh {VERDICT} {REPO_SLUG} {ISSUE_N} {PR_NUMBER} {API_URL}
+```
+
+If any check fails, **stop and fix before continuing**:
+- Classification violation → re-evaluate the PR signals and take the correct action
+- State transition violation → the API PATCH was likely skipped; execute it now
+- Comment violation → edit the PR comment to include the correct verdict label
+
+Do NOT proceed to Phase 8 until this script exits 0.
 
 ## Phase 8: Journal
 
