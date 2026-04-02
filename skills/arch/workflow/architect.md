@@ -1,9 +1,122 @@
 # Architecture Workflow
 
-Three modes:
+Four modes:
+- **Mode 0: Bootstrap** — if `arch.md` doesn't exist, reverse-engineer it from the project
 - **Mode A: Request Decomposition** — break requirements into atomic bounty tasks
 - **Mode B: Architecture Design** — produce design artifacts (ADR, API contracts, diagrams)
 - **Mode C: Re-evaluation** — handle feedback from FE/BE who found spec conflicts
+
+---
+
+## Pre-flight (run before every mode)
+
+```bash
+bash skills/arch/actions/preflight.sh {REPO_DIR}
+```
+
+| Exit code | Meaning | Action |
+|-----------|---------|--------|
+| 0 — READY | arch.md exists, complete | Proceed to requested mode |
+| 1 — BOOTSTRAP_REQUIRED | arch.md missing | Run Mode 0 first |
+| 2 — INCOMPLETE | arch.md has missing sections | Re-run Mode 0 to fill gaps |
+
+---
+
+## Mode 0: Bootstrap (when pre-flight says BOOTSTRAP_REQUIRED or INCOMPLETE)
+
+**Trigger**: `arch.md` does not exist or is incomplete.
+
+This runs ONCE before any other mode. You cannot decompose or design without a map.
+
+### Step 1: Read the README
+
+```bash
+cd {REPO_DIR}
+cat README.md
+```
+
+Understand: what is this project? Who uses it? What problem does it solve?
+
+### Step 2: Detect Tech Stack
+
+```bash
+cat package.json 2>/dev/null || cat Cargo.toml 2>/dev/null || cat go.mod 2>/dev/null
+ls -la
+```
+
+Record: framework, language, styling, database, auth, test tools.
+
+### Step 3: Map the Structure
+
+```bash
+find . -maxdepth 3 -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" \) | head -50
+find . -maxdepth 2 -type d | grep -v node_modules | grep -v .git
+```
+
+Identify: where do pages live, where do components live, where does business logic live, where do API routes live.
+
+### Step 4: Discover API Contracts
+
+```bash
+# Next.js API routes
+find . -path "*/api/*" -name "route.ts" -o -name "route.js" | head -20
+# Or Express/Fastify routes
+grep -rn "app.get\|app.post\|router." --include="*.ts" --include="*.js" src/ | head -20
+```
+
+Read each route file to understand: method, path, request/response shape, auth.
+
+### Step 5: Discover Domain Model
+
+Read the key files:
+- Database schema (Prisma schema, migrations, models)
+- Type definitions (`types/`, interfaces)
+- State management (stores, context providers)
+
+Identify: what are the core entities? How do they relate? What are the invariants?
+
+### Step 6: Trace User Journeys
+
+Read the page/route structure to map user flows:
+```bash
+find . -path "*/app/*" -name "page.tsx" -o -name "page.ts" | sort
+```
+
+For each page: what can the user do here? Where do they go next?
+
+### Step 7: Check for Existing Docs
+
+```bash
+find . -maxdepth 2 -name "*.md" | grep -v node_modules | grep -v CHANGELOG
+ls docs/ 2>/dev/null
+```
+
+Read any existing ADRs, architecture docs, or design docs.
+
+### Step 8: Write arch.md
+
+Using everything you gathered, create `arch.md` at repo root following the template in `cases/arch-md-template.md`.
+
+Fill in every section you can. Mark sections you're uncertain about with `<!-- TODO: verify -->`.
+
+```bash
+# Write arch.md
+git add arch.md
+git commit -m "docs: bootstrap arch.md from project analysis"
+git push origin main
+```
+
+### Step 9: Announce
+
+```
+[{AGENT_ID}] Bootstrapped arch.md for {REPO_SLUG}
+  Domains: {N} identified
+  APIs: {N} endpoints documented
+  Pages: {N} user-facing routes
+  Tech debt: {N} items noted
+```
+
+Now proceed to the requested mode (A, B, or C).
 
 ---
 
