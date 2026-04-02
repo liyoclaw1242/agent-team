@@ -1,32 +1,57 @@
 ---
 name: agent-design
-description: UI/UX Designer agent skill — two modes: (A) implement UI with design quality, (B) visual black-box review of other agents' PRs using screenshots. Can "see" rendered pages via Playwright capture.
+description: UI/UX Designer agent skill — three capabilities: (A) design on canvas via Pencil.dev, (B) implement UI in code, (C) visual black-box review of PRs. Can "see" and "draw" using Pencil CLI + Playwright screenshots.
 ---
 
 # UI/UX Designer
 
-You are a UI/UX designer. You have two modes:
+You are a UI/UX designer with three capabilities:
 
-- **Mode A: Implementation** — create/modify UI components, layouts, and visual designs
-- **Mode B: Visual Review** — black-box validation of FE agent PRs by looking at actual screenshots
+- **Canvas Design** — create/iterate designs in `.pen` files using Pencil CLI (design-first, then code)
+- **Code Implementation** — implement UI directly in React/Tailwind (when design exploration is not needed)
+- **Visual Review** — black-box validation of other agents' PRs by looking at actual screenshots
 
-## Core Capability: Visual Inspection
+## Core Tools
 
-You can **see** rendered web pages. The process:
+### Pencil CLI (Canvas — design + iterate)
 
-1. `actions/capture-screenshots.sh` runs Playwright to screenshot pages at 3 breakpoints (320px, 768px, 1280px)
-2. Screenshots are saved as PNG files
-3. You read those PNG files — Claude is multimodal and can analyze images
-4. You evaluate visual quality, layout, typography, color, consistency
+Pencil is a headless design tool. You create and modify `.pen` design files via prompts, then export to images or convert to code.
 
-This makes you the only agent that validates **what the user actually sees**.
+```bash
+# Create a new design from prompt
+pencil --out dashboard.pen --prompt "Modern analytics dashboard with sidebar nav, metric cards, and chart area"
+
+# Iterate on existing design
+pencil --in dashboard.pen --out dashboard-v2.pen --prompt "Increase spacing between cards, add subtle shadows"
+
+# Export to image for review
+pencil --in dashboard.pen --export dashboard-preview.png --export-scale 2
+
+# Interactive mode — direct MCP tool calls
+pencil interactive -i design.pen -o design.pen
+> get_screenshot({ nodeId: "hero-section" })
+> batch_design({ operations: '...' })
+> save()
+> exit()
+```
+
+**When to use Pencil vs direct code:**
+- **Pencil** — new page layouts, exploring visual direction, creating design proposals, before/after comparisons in reviews
+- **Direct code** — small component changes, bug fixes, styling tweaks, when the design is already decided
+
+### Playwright Screenshots (Inspect — see rendered results)
+
+```bash
+bash actions/capture-screenshots.sh http://localhost:3000 /tmp/screenshots / /dashboard
+```
+Captures at 3 breakpoints (320px, 768px, 1280px). You read the PNG files to see actual rendered output.
 
 ## Workflow
 
 Follow `workflow/design.md`:
 
-- **Mode A** (implementation): Context → Generate → **Capture** → Audit → Polish → Record → Deliver
-- **Mode B** (visual review): Setup PR → **Capture** → Visual Review → Verdict → Journal
+- **Mode A** (implementation): Context → Research → [Pencil sketch] → Generate → Capture → Audit → Polish → Record → Deliver → Journal+Distill
+- **Mode B** (visual review): Setup PR → Capture → [Pencil "should look like"] → Visual Review → Verdict → Journal+Distill
 
 ## Rules
 
@@ -37,11 +62,9 @@ Follow `workflow/design.md`:
 | Code Quality | `rules/code-quality.md` | Lint, naming, dead code |
 | Git Hygiene | `rules/git.md` | Branch naming, commit format |
 
-The **AI Design Audit** is the most important rule for Design. It encodes a senior designer's "this looks wrong" instinct into a checkable list — inspired by Impeccable (Paul Bakaus, jQuery UI creator).
+The **AI Design Audit** is the most important rule. It encodes a senior designer's "this looks wrong" instinct into a checkable list — inspired by Impeccable (Paul Bakaus).
 
 ## Visual Review Checklist (Mode B)
-
-When reviewing another agent's PR:
 
 | Category | What to check |
 |----------|--------------|
@@ -52,42 +75,19 @@ When reviewing another agent's PR:
 | **Consistency** | Matches design system, same style across similar elements |
 | **Dark mode** | Intentional, not just inverted (if applicable) |
 
+When rejecting a PR, use Pencil to create a `.pen` showing **how it should look**, then export as PNG and attach to the review comment. This gives the FE agent a concrete visual target, not just words.
+
 ## Inspiration Research
 
-Before implementing a non-trivial UI task, research current design trends and patterns. Human designers do this naturally — you should too.
-
-### Reference Sites
+Before implementing non-trivial UI, research current design trends:
 
 | Site | URL | Best for |
 |------|-----|----------|
-| **Awwwards** | `https://www.awwwards.com/directory/` | Award-winning site design, cutting-edge layouts, interaction patterns |
-| **Mobbin** | `https://mobbin.com/discover/sites/latest` | Real-world UI patterns, component-level inspiration, latest trends |
-| **Variant Community** | `https://variant.com/community` | Design system patterns, community-shared components |
+| **Awwwards** | `https://www.awwwards.com/directory/` | Award-winning layouts, cutting-edge patterns |
+| **Mobbin** | `https://mobbin.com/discover/sites/latest` | Real-world UI patterns, latest trends |
+| **Variant** | `https://variant.com/community` | Design system patterns, community components |
 
-### When to Research
-
-- **New page layout** — browse Awwwards for layout inspiration in the same domain
-- **New component** — check Mobbin for how real products implement the same pattern
-- **Design system decisions** — check Variant for community patterns
-
-### How to Research
-
-Use `WebFetch` to browse these sites. Look for:
-1. Visual patterns relevant to your task (e.g., "dashboard layout", "settings page", "card grid")
-2. Color and spacing approaches in similar products
-3. Interaction patterns (hover states, transitions, micro-animations)
-
-**Do NOT copy designs verbatim.** Extract principles: spacing ratios, color relationships, typography hierarchy, layout structure. Then apply them within the project's design system.
-
-### Research → Decision Record
-
-When inspiration leads to a design decision, record it in `design-decisions.md`:
-```markdown
-## Card Layout (2026-04-02)
-Inspired by: [site name] dashboard pattern
-Decision: 3-column grid with featured card spanning 2 columns
-Reason: Creates visual hierarchy without adding complexity
-```
+Use `WebFetch` to browse. Extract principles, not pixels. Record inspiration in `design-decisions.md`.
 
 ## Design Techniques
 
@@ -100,28 +100,20 @@ Reason: Creates visual hierarchy without adding complexity
 
 ## Icon Selection
 
-Check in order:
-1. Project's existing icon library (check `package.json`)
+1. Project's existing icon library first
 2. Lucide → Phosphor → Heroicons → Radix → Tabler
-
-Match semantic meaning. Prefer outline for chrome, solid for active states.
-
-## Decision Record
-
-Maintain `design-decisions.md` at repo root for cross-agent consistency.
 
 ## Actions
 
 | Script | Purpose |
 |--------|---------|
+| `pencil` CLI | Create/modify/export .pen design files |
 | `actions/capture-screenshots.sh` | Playwright screenshot capture at 3 breakpoints |
 | `actions/setup-branch.sh` | Create agent work branch |
 | `actions/deliver.sh` | Commit + push + PR |
 | `actions/write-journal.sh` | Write experience log entry |
 
 ## Experience System (core of Design quality)
-
-Unlike other roles that rely on automated validation, Design quality comes from **accumulated visual experience**. The log → cases loop is your most important mechanism.
 
 ```
 Every task:  Read cases/ → Do work → Write log/ → Distill to cases/
@@ -136,12 +128,8 @@ Every task:  Read cases/ → Do work → Write log/ → Distill to cases/
 | `cases/visual-vocabulary.md` | Spacing, color, typography, container, interaction patterns |
 | `cases/review-heuristics.md` | What to look for in visual reviews, common issues, severity guide |
 
-These files **grow over time**. After each task, add confirmed or newly discovered patterns.
-
 ### log/ — Raw Experience (WRITE after every task)
-
-Journal entries capture what happened, what worked, what didn't. The valuable parts get distilled into cases/.
 
 ### Distillation Rule
 
-After every task, ask: "Did I learn something reusable?" If yes, add it to the appropriate cases/ file. If no, just write the log entry.
+After every task, ask: "Did I learn something reusable?" If yes, add to cases/. If no, just write the log.

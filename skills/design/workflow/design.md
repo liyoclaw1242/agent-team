@@ -1,240 +1,206 @@
 # Design Workflow
 
-Two modes: **Implementation** (create/modify UI) and **Visual Review** (black-box validation of FE work).
+Three modes:
+- **Mode A: Design-First** — sketch in Pencil canvas → review → implement in code
+- **Mode B: Code-Direct** — implement directly in code (minor changes, design already decided)
+- **Mode C: Visual Review** — black-box validation of other agents' PRs
 
 ---
 
-## Mode A: Implementation
+## Mode A: Design-First (new pages, layouts, major UI changes)
 
-Iterative: Context → Research → Generate → Capture → Audit → Polish → Record → Deliver → Journal
+Canvas sketch → Visual review → Code implementation
 
 ### Phase 1: Context
 
 1. Read design system: tokens, Tailwind config, component library
 2. Read `design-decisions.md` if it exists
 3. Read journal entries from `log/`
-4. Understand the existing visual language
+4. Read `cases/visual-vocabulary.md` for established patterns
 
 ### Phase 2: Research (for non-trivial tasks)
 
-Skip this phase for minor fixes or polish. Activate for:
-- New page layouts
-- New component types the project hasn't used before
-- Design system-level decisions
+1. Identify the pattern type (dashboard, settings, card grid, form, etc.)
+2. Browse reference sites using `WebFetch`:
+   - Awwwards — layout & visual quality
+   - Mobbin — real-world component patterns
+   - Variant — design system patterns
+3. Extract principles, not pixels
+4. Record inspiration in `design-decisions.md`
 
-1. **Identify the pattern** — what type of UI are you building? (dashboard, settings, card grid, form, etc.)
-2. **Browse reference sites** using `WebFetch`:
-   - Awwwards (`https://www.awwwards.com/directory/`) — layout & visual quality
-   - Mobbin (`https://mobbin.com/discover/sites/latest`) — real-world component patterns
-   - Variant (`https://variant.com/community`) — design system patterns
-3. **Extract principles, not pixels** — note spacing ratios, color relationships, hierarchy techniques
-4. **Record inspiration** in `design-decisions.md` with source attribution
+**Gate**: Can you describe the visual approach in one sentence?
 
-**Gate**: Can you describe the visual approach in one sentence? If not, research more.
+### Phase 3: Sketch in Pencil
 
-### Phase 3: Generate
+Create a design proposal on canvas before writing any code:
 
-Implement based on issue type:
-- **Component** → styling, a11y, responsive, design tokens
-- **Layout/page** → responsive breakpoints, spacing, asymmetric layouts
-- **Icon selection** → check project's icon library first
+```bash
+# Create initial design
+pencil --out {feature-name}.pen \
+  --prompt "Design a {description}. Style: {design system context}. Layout: {approach from research}."
 
-Design techniques:
-- Ring borders (not solid) for subtle containers
-- Concentric border radius
-- Tight letter-spacing on headlines
-- Shadow + ring combo for depth
-- Button sizing: 36-38px height
-
-### Phase 3: Capture
-
-**Take screenshots to verify your own work visually:**
-
-1. Start dev server if not running: `pnpm dev &`
-2. Capture screenshots:
-   ```bash
-   bash skills/design/actions/capture-screenshots.sh http://localhost:3000 /tmp/design-review /route/you/changed
-   ```
-3. **Read each screenshot** (Claude can see images):
-   ```bash
-   # Claude will visually inspect these
-   ls /tmp/design-review/*.png
-   ```
-   Read each .png file to see the actual rendered result.
-
-### Phase 4: Audit
-
-Review the screenshots against quality rules:
-
-**Critical (must fix)**:
-- [ ] Missing focus indicators on interactive elements
-- [ ] Text unreadable (contrast, size, truncation)
-- [ ] Broken layout at any breakpoint
-- [ ] Elements overlapping or overflowing
-
-**Warning (should fix)**:
-- [ ] Everything centered (no visual hierarchy)
-- [ ] Identical card grids (no variation in emphasis)
-- [ ] Muddy borders (solid gray vs ring technique)
-- [ ] Inconsistent spacing
-
-**Visual polish**:
-- [ ] Shadow quality (too harsh? too subtle?)
-- [ ] Color harmony (do the colors work together?)
-- [ ] Typography hierarchy (clear heading > body distinction?)
-- [ ] Whitespace balance (breathing room?)
-
-### Phase 5: Polish
-
-Fix issues found. Recapture + re-audit. Max 2 rounds.
-
-### Phase 6: Record
-
-Update `design-decisions.md` with choices made.
-
-### Phase 7: Deliver
-
-### Phase 8: Journal + Distill
-
-This is the most important phase for Design. Your quality grows from accumulated experience.
-
-1. **Write journal entry** to `log/` via `actions/write-journal.sh`
-2. **Distill to cases** — if you discovered or confirmed a reusable visual pattern:
-   - Add it to `cases/visual-vocabulary.md` under the right section
-   - If it's a review insight, add it to `cases/review-heuristics.md`
-3. **Update design-decisions.md** in the repo itself (project-specific)
-
-```
-log/2026-04-02-issue-69.md         ← raw experience (what happened)
-        │
-        ▼ distill
-cases/visual-vocabulary.md          ← reusable patterns (what we learned)
-cases/review-heuristics.md          ← review instincts (what to look for)
-        │
-        ▼ apply
-Next task reads cases/ first        ← experience compounds
+# Export preview for self-review
+pencil --in {feature-name}.pen --export /tmp/sketch-preview.png --export-scale 2
 ```
 
-**What to distill**:
-- A spacing/color/typography pattern that worked well → visual-vocabulary.md
-- A visual issue you almost missed in review → review-heuristics.md
-- A project-specific design choice → design-decisions.md (in repo)
+Read the exported PNG. Evaluate against your design intuition and the AI Design Audit checklist.
 
-**What NOT to distill** (keep in log only):
-- Task-specific details ("I changed the button color on the settings page")
-- Temporary workarounds
-- Things that are already well-documented in cases/
+**Iterate if needed:**
+```bash
+# Fix issues
+pencil --in {feature-name}.pen --out {feature-name}.pen \
+  --prompt "Fix: {specific issues you see in the preview}"
+
+# Re-export and re-review
+pencil --in {feature-name}.pen --export /tmp/sketch-v2.png --export-scale 2
+```
+
+Max 3 iterations. When satisfied, move to code.
+
+**Gate**: Does the sketch look like something you'd approve in a visual review? If not, iterate.
+
+### Phase 4: Implement in Code
+
+Now translate the approved sketch into React/Tailwind:
+
+1. Create branch: `actions/setup-branch.sh`
+2. Implement following the sketch as your visual target
+3. Apply design techniques (ring borders, spacing scale, etc.)
+4. Handle all component states (loading, error, empty)
+
+### Phase 5: Capture + Compare
+
+1. Start dev server: `pnpm dev &`
+2. Screenshot the implemented result:
+   ```bash
+   bash actions/capture-screenshots.sh http://localhost:3000 /tmp/implemented /route
+   ```
+3. **Compare sketch vs implementation** — read both PNGs:
+   - Does the implementation match the sketch?
+   - Any details lost in translation?
+
+### Phase 6: Audit
+
+Review screenshots against:
+- `rules/ai-design-audit.md` checklist
+- Accessibility rules
+- Visual quality (shadows, spacing, typography hierarchy)
+
+### Phase 7: Polish
+
+Fix issues. Recapture. Max 2 rounds.
+
+### Phase 8: Record
+
+- Update `design-decisions.md` in the repo
+- Commit the `.pen` file alongside the code (optional — for design history)
+
+### Phase 9: Deliver
+
+### Phase 10: Journal + Distill
+
+1. Write journal entry to `log/`
+2. Distill reusable patterns to `cases/visual-vocabulary.md`
+3. Distill review insights to `cases/review-heuristics.md`
 
 ---
 
-## Mode B: Visual Review (black-box validation of FE/other agent's PR)
+## Mode B: Code-Direct (minor changes, tweaks, polish)
 
-This is the Design equivalent of QA's code review — but you look at **what the user sees**, not the code.
+For tasks where the design is already decided (bug fixes, spacing adjustments, color changes):
+
+Skip Pencil. Go straight to code:
+Context → Implement → Capture → Audit → Polish → Deliver → Journal
+
+Same as Mode A phases 4-10, without the sketch step.
+
+---
+
+## Mode C: Visual Review (black-box validation of PRs)
+
+You review **what the user sees**, not the code.
 
 ### Phase 1: Setup
 
-1. Checkout the PR branch:
-   ```bash
-   gh pr checkout {PR_NUMBER} --repo {REPO_SLUG}
-   ```
-2. Install dependencies and start dev server:
-   ```bash
-   pnpm install && pnpm dev &
-   ```
-3. Wait for server to be ready:
-   ```bash
-   sleep 5
-   curl -sf http://localhost:3000 > /dev/null || sleep 5
-   ```
+```bash
+gh pr checkout {PR_NUMBER} --repo {REPO_SLUG}
+pnpm install && pnpm dev &
+sleep 5
+```
 
 ### Phase 2: Capture
 
-Identify which pages/routes the PR affects (from PR description or diff), then screenshot them all:
-
 ```bash
-# Determine affected routes from the PR diff
+# Identify affected routes
 gh pr diff {PR_NUMBER} --repo {REPO_SLUG} | grep -E 'app/.*page\.(tsx|ts)' | head -10
 
-# Capture all affected routes at 3 breakpoints
-bash skills/design/actions/capture-screenshots.sh \
-  http://localhost:3000 \
-  /tmp/design-review \
-  / /affected-route-1 /affected-route-2
+# Screenshot all affected routes
+bash actions/capture-screenshots.sh http://localhost:3000 /tmp/design-review / /route1 /route2
 ```
 
 ### Phase 3: Visual Review
 
-**Read each screenshot** and evaluate:
+Read each screenshot and evaluate:
 
-#### Layout & Composition
-- [ ] Visual hierarchy clear? (what draws the eye first?)
-- [ ] Spacing consistent? (same scale used throughout?)
-- [ ] Alignment clean? (no jagged edges, elements lined up?)
-- [ ] Responsive? (mobile doesn't just squish desktop)
+- **Layout**: hierarchy, spacing, alignment, responsive
+- **Typography**: heading scale, readability, line-height
+- **Color**: palette cohesion, contrast, interactive distinction
+- **Interaction**: buttons clickable, links distinguishable, disabled states
+- **Consistency**: matches design system, no one-off styling
+- **Dark mode**: intentional, not inverted
 
-#### Typography
-- [ ] Heading hierarchy clear? (h1 > h2 > h3 visually distinct?)
-- [ ] Body text readable? (size, line-height, contrast)
-- [ ] No orphaned words or awkward wrapping?
+### Phase 4: Corrective Sketch (if rejecting)
 
-#### Color & Contrast
-- [ ] Color palette cohesive? (not random colors)
-- [ ] Sufficient contrast for readability?
-- [ ] Interactive elements visually distinct from static?
-- [ ] Dark mode (if applicable) looks intentional, not inverted?
+When you find issues, **show don't tell** — create a Pencil sketch showing the correct version:
 
-#### Interaction Cues
-- [ ] Buttons look clickable? (not flat text)
-- [ ] Links distinguishable from text?
-- [ ] Disabled states visually distinct?
-- [ ] Hover/focus states present? (capture with Playwright hover if needed)
+```bash
+# Create "should look like" design
+pencil --out /tmp/correction.pen \
+  --prompt "Design a {component/page} that fixes: {issues found}. Match existing design system."
 
-#### Consistency
-- [ ] Matches design system / existing pages?
-- [ ] Same component style used across similar elements?
-- [ ] No "one-off" styling that breaks the visual language?
+# Export for comparison
+pencil --in /tmp/correction.pen --export /tmp/should-look-like.png --export-scale 2
+```
 
-### Phase 4: Verdict
+Attach both the "current" screenshot and the "should look like" export in your review comment. This gives the FE agent a concrete visual target.
 
-**APPROVED** — post comment with visual assessment:
+### Phase 5: Verdict
+
+**APPROVED**:
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
   --body "## Design Review by \`{AGENT_ID}\`
 
 ### Visual Assessment
-{summary of what looks good}
+{what looks good}
 
 ### Screenshots Reviewed
 - mobile (320px): ✓
 - tablet (768px): ✓
 - desktop (1280px): ✓
 
-**Verdict: APPROVED** — visual quality meets standards."
+**Verdict: APPROVED**"
 ```
 
-**NEEDS CHANGES** — post specific visual feedback:
+**NEEDS CHANGES**:
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
   --body "## Design Review by \`{AGENT_ID}\`
 
 ### Issues Found
-1. {specific visual issue — describe what you see, where, and what it should look like}
-2. {another issue}
+1. {what you see} → {what it should look like} (see attached sketch)
 
-### Screenshots
-(Attach or describe the problematic screenshots)
+### Current vs Expected
+Current: [screenshot description]
+Expected: [Pencil sketch description]
 
-**Verdict: NEEDS CHANGES** — see issues above."
+**Verdict: NEEDS CHANGES**"
 ```
 
-If rejected: close PR, post feedback on the issue, reset status to `ready`.
+If rejected: close PR, post feedback on issue, reset status to `ready`.
 
-### Phase 5: Journal + Distill
+### Phase 6: Journal + Distill
 
-Same as Mode A Phase 8:
-
-1. Write journal entry — what you reviewed, what you found, what you approved/rejected
-2. Distill recurring visual issues to `cases/review-heuristics.md`
-3. If a PR introduced a good visual pattern, capture it in `cases/visual-vocabulary.md`
-
-Over time, your reviews get sharper because you're learning from every PR you see.
+1. Write journal — what you reviewed, findings, verdict
+2. Distill recurring issues to `cases/review-heuristics.md`
+3. Capture good patterns from approved PRs to `cases/visual-vocabulary.md`
