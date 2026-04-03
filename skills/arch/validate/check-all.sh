@@ -54,7 +54,30 @@ else
   echo "SKIP: No ADRs modified"
 fi
 
-# 3. Git hygiene
+# 3. Issue state consistency — done bounties must have closed GitHub issues
+echo "── Issue State ──"
+API_URL="${API_URL:-http://localhost:8000}"
+REPO_SLUG="${REPO_SLUG:-}"
+if [ -n "$REPO_SLUG" ]; then
+  DONE_ISSUES=$(curl -sf "${API_URL}/bounties?status=done&repo_slug=${REPO_SLUG}" 2>/dev/null | jq -r '.[].number // empty' 2>/dev/null || true)
+  if [ -n "$DONE_ISSUES" ]; then
+    for ISSUE_N in $DONE_ISSUES; do
+      GH_STATE=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json state -q '.state' 2>/dev/null || echo "unknown")
+      if [ "$GH_STATE" = "CLOSED" ]; then
+        echo "OK: #${ISSUE_N} done + closed"
+      else
+        echo "FAIL: #${ISSUE_N} is status:done but GitHub state is '${GH_STATE}' — run: gh issue close ${ISSUE_N} --repo ${REPO_SLUG}"
+        FAILURES=$((FAILURES+1))
+      fi
+    done
+  else
+    echo "SKIP: No done issues found"
+  fi
+else
+  echo "SKIP: REPO_SLUG not set"
+fi
+
+# 4. Git hygiene
 echo "── Git ──"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 echo "Branch: $BRANCH"
