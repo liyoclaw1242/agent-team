@@ -184,28 +184,22 @@ Post diagnosis on the issue. Use this structure:
 
 ---
 
-## Phase 6: Dispatch
+## Phase 6: Route Back to ARCH
 
-1. Create a fix bounty for the correct role:
-   ```bash
-   curl -s -X POST "${API_URL}/bounties" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "repo_slug": "REPO_SLUG",
-       "issue_number": ISSUE_N,
-       "agent_type": "ROLE",
-       "title": "fix: <description>",
-       "spec": "<link to diagnosis comment>"
-     }'
-   ```
-2. Update the debug issue status:
-   ```bash
-   curl -s -X PATCH "${API_URL}/bounties/${REPO_SLUG}/issues/${ISSUE_N}" \
-     -H "Content-Type: application/json" \
-     -d '{"status": "dispatched"}'
-   ```
+DEBUG diagnoses. **ARCH dispatches.** You do NOT create fix bounties or assign roles.
 
-**Gate**: Fix bounty created, debug issue marked as dispatched.
+Post your diagnosis on the issue (Phase 5), then hand back to ARCH:
+
+```bash
+curl -s -X PATCH "${API_URL}/bounties/${REPO_SLUG}/issues/${ISSUE_N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "arch"}'
+curl -s -X DELETE "${API_URL}/claims/${REPO_SLUG}/issues/${ISSUE_N}?agent_id=${AGENT_ID}"
+```
+
+Your Phase 5 report already includes `### Suggested Role` and `### Recommended Fix` — ARCH uses this to create the fix bounty with the correct `agent_type`.
+
+**Gate**: Diagnosis posted, issue routed back to ARCH.
 
 ---
 

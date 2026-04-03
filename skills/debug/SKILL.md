@@ -49,10 +49,12 @@ Always check observability signals before reading code:
 
 Can you explain it in one paragraph without "might be" or "probably"? If not, keep investigating.
 
-### Dispatch Guide
+### Suggested Role Guide (for ARCH's dispatch decision)
 
-| Symptom | Assign To |
-|---------|-----------|
+Include this in your report. ARCH makes the final routing decision.
+
+| Symptom | Suggest |
+|---------|---------|
 | TypeScript/React/CSS/browser error | `fe` |
 | API/DB/business logic | `be` |
 | Build/deploy/CI/infrastructure | `ops` |

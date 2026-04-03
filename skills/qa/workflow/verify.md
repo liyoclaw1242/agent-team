@@ -170,82 +170,50 @@ All verification steps passed.
 Full report: \`test-plans/{ISSUE_N}-verify-report.md\`"
 ```
 
-**Merge or route to Design?** Check the issue title, body, and PR diff to classify:
-
-| Signal | Classification | Action |
-|--------|---------------|--------|
-| Non-frontend PR (BE, OPS, ARCH, etc.) | — | Merge |
-| Frontend — title/body contains `fix`, `bug`, `broken`, `missing`, `repair`, `restore`; diff restores existing behavior or adds spec-defined elements that were missing | **Bug fix** | Merge |
-| Frontend — title/body contains `add`, `new`, `redesign`, `restyle`, `layout change`; diff introduces new components, pages, or visual changes not previously spec'd | **New/changed visual** | Route to Design visual review. Do NOT merge. |
-
-If ambiguous, check: "Does this PR change what the user **sees** in a way that wasn't already defined?" If yes → Design. If no → merge.
-
-**Action: Merge** (non-frontend or bug fix):
-```bash
-gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
-```
-Verdict line: `**Code: APPROVED** | **Visual: N/A** (bug fix — restores expected behavior)`
-
-**Action: Route to Design** (new/changed visual):
-```bash
-# Hand off to Design agent by changing agent_type
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
-  -H "Content-Type: application/json" \
-  -d '{"agent_type": "design"}'
-```
-Verdict line: `**Code: APPROVED** | **Visual: PENDING** (new visual work — routed to Design)`
-
 ### FAIL — Any step red
 
-**Step 1: Surface triage** (see `rules/test-plan.md` → "Failure Triage")
+**Surface triage** (see `rules/test-plan.md` → "Failure Triage")
 
 For each failure, spend ≤10 seconds checking Chrome MCP console + network tab to classify:
-- No request / API 200 but UI broken → **FE**
-- API 5xx / wrong response → **BE**
-- Can't tell → **DEBUG**
+- No request / API 200 but UI broken → likely **FE**
+- API 5xx / wrong response → likely **BE**
+- Can't tell → likely **DEBUG**
 
-**Step 2: Post feedback** with the format matching the target role (see `rules/test-plan.md` → "Rejection Feedback Format")
+Include your triage assessment in the report so ARCH can make the routing decision.
 
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
   --body "## QA Verify Report by \`{AGENT_ID}\`
 
-**Verdict: FAIL → {FE|BE|DEBUG}**
+**Verdict: FAIL**
 
 {count} of {total} steps failed.
 
-{paste role-specific feedback (operation steps / curl / full context)}
+### Failure Details
+{for each failure: step, expected, actual, evidence}
+
+### Triage Assessment
+{for each failure: likely owner (FE/BE/DEBUG) and reasoning}
 
 Full report: \`test-plans/{ISSUE_N}-verify-report.md\`"
-```
-
-**Step 3: Reset the bounty** with the correct `agent_type` so it routes to the right role:
-
-```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "{fe|be|debug}"}'
 ```
 
 ### BLOCKED — Cannot verify
 
 Report the blocker clearly. Do NOT approve or reject.
 
-### Post-verdict validation gate
+### Post-verdict: Route back to ARCH
 
-After executing the verdict action (merge / route / reset), run the routing validation script:
+**QA does NOT merge, reject, or reassign.** All verdicts route back to ARCH for decision.
 
 ```bash
-# VERDICT is one of: pass-merge, pass-design, fail
-bash validate/check-all.sh {VERDICT} {REPO_SLUG} {ISSUE_N} {PR_NUMBER} {API_URL}
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "arch"}'
+curl -s -X DELETE "{API_URL}/claims/{REPO_SLUG}/issues/{ISSUE_N}?agent_id={AGENT_ID}"
 ```
 
-If any check fails, **stop and fix before continuing**:
-- Classification violation → re-evaluate the PR signals and take the correct action
-- State transition violation → the API PATCH was likely skipped; execute it now
-- Comment violation → edit the PR comment to include the correct verdict label
-
-Do NOT proceed to Phase 8 until this script exits 0.
+> **Why**: ARCH is the sole merge authority and dispatcher. QA provides the verdict and evidence; ARCH decides the action (merge, route to Design for visual review, reject back to FE/BE, or escalate to DEBUG).
 
 ## Phase 8: Journal
 

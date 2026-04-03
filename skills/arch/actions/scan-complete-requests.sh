@@ -1,8 +1,8 @@
 #!/bin/bash
-# Mark decomposed requests as completed when all sub-issues are closed.
-# Deterministic: fetch pending requests → check sub-issues → complete.
+# Scan for decomposed requests where all sub-issues are closed, then mark completed.
+# Run as ARCH pre-triage step every cycle.
 #
-# Usage: complete-request.sh <API_URL> [REPO_SLUG]
+# Usage: scan-complete-requests.sh <API_URL> [REPO_SLUG]
 # If REPO_SLUG is omitted, checks all repos.
 # Exit 0 = success, non-zero = API error
 set -euo pipefail
@@ -10,7 +10,7 @@ set -euo pipefail
 API_URL="${1:?API_URL required (e.g. http://localhost:8000)}"
 REPO_SLUG="${2:-}"
 
-echo "═══ PM: Request Completion Check ═══"
+echo "═══ ARCH: Request Completion Scan ═══"
 
 # 1. Fetch decomposed requests (status=decomposed means ARCH split it, waiting for sub-issues)
 QUERY="${API_URL}/requests?status=decomposed"

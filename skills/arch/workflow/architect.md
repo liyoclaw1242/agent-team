@@ -1,10 +1,25 @@
 # Architecture Workflow
 
-Four modes:
+Five modes:
 - **Mode 0: Bootstrap** — if `arch.md` doesn't exist, reverse-engineer it from the project
 - **Mode A: Request Decomposition** — break requirements into atomic bounty tasks
 - **Mode B: Architecture Design** — produce design artifacts (ADR, API contracts, diagrams)
 - **Mode C: Re-evaluation** — handle feedback from FE/BE who found spec conflicts
+- **Mode D: Triage** — receive completed work from agents, decide: merge / route / decompose
+
+## Mode Routing
+
+After pre-flight, classify the task to choose the correct mode:
+
+| How you got this task | Mode |
+|----------------------|------|
+| Polled from `/requests?status=pending` | **A** (Decomposition) |
+| Task body requests architecture design / ADR | **B** (Design) |
+| Issue comments contain "Technical Feedback from" by FE/BE | **C** (Re-evaluation) |
+| Issue comments contain QA/Design verdict, or PR exists with no review | **D** (Triage) |
+| Task was previously `agent_type` ≠ arch (routed back from another agent) | **D** (Triage) |
+
+**Mode D is the most common mode** — every completed task from every agent flows through here.
 
 ---
 
@@ -283,6 +298,149 @@ git add -A && git commit -m "docs: {title} (closes #{N})"
 ```
 
 ### Phase 7: Journal
+
+---
+
+## Mode D: Triage (completed work routed back from other agents)
+
+ARCH is the sole merge authority and dispatcher. When any agent (FE, BE, QA, Design, OPS, DEBUG) completes work, they set `agent_type: arch` + `status: ready`. ARCH picks it up here.
+
+### Phase 0: Pre-triage Scan (run every cycle before processing tasks)
+
+Housekeeping that ARCH runs automatically — dependency unblocking and request completion:
+
+```bash
+# 1. Unblock issues whose deps are all resolved
+bash actions/scan-unblock.sh "{API_URL}" "{REPO_SLUG}"
+
+# 2. Mark requests as completed if all sub-issues are done
+bash actions/scan-complete-requests.sh "{API_URL}" "{REPO_SLUG}"
+```
+
+These are deterministic — if all deps are closed, unblock. If all sub-issues are done, complete the request. No judgment needed.
+
+After the scan, proceed to classify and process incoming tasks:
+
+### Phase 1: Classify the Incoming Task
+
+Read the issue and all comments:
+
+```bash
+gh issue view {N} --repo {REPO_SLUG} --comments
+```
+
+Determine what kind of report this is:
+
+| Signal | Classification |
+|--------|---------------|
+| PR exists + QA verdict comment (PASS/FAIL) | **QA verification result** |
+| PR exists + Design verdict comment (APPROVED/NEEDS CHANGES) | **Design review result** |
+| PR exists + no review comments | **Implementation delivered, needs routing** |
+| No PR + audit/review report in comments | **Audit report, needs triage into tasks** |
+| Issue has `<!-- deps: N -->` and dependency is now resolved | **Blocked task, check if unblockable** |
+
+### Phase 2: Act on Classification
+
+#### QA Verdict: PASS
+
+Check if visual review is needed:
+
+| PR changes | Action |
+|------------|--------|
+| Non-frontend (BE, OPS, infra, docs) | **Merge** |
+| Frontend bug fix (restores existing behavior) | **Merge** |
+| Frontend new/changed visual (new components, layout changes) | **Route to Design** |
+
+**Merge**:
+```bash
+gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" -d '{"status": "done"}'
+```
+
+**Route to Design**:
+```bash
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "design"}'
+```
+
+#### QA Verdict: FAIL
+
+Read QA's triage assessment. Route to the appropriate role:
+
+```bash
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "{fe|be|debug}"}'
+```
+
+#### Design Verdict: APPROVED
+
+If QA already passed → **Merge**. If QA hasn't verified yet → **Route to QA**.
+
+#### Design Verdict: NEEDS CHANGES
+
+Route back to the implementing role (usually FE) with Design's feedback:
+
+```bash
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "{fe|be}"}'
+```
+
+#### Implementation Delivered (no review yet)
+
+A FE/BE/OPS agent completed work and opened a PR. Route to QA for verification:
+
+```bash
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "qa"}'
+```
+
+#### Audit Report (no PR, findings in comments)
+
+QA or Design completed an audit task. Read the report and decompose findings into actionable fix tasks:
+
+1. Read the report comment carefully — note severity (Critical/P0 > Major/P1 > Minor/P2)
+2. Group related findings into coherent fix tasks (e.g. "all Header dark mode issues" = 1 task)
+3. Create new bounty issues using the same flow as **Mode A Phase 5** (POST to `/bounties`)
+4. Each new issue must have: clear spec, acceptance criteria, correct `agent_type`
+5. Close or mark the audit issue as done:
+   ```bash
+   curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+     -H "Content-Type: application/json" -d '{"status": "done"}'
+   ```
+
+**Prioritization rule**: Create tasks in severity order. Critical/P0 tasks get `status: ready` immediately. P2/nice-to-have can be batched or deferred.
+
+#### Blocked Task Unblocking
+
+Check if the dependency is now resolved:
+
+```bash
+# Parse <!-- deps: M --> from issue body, check if #M is done
+gh issue view {M} --repo {REPO_SLUG} --json state,labels
+```
+
+If the dependency is complete, unblock and set ready:
+
+```bash
+# Remove blocked label, set ready
+gh issue edit {N} --repo {REPO_SLUG} --remove-label "status:blocked" --add-label "status:ready"
+curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "{original_agent_type}"}'
+```
+
+### Phase 3: Update arch.md
+
+If triage revealed new domain knowledge, architectural concerns, or tech debt → update `arch.md`.
+
+### Phase 4: Journal
+
+Record: what came back, what decision you made and why, any patterns across reports.
 
 ---
 

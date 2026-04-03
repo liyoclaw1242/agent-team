@@ -111,10 +111,10 @@ Fix remaining issues from validation. Recapture screenshots to confirm.
 ### Phase 9: Deliver
 
 1. Run `actions/deliver.sh` — commit + push + open PR
-2. Update bounty status:
+2. Route back to ARCH for decision:
    ```bash
    curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-     -H "Content-Type: application/json" -d '{"status": "review"}'
+     -H "Content-Type: application/json" -d '{"status": "ready", "agent_type": "arch"}'
    curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
    ```
 
@@ -228,7 +228,15 @@ Expected: [Pencil sketch description]
 **Verdict: NEEDS CHANGES**"
 ```
 
-If rejected: close PR, post feedback on issue, reset status to `ready`.
+**Design does NOT merge, reject, or reassign.** Post your verdict, then route back to ARCH:
+
+```bash
+curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
+  -H "Content-Type: application/json" -d '{"status": "ready", "agent_type": "arch"}'
+curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
+```
+
+ARCH reads the verdict and decides: merge (if approved), route back to FE (if needs changes), or escalate.
 
 ### Phase 6: Journal + Distill
 

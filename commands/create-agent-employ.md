@@ -9,7 +9,7 @@ argument-hint: [role] [repo]
 Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe liyoclaw1242/whitelabel-admin`)
 
 Parse `$ARGUMENTS` by splitting on whitespace:
-- First token → role (be, fe, ops, arch, design, qa, debug, pm)
+- First token → role (be, fe, ops, arch, design, qa, debug)
 - Second token → repo slug (owner/repo)
 
 If either is missing, prompt the user interactively (see steps below).
@@ -37,16 +37,13 @@ Which agent role should I take on?
   2. FE     — Frontend engineer (UI, components, styling)
   3. OPS    — DevOps / infrastructure (CI, deployment, config)
 
- Design & Architecture Agents:
-  4. ARCH   — Software architect (system design, ADRs, API contracts)
+ Architecture & Design Agents:
+  4. ARCH   — Software architect (sole dispatcher + merge authority, system design, triage)
   5. DESIGN — UI/UX designer (design audit, component design, a11y)
 
  Review & Quality Agents:
-  6. QA     — Code reviewer (reviews open PRs from agent branches)
+  6. QA     — QA engineer (test plans, verification, verdicts)
   7. DEBUG  — Investigator (root cause analysis, bug diagnosis)
-
- Coordination Agent:
-  8. PM     — Project manager (dependency tracking, issue triage, unblocking)
 
 Reply with the number or name.
 ```
@@ -199,10 +196,18 @@ git push origin agent/{AGENT_ID}/issue-{N}
 gh pr create --title "[{AGENT_ID}] {title}" \
   --body "Closes #{N}\n\nBy agent \`{AGENT_ID}\`." \
   --base main --head agent/{AGENT_ID}/issue-{N} --repo {REPO_SLUG}
+```
+
+**Route back to ARCH for decision** — only ARCH can merge, reject, or reassign:
+
+```bash
 curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" -d '{"status": "review"}'
+  -H "Content-Type: application/json" \
+  -d '{"status": "ready", "agent_type": "arch"}'
 curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
 ```
+
+> **Why**: ARCH is the sole dispatcher and merge authority. All completed work flows back to ARCH, who decides the next step (merge, route to QA/Design, reject, or create follow-up tasks).
 
 ### 8.6 Sleep
 
@@ -230,11 +235,10 @@ Every task ends with: **DONE** | **DONE_WITH_CONCERNS** | **BLOCKED** | **NEEDS_
 
 | # | Role | Workflow | Delivers |
 |---|------|----------|----------|
-| 1 | BE | implement | Code + PR |
-| 2 | FE | implement | Code + PR |
-| 3 | OPS | implement | Code + PR |
-| 4 | ARCH | architect | Docs + PR |
-| 5 | DESIGN | design | Code + PR |
-| 6 | QA | review | Comments + merge/reject |
-| 7 | DEBUG | investigate | Diagnosis + fix bounty |
-| 8 | PM | coordinate | Status updates |
+| 1 | BE | implement | Code + PR → ARCH |
+| 2 | FE | implement | Code + PR → ARCH |
+| 3 | OPS | implement | Code + PR → ARCH |
+| 4 | ARCH | architect | Dispatch + merge + triage |
+| 5 | DESIGN | design | Code + PR or verdict → ARCH |
+| 6 | QA | verify | Verdict + report → ARCH |
+| 7 | DEBUG | investigate | Diagnosis + report → ARCH |

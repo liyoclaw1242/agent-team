@@ -1,15 +1,15 @@
 #!/bin/bash
-# Unblock issues whose dependencies are all closed.
-# Deterministic: preflight check → execute → verify. AI should NOT reason about this.
+# Scan for blocked issues whose dependencies are all closed, then unblock them.
+# Run as ARCH pre-triage step every cycle.
 #
-# Usage: unblock.sh <API_URL> <REPO_SLUG>
+# Usage: scan-unblock.sh <API_URL> <REPO_SLUG>
 # Exit 0 = success (0 or more issues unblocked), non-zero = API error
 set -euo pipefail
 
 API_URL="${1:?API_URL required (e.g. http://localhost:8000)}"
 REPO_SLUG="${2:?REPO_SLUG required (e.g. owner/repo)}"
 
-echo "═══ PM: Dependency Unblock ═══"
+echo "═══ ARCH: Dependency Unblock Scan ═══"
 echo "Repo: ${REPO_SLUG}"
 
 # 1. Fetch all blocked issues for this repo
