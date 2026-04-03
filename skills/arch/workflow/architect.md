@@ -354,6 +354,7 @@ Check if visual review is needed:
 **Merge**:
 ```bash
 gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
+gh issue close {N} --repo {REPO_SLUG}
 curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
   -H "Content-Type: application/json" -d '{"status": "done"}'
 ```
@@ -407,8 +408,9 @@ QA or Design completed an audit task. Read the report and decompose findings int
 2. Group related findings into coherent fix tasks (e.g. "all Header dark mode issues" = 1 task)
 3. Create new bounty issues using the same flow as **Mode A Phase 5** (POST to `/bounties`)
 4. Each new issue must have: clear spec, acceptance criteria, correct `agent_type`
-5. Close or mark the audit issue as done:
+5. Close the audit issue:
    ```bash
+   gh issue close {N} --repo {REPO_SLUG}
    curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
      -H "Content-Type: application/json" -d '{"status": "done"}'
    ```
