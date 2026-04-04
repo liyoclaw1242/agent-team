@@ -392,8 +392,10 @@ Read QA's triage assessment. Route to the appropriate role:
 ```bash
 gh issue edit {N} --repo {REPO_SLUG} \
   --remove-label "agent:arch" \
-  --add-label "agent:{fe|be|debug}" --add-label "status:ready"
+  --add-label "agent:{fe|be|ops|debug}" --add-label "status:ready"
 ```
+
+Choose the role based on QA's triage: UI/component → `fe`, API/DB → `be`, CI/infra → `ops`, unclear → `debug`.
 
 #### Design Verdict: APPROVED
 
@@ -401,12 +403,12 @@ If QA already passed → **Merge**. If QA hasn't verified yet → **Route to QA*
 
 #### Design Verdict: NEEDS CHANGES
 
-Route back to the implementing role (usually FE) with Design's feedback:
+Route back to the implementing role with Design's feedback:
 
 ```bash
 gh issue edit {N} --repo {REPO_SLUG} \
   --remove-label "agent:arch" \
-  --add-label "agent:{fe|be}" --add-label "status:ready"
+  --add-label "agent:{fe|be|ops}" --add-label "status:ready"
 ```
 
 #### Implementation Delivered (no review yet)
