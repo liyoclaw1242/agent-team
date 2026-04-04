@@ -41,6 +41,9 @@ gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
 
 echo "Routed #${ISSUE_N} back to ARCH"
 
-# 4. Release comment
+# 4. Verify labels
+bash scripts/verify-labels.sh "$REPO_SLUG" "$ISSUE_N" || echo "WARN: Label verification failed for #${ISSUE_N}"
+
+# 5. Release comment
 gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
   --body "Delivered by \`${AGENT_ID}\` — PR opened, routed to ARCH for triage."

@@ -38,4 +38,8 @@ if [ "$CLAIM_COUNT" -gt 1 ]; then
   exit 1
 fi
 
+# Verify labels
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+bash "${SCRIPT_DIR}/verify-labels.sh" "$REPO_SLUG" "$ISSUE_N" || echo "WARN: Label verification failed for #${ISSUE_N}"
+
 echo "CLAIMED: #${ISSUE_N} by ${AGENT_ID}"

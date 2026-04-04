@@ -102,3 +102,10 @@ case "$TARGET" in
     exit 1
     ;;
 esac
+
+# ── Post-routing verification ──
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+bash "${SCRIPT_DIR}/verify-labels.sh" "$REPO_SLUG" "$ISSUE_N" || {
+  echo "LABEL VERIFICATION FAILED after routing #${ISSUE_N} → ${TARGET}"
+  exit 1
+}
