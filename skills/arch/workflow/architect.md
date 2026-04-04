@@ -349,15 +349,34 @@ Read the issue and all comments:
 gh issue view {N} --repo {REPO_SLUG} --comments
 ```
 
-Determine what kind of report this is:
+**Classify by scanning comments in reverse order (newest first).** Check these signals in this exact priority:
 
-| Signal | Classification |
-|--------|---------------|
-| PR exists + QA verdict comment (PASS/FAIL) | **QA verification result** |
-| PR exists + Design verdict comment (APPROVED/NEEDS CHANGES) | **Design review result** |
-| PR exists + no review comments | **Implementation delivered, needs routing** |
-| No PR + audit/review report in comments | **Audit report, needs triage into tasks** |
-| Issue has `<!-- deps: N -->` and dependency is now resolved | **Blocked task, check if unblockable** |
+```bash
+# 1. Check for QA verdict (highest priority)
+QA_VERDICT=$(gh issue view {N} --repo {REPO_SLUG} --json comments \
+  --jq '[.comments[].body | select(test("Verdict:.*PASS|Verdict:.*FAIL"))] | last // empty')
+
+# 2. Check for Design verdict
+DESIGN_VERDICT=$(gh issue view {N} --repo {REPO_SLUG} --json comments \
+  --jq '[.comments[].body | select(test("Verdict:.*APPROVED|Verdict:.*NEEDS CHANGES"))] | last // empty')
+
+# 3. Check if a PR exists
+PR_EXISTS=$(gh pr list --repo {REPO_SLUG} --search "closes #{N}" --json number --jq '.[0].number // empty')
+```
+
+**Classification rules (check in this order — first match wins):**
+
+| Priority | Signal | Classification |
+|----------|--------|---------------|
+| 1 | QA_VERDICT contains "PASS" | **QA PASS → decide merge or route to Design** |
+| 2 | QA_VERDICT contains "FAIL" | **QA FAIL → route to implementer** |
+| 3 | DESIGN_VERDICT contains "APPROVED" | **Design APPROVED → merge** |
+| 4 | DESIGN_VERDICT contains "NEEDS CHANGES" | **Design rejected → route to implementer** |
+| 5 | PR exists + no verdict comments | **Implementation delivered → route to QA** |
+| 6 | No PR + report in comments | **Audit report → decompose into tasks** |
+| 7 | Issue has `<!-- deps: N -->` | **Check if unblockable** |
+
+**CRITICAL: If a QA or Design verdict exists, NEVER re-route to the same role. Act on the verdict.**
 
 ### Phase 2: Act on Classification
 

@@ -14,3 +14,4 @@ release/
 # Agent runtime data (generated at runtime, not source)
 skills/*/log/*.md
 !skills/*/log/.gitkeep
+supervisor/agent-team-supervisor-0.1.0.tgz
