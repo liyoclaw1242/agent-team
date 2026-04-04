@@ -1,6 +1,6 @@
 #!/bin/bash
-# Commit, push, open PR, and route back to ARCH for decision.
-# Usage: deliver.sh <AGENT_ID> <ISSUE_NUMBER> <TITLE> <REPO_SLUG> [COMMIT_PREFIX] [API_URL]
+# Commit, push, open PR, and route back to ARCH via GitHub labels.
+# Usage: deliver.sh <AGENT_ID> <ISSUE_NUMBER> <TITLE> <REPO_SLUG> [COMMIT_PREFIX]
 set -e
 
 AGENT_ID="${1:?Agent ID required}"
@@ -8,7 +8,6 @@ ISSUE_N="${2:?Issue number required}"
 TITLE="${3:?Title required}"
 REPO_SLUG="${4:?Repo slug required}"
 PREFIX="${5:-feat:}"
-API_URL="${6:-http://localhost:8000}"
 
 BRANCH="agent/${AGENT_ID}/issue-${ISSUE_N}"
 
@@ -29,14 +28,19 @@ Implemented by agent \`${AGENT_ID}\`." \
 
 echo "PR created for #${ISSUE_N}"
 
-# 3. Bounty board: route back to ARCH for triage
-curl -sf -X PATCH "${API_URL}/bounties/${REPO_SLUG}/issues/${ISSUE_N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "arch"}' \
-  && echo "Routed #${ISSUE_N} back to ARCH" \
-  || echo "WARN: Failed to update bounty status for #${ISSUE_N}"
+# 3. Route back to ARCH: swap labels
+CURRENT_AGENT=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels \
+  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
 
-# 4. Release claim
-curl -sf -X DELETE "${API_URL}/claims/${REPO_SLUG}/issues/${ISSUE_N}?agent_id=${AGENT_ID}" \
-  && echo "Released claim on #${ISSUE_N}" \
-  || echo "WARN: Failed to release claim for #${ISSUE_N}"
+if [ -n "$CURRENT_AGENT" ]; then
+  gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
+fi
+gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
+  --remove-label "status:in-progress" \
+  --add-label "agent:arch" --add-label "status:ready"
+
+echo "Routed #${ISSUE_N} back to ARCH"
+
+# 4. Release comment
+gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
+  --body "Delivered by \`${AGENT_ID}\` — PR opened, routed to ARCH for triage."

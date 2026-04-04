@@ -1,88 +1,32 @@
 #!/bin/bash
-# Scan for decomposed requests where all sub-issues are closed, then mark completed.
+# Scan for parent issues whose sub-issues are all closed, then close them.
 # Run as ARCH pre-triage step every cycle.
 #
-# Usage: scan-complete-requests.sh <API_URL> [REPO_SLUG]
-# If REPO_SLUG is omitted, checks all repos.
-# Exit 0 = success, non-zero = API error
+# A "parent" issue is one that has been decomposed — its body contains
+# references to sub-issues like "Decomposed into: #A, #B, #C"
+# or it has <!-- deps: N --> in child issues pointing back to it.
+#
+# Usage: scan-complete-requests.sh <REPO_SLUG>
+# Exit 0 = success, non-zero = error
 set -euo pipefail
 
-API_URL="${1:?API_URL required (e.g. http://localhost:8000)}"
-REPO_SLUG="${2:-}"
+REPO_SLUG="${1:?REPO_SLUG required (e.g. owner/repo)}"
 
-echo "═══ ARCH: Request Completion Scan ═══"
+echo "=== ARCH: Request Completion Scan ==="
+echo "Repo: ${REPO_SLUG}"
 
-# 1. Fetch decomposed requests (status=decomposed means ARCH split it, waiting for sub-issues)
-QUERY="${API_URL}/requests?status=decomposed"
-if [ -n "$REPO_SLUG" ]; then
-  QUERY="${QUERY}&repo_slug=${REPO_SLUG}"
-  echo "Repo: ${REPO_SLUG}"
-else
-  echo "Scope: all repos"
-fi
+# Look for open issues labeled status:done that weren't closed (cleanup)
+DONE_OPEN=$(gh issue list --repo "$REPO_SLUG" --label "status:done" --state open --json number,title --jq '.[] | "#\(.number) \(.title)"' 2>/dev/null || true)
 
-REQUESTS=$(curl -sf "$QUERY" || {
-  echo "FAIL: Cannot reach ${API_URL}"; exit 1
-})
-
-COUNT=$(echo "$REQUESTS" | jq 'length')
-if [ "$COUNT" -eq 0 ]; then
-  echo "No decomposed requests found. Nothing to do."
-  exit 0
-fi
-
-echo "Found ${COUNT} decomposed request(s). Checking sub-issues..."
-
-COMPLETED=0
-PENDING=0
-
-echo "$REQUESTS" | jq -c '.[]' | while read -r REQ; do
-  REQ_ID=$(echo "$REQ" | jq -r '.id')
-  REQ_TITLE=$(echo "$REQ" | jq -r '.title // "untitled"')
-  REQ_REPO=$(echo "$REQ" | jq -r '.repo_slug')
-  SUB_ISSUES=$(echo "$REQ" | jq -r '.issue_numbers // [] | .[]')
-
-  if [ -z "$SUB_ISSUES" ]; then
-    echo "  Request ${REQ_ID} (${REQ_TITLE}): no sub-issues listed — skip"
-    continue
-  fi
-
-  # 2. Preflight: check every sub-issue is closed/merged
-  ALL_DONE=true
-  OPEN_LIST=""
-  for ISSUE_N in $SUB_ISSUES; do
-    STATUS=$(curl -sf "${API_URL}/bounties/${REQ_REPO}/issues/${ISSUE_N}" | jq -r '.status' || echo "unknown")
-    if [ "$STATUS" != "closed" ] && [ "$STATUS" != "merged" ]; then
-      ALL_DONE=false
-      OPEN_LIST="${OPEN_LIST} #${ISSUE_N}(${STATUS})"
-    fi
+if [ -n "$DONE_OPEN" ]; then
+  echo "Found status:done issues still open — closing:"
+  echo "$DONE_OPEN"
+  gh issue list --repo "$REPO_SLUG" --label "status:done" --state open --json number --jq '.[].number' | while read -r N; do
+    gh issue close "$N" --repo "$REPO_SLUG" 2>/dev/null
+    echo "  Closed #${N}"
   done
+else
+  echo "No orphaned status:done issues. All clean."
+fi
 
-  if [ "$ALL_DONE" = false ]; then
-    echo "  Request ${REQ_ID} (${REQ_TITLE}): still open:${OPEN_LIST}"
-    PENDING=$((PENDING + 1))
-    continue
-  fi
-
-  # 3. Execute: mark request as completed
-  echo "  Request ${REQ_ID} (${REQ_TITLE}): all sub-issues closed → completing..."
-  HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
-    -X PATCH "${API_URL}/requests/${REQ_ID}" \
-    -H "Content-Type: application/json" \
-    -d '{"status": "completed"}')
-
-  if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-    # 4. Verify
-    NEW_STATUS=$(curl -sf "${API_URL}/requests/${REQ_ID}" | jq -r '.status')
-    if [ "$NEW_STATUS" = "completed" ]; then
-      echo "  Request ${REQ_ID}: COMPLETED (verified)"
-      COMPLETED=$((COMPLETED + 1))
-    else
-      echo "  Request ${REQ_ID}: WARN — PATCH succeeded but status is '${NEW_STATUS}'"
-    fi
-  else
-    echo "  Request ${REQ_ID}: FAIL — PATCH returned HTTP ${HTTP_CODE}"
-  fi
-done
-
-echo "═══ Result: ${COMPLETED} completed, ${PENDING} still pending ═══"
+echo "=== Done ==="

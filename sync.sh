@@ -16,7 +16,13 @@ mkdir -p "$TARGET/commands"
 cp "$SCRIPT_DIR/commands/create-agent-employ.md" "$TARGET/commands/"
 echo "  commands/create-agent-employ.md"
 
-# Skills (8 role-based skills with full directory structure)
+# Shared scripts (claims, release-claim)
+mkdir -p "$TARGET/scripts"
+cp "$SCRIPT_DIR/scripts/"*.sh "$TARGET/scripts/"
+chmod +x "$TARGET/scripts/"*.sh
+echo "  scripts/"
+
+# Skills (7 role-based skills with full directory structure)
 for skill_dir in "$SCRIPT_DIR/skills/"*/; do
   skill_name="$(basename "$skill_dir")"
   cp -r "$skill_dir" "$TARGET/skills/$skill_name"

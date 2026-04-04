@@ -13,11 +13,11 @@ After pre-flight, classify the task to choose the correct mode:
 
 | How you got this task | Mode |
 |----------------------|------|
-| Polled from `/requests?status=pending` | **A** (Decomposition) |
-| Task body requests architecture design / ADR | **B** (Design) |
+| Issue is a new requirement / feature request (no prior agent work) | **A** (Decomposition) |
+| Issue body requests architecture design / ADR | **B** (Design) |
 | Issue comments contain "Technical Feedback from" by FE/BE | **C** (Re-evaluation) |
 | Issue comments contain QA/Design verdict, or PR exists with no review | **D** (Triage) |
-| Task was previously `agent_type` ≠ arch (routed back from another agent) | **D** (Triage) |
+| Issue was previously assigned to another agent (routed back) | **D** (Triage) |
 
 **Mode D is the most common mode** — every completed task from every agent flows through here.
 
@@ -139,23 +139,26 @@ Now proceed to the requested mode (A, B, or C).
 
 ### Phase 1: Intake
 
-1. Poll for pending requests: `GET /requests?status=pending`
-2. Claim the oldest: `POST /requests/{ID}/claim`
-3. Read `summary` + `body` carefully
+The request is a GitHub issue with `agent:arch` + `status:ready`. You already picked it up during polling.
+
+1. Read the issue title + body carefully
+2. Claim it: `bash scripts/claims.sh "{REPO_SLUG}" {N} "{AGENT_ID}"`
 
 ### Phase 2: Context
 
-1. List repos: `GET /repos`
-2. List existing bounties: `GET /bounties` — what's already in progress?
-3. **Read arch.md first** — if `arch.md` exists at repo root, read it. This is your persistent map:
+1. List existing open issues:
+   ```bash
+   gh issue list --repo {REPO_SLUG} --state open --json number,title,labels --jq '.[]'
+   ```
+2. **Read arch.md first** — if `arch.md` exists at repo root, read it. This is your persistent map:
    - Domain model, bounded contexts, aggregate roots
    - System architecture, tech stack, data flow
    - API contracts
    - User journey map
    - Product roadmap context, known tech debt
    - If `arch.md` doesn't exist → you must create it as part of this task (see `cases/arch-md-template.md`)
-4. Read `README.md`, `package.json`, folder structure
-5. Read past journal entries
+3. Read `README.md`, `package.json`, folder structure
+4. Read past journal entries
 
 ### Phase 3: Domain Analysis
 
@@ -178,10 +181,9 @@ Break into 1-6 atomic tasks. Each task must be:
 For each task, define:
 ```json
 {
-  "title": "Verb: what changes",
-  "body": "## Task\n...\n## Acceptance Criteria\n- [ ] ...\n## Technical Notes\n...",
-  "agent_type": "fe",
-  "deps": []
+  "title": "{Role}: {what changes}",
+  "labels": ["agent:{role}", "status:ready"],
+  "body": "## Task\n...\n## Acceptance Criteria\n- [ ] ...\n## Technical Notes\n...\n\n<!-- deps: {N} -->"
 }
 ```
 
@@ -194,7 +196,18 @@ For each task, define:
 
 ### Phase 5: Create
 
-POST each task to `/bounties` in dependency order. Collect issue numbers.
+Create each task as a GitHub issue in dependency order:
+
+```bash
+gh issue create --repo {REPO_SLUG} \
+  --title "{Role}: {title}" \
+  --label "agent:{role}" --label "status:ready" \
+  --body "{spec with acceptance criteria and <!-- deps: N --> if needed}"
+```
+
+For issues with unmet dependencies, use `status:blocked` instead of `status:ready`.
+
+Collect issue numbers for the report.
 
 ### Phase 6: Update arch.md
 
@@ -210,7 +223,14 @@ git push origin main
 
 ### Phase 7: Report
 
-Mark request as decomposed: `PATCH /requests/{ID}` with status + issue list.
+Close the original request issue and comment with the decomposition:
+
+```bash
+gh issue comment {N} --repo {REPO_SLUG} \
+  --body "Decomposed into: #A, #B, #C, ..."
+gh issue close {N} --repo {REPO_SLUG}
+gh issue edit {N} --repo {REPO_SLUG} --add-label "status:done"
+```
 
 ### Phase 8: Journal
 
@@ -311,10 +331,10 @@ Housekeeping that ARCH runs automatically — dependency unblocking and request 
 
 ```bash
 # 1. Unblock issues whose deps are all resolved
-bash actions/scan-unblock.sh "{API_URL}" "{REPO_SLUG}"
+bash actions/scan-unblock.sh "{REPO_SLUG}"
 
-# 2. Mark requests as completed if all sub-issues are done
-bash actions/scan-complete-requests.sh "{API_URL}" "{REPO_SLUG}"
+# 2. Check for completed requests (all sub-issues done)
+bash actions/scan-complete-requests.sh "{REPO_SLUG}"
 ```
 
 These are deterministic — if all deps are closed, unblock. If all sub-issues are done, complete the request. No judgment needed.
@@ -355,15 +375,14 @@ Check if visual review is needed:
 ```bash
 gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
 gh issue close {N} --repo {REPO_SLUG}
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" -d '{"status": "done"}'
+gh issue edit {N} --repo {REPO_SLUG} --remove-label "status:ready" --add-label "status:done"
 ```
 
 **Route to Design**:
 ```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "design"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "agent:arch" --remove-label "status:in-progress" \
+  --add-label "agent:design" --add-label "status:ready"
 ```
 
 #### QA Verdict: FAIL
@@ -371,9 +390,9 @@ curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
 Read QA's triage assessment. Route to the appropriate role:
 
 ```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "{fe|be|debug}"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "agent:arch" \
+  --add-label "agent:{fe|be|debug}" --add-label "status:ready"
 ```
 
 #### Design Verdict: APPROVED
@@ -385,9 +404,9 @@ If QA already passed → **Merge**. If QA hasn't verified yet → **Route to QA*
 Route back to the implementing role (usually FE) with Design's feedback:
 
 ```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "{fe|be}"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "agent:arch" \
+  --add-label "agent:{fe|be}" --add-label "status:ready"
 ```
 
 #### Implementation Delivered (no review yet)
@@ -395,9 +414,9 @@ curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
 A FE/BE/OPS agent completed work and opened a PR. Route to QA for verification:
 
 ```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "qa"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "agent:arch" \
+  --add-label "agent:qa" --add-label "status:ready"
 ```
 
 #### Audit Report (no PR, findings in comments)
@@ -406,16 +425,21 @@ QA or Design completed an audit task. Read the report and decompose findings int
 
 1. Read the report comment carefully — note severity (Critical/P0 > Major/P1 > Minor/P2)
 2. Group related findings into coherent fix tasks (e.g. "all Header dark mode issues" = 1 task)
-3. Create new bounty issues using the same flow as **Mode A Phase 5** (POST to `/bounties`)
-4. Each new issue must have: clear spec, acceptance criteria, correct `agent_type`
+3. Create new issues via `gh issue create`:
+   ```bash
+   gh issue create --repo {REPO_SLUG} \
+     --title "{role}: {title}" \
+     --label "agent:{role}" --label "status:ready" \
+     --body "{spec with acceptance criteria}"
+   ```
+4. Each new issue must have: clear spec, acceptance criteria, correct `agent:*` label
 5. Close the audit issue:
    ```bash
    gh issue close {N} --repo {REPO_SLUG}
-   curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-     -H "Content-Type: application/json" -d '{"status": "done"}'
+   gh issue edit {N} --repo {REPO_SLUG} --add-label "status:done"
    ```
 
-**Prioritization rule**: Create tasks in severity order. Critical/P0 tasks get `status: ready` immediately. P2/nice-to-have can be batched or deferred.
+**Prioritization rule**: Create tasks in severity order. Critical/P0 tasks get `status:ready` immediately. P2/nice-to-have can be batched or deferred.
 
 #### Blocked Task Unblocking
 
@@ -429,11 +453,8 @@ gh issue view {M} --repo {REPO_SLUG} --json state,labels
 If the dependency is complete, unblock and set ready:
 
 ```bash
-# Remove blocked label, set ready
-gh issue edit {N} --repo {REPO_SLUG} --remove-label "status:blocked" --add-label "status:ready"
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "{original_agent_type}"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "status:blocked" --add-label "status:ready"
 ```
 
 ### Phase 3: Update arch.md
@@ -489,9 +510,9 @@ Accepted feedback from {FE/BE agent}. Spec updated:
 Handing back to \`agent:{original_type}\`."
 
 # Hand back
-curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "{original_type}"}'
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "agent:arch" \
+  --add-label "agent:{original_type}" --add-label "status:ready"
 ```
 
 **Counter-propose** (when global concerns override local optimization):

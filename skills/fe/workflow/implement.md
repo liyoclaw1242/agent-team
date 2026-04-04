@@ -75,9 +75,12 @@ gh issue comment {N} --repo {REPO_SLUG} \
 {which parts of the spec need to change}"
 
 # 2. Hand back to ARCH for re-evaluation
-curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "arch"}'
+CURRENT_AGENT=$(gh issue view {N} --repo {REPO_SLUG} --json labels \
+  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
+[ -n "$CURRENT_AGENT" ] && gh issue edit {N} --repo {REPO_SLUG} --remove-label "$CURRENT_AGENT"
+gh issue edit {N} --repo {REPO_SLUG} \
+  --remove-label "status:in-progress" \
+  --add-label "agent:arch" --add-label "status:ready"
 ```
 
 Then move on to your next task. Don't wait for ARCH — they'll update the spec and it will come back to you.

@@ -207,10 +207,15 @@ Report the blocker clearly. Do NOT approve or reject.
 **QA does NOT merge, reject, or reassign.** All verdicts route back to ARCH for decision.
 
 ```bash
-curl -s -X PATCH "{API_URL}/bounties/{REPO_SLUG}/issues/{ISSUE_N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "arch"}'
-curl -s -X DELETE "{API_URL}/claims/{REPO_SLUG}/issues/{ISSUE_N}?agent_id={AGENT_ID}"
+# Swap labels to route to ARCH
+CURRENT_AGENT=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels \
+  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
+[ -n "$CURRENT_AGENT" ] && gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
+gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
+  --remove-label "status:in-progress" \
+  --add-label "agent:arch" --add-label "status:ready"
+gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
+  --body "QA complete. Routed to ARCH by \`${AGENT_ID}\`."
 ```
 
 > **Why**: ARCH is the sole merge authority and dispatcher. QA provides the verdict and evidence; ARCH decides the action (merge, route to Design for visual review, reject back to FE/BE, or escalate to DEBUG).

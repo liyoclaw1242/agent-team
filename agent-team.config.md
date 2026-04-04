@@ -1,5 +1,4 @@
 ---
-api_url: http://localhost:8000
 cycle_interval: 30
 ---
 

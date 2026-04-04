@@ -191,13 +191,17 @@ DEBUG diagnoses. **ARCH dispatches.** You do NOT create fix bounties or assign r
 Post your diagnosis on the issue (Phase 5), then hand back to ARCH:
 
 ```bash
-curl -s -X PATCH "${API_URL}/bounties/${REPO_SLUG}/issues/${ISSUE_N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "arch"}'
-curl -s -X DELETE "${API_URL}/claims/${REPO_SLUG}/issues/${ISSUE_N}?agent_id=${AGENT_ID}"
+CURRENT_AGENT=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels \
+  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
+[ -n "$CURRENT_AGENT" ] && gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
+gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
+  --remove-label "status:in-progress" \
+  --add-label "agent:arch" --add-label "status:ready"
+gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
+  --body "Diagnosis complete. Routed to ARCH by \`${AGENT_ID}\`."
 ```
 
-Your Phase 5 report already includes `### Suggested Role` and `### Recommended Fix` — ARCH uses this to create the fix bounty with the correct `agent_type`.
+Your Phase 5 report already includes `### Suggested Role` and `### Recommended Fix` — ARCH uses this to create the fix issue with the correct `agent:*` label.
 
 **Gate**: Diagnosis posted, issue routed back to ARCH.
 

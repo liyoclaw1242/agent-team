@@ -113,9 +113,12 @@ Fix remaining issues from validation. Recapture screenshots to confirm.
 1. Run `actions/deliver.sh` — commit + push + open PR
 2. Route back to ARCH for decision:
    ```bash
-   curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-     -H "Content-Type: application/json" -d '{"status": "ready", "agent_type": "arch"}'
-   curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
+   CURRENT_AGENT=$(gh issue view "$N" --repo "$REPO_SLUG" --json labels \
+     --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
+   [ -n "$CURRENT_AGENT" ] && gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
+   gh issue edit "$N" --repo "$REPO_SLUG" \
+     --remove-label "status:in-progress" \
+     --add-label "agent:arch" --add-label "status:ready"
    ```
 
 ### Phase 10: Journal + Distill
@@ -231,9 +234,12 @@ Expected: [Pencil sketch description]
 **Design does NOT merge, reject, or reassign.** Post your verdict, then route back to ARCH:
 
 ```bash
-curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" -d '{"status": "ready", "agent_type": "arch"}'
-curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
+CURRENT_AGENT=$(gh issue view "$N" --repo "$REPO_SLUG" --json labels \
+  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
+[ -n "$CURRENT_AGENT" ] && gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
+gh issue edit "$N" --repo "$REPO_SLUG" \
+  --remove-label "status:in-progress" \
+  --add-label "agent:arch" --add-label "status:ready"
 ```
 
 ARCH reads the verdict and decides: merge (if approved), route back to FE (if needs changes), or escalate.

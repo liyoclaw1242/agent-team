@@ -14,16 +14,16 @@ Parse `$ARGUMENTS` by splitting on whitespace:
 
 If either is missing, prompt the user interactively (see steps below).
 
-You are about to become a bounty board execution agent.
+You are about to become an autonomous execution agent. All task management is done via GitHub Issues + labels. No external API required.
 
 ## Step 1: Load Configuration
 
 Look for `agent-team.config.md` in this order (highest priority wins):
 1. Project-level: `.claude/agent-team.config.md` in the current working directory
 2. User-level: `~/.claude/agent-team.config.md`
-3. Defaults: `api_url=http://localhost:8000`, `cycle_interval=30`
+3. Defaults: `cycle_interval=30`
 
-If found, read it. Extract `api_url`, `cycle_interval`. Remember any `## inject` content.
+If found, read it. Extract `cycle_interval`. Remember any `## inject` content.
 
 ## Step 2: Select Role
 
@@ -54,23 +54,13 @@ Wait for answer.
 
 An agent is bound to ONE repo for its entire lifecycle. This prevents context pollution.
 
-If a repo was passed as argument, use it. Otherwise, fetch and list available repos:
-
-```bash
-curl -s {api_url}/repos
-```
+If a repo was passed as argument, use it. Otherwise, ask:
 
 ```
-Which repo should I work on?
-
-  1. owner/repo-a    →  ~/Projects/repo-a
-  2. owner/repo-b    →  ~/Projects/repo-b
-  3. owner/repo-c    →  ~/Projects/repo-c
-
-Reply with the number or slug.
+Which repo should I work on? (Enter the full slug, e.g. owner/repo)
 ```
 
-Wait for answer. Store as `{REPO_SLUG}` and resolve `{REPO_DIR}` from the API response.
+Wait for answer. Store as `{REPO_SLUG}`. Resolve `{REPO_DIR}` by cloning or locating the repo locally.
 
 **One agent, one repo.** If you need coverage on multiple repos, create multiple agents.
 
@@ -107,9 +97,9 @@ Format: `{role}-{timestamp}` — e.g. `be-20260401-143022`
 │  Dir:       {REPO_DIR}                         │
 │  Workflow:  {workflow name}                     │
 │  Standards: {standards list}                    │
-│  API:       {api_url}                          │
 │  Cycle:     every {cycle_interval} min         │
 │  Journal:   ~/.agent-team/journal/             │
+│  Backend:   GitHub Issues + Labels (gh CLI)    │
 └────────────────────────────────────────────────┘
 
 Ready to start? (y/n)
@@ -159,7 +149,7 @@ Repeat until stopped (Ctrl+C):
 ### 8.1 Poll
 
 ```bash
-curl -s "{api_url}/bounties?status=ready&agent_type={agent_type}&repo_slug={REPO_SLUG}"
+gh issue list --repo {REPO_SLUG} --label "agent:{agent_type}" --label "status:ready" --json number,title --jq '.[]'
 ```
 
 ### 8.2 No Tasks
@@ -174,12 +164,13 @@ Restart from 8.1. **CRITICAL**: Use `sleep`. Do NOT use CronCreate or end the co
 
 ### 8.3 Claim
 
+For the first available task, run the claim script:
+
 ```bash
-curl -s -X POST {api_url}/claims \
-  -H "Content-Type: application/json" \
-  -d '{"repo_slug": "{REPO_SLUG}", "issue_number": {N}, "agent_id": "{AGENT_ID}"}'
+bash scripts/claims.sh "{REPO_SLUG}" {N} "{AGENT_ID}"
 ```
-`409` → skip, try next. `201` → `[{AGENT_ID}] Claimed #{N}: {title}`
+
+Exit 1 → skip, try next issue. Exit 0 → `[{AGENT_ID}] Claimed #{N}: {title}`
 
 ### 8.4 Execute
 
@@ -190,22 +181,16 @@ Follow your **workflow** from `skills/{role}/workflow/`:
 
 ### 8.5 Deliver
 
-```bash
-git add -A && git commit -m "{commit_prefix} {title} (closes #{N})"
-git push origin agent/{AGENT_ID}/issue-{N}
-gh pr create --title "[{AGENT_ID}] {title}" \
-  --body "Closes #{N}\n\nBy agent \`{AGENT_ID}\`." \
-  --base main --head agent/{AGENT_ID}/issue-{N} --repo {REPO_SLUG}
-```
-
-**Route back to ARCH for decision** — only ARCH can merge, reject, or reassign:
+Run the deliver script which handles everything (git + PR + routing):
 
 ```bash
-curl -s -X PATCH "{api_url}/bounties/{REPO_SLUG}/issues/{N}" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "ready", "agent_type": "arch"}'
-curl -s -X DELETE "{api_url}/claims/{REPO_SLUG}/issues/{N}?agent_id={AGENT_ID}"
+bash skills/{role}/actions/deliver.sh "{AGENT_ID}" {N} "{title}" "{REPO_SLUG}"
 ```
+
+The script will:
+1. Commit + push + open PR
+2. Swap labels to route back to ARCH (`agent:arch` + `status:ready`)
+3. Post a release comment
 
 > **Why**: ARCH is the sole dispatcher and merge authority. All completed work flows back to ARCH, who decides the next step (merge, route to QA/Design, reject, or create follow-up tasks).
 
@@ -228,8 +213,19 @@ Every task ends with: **DONE** | **DONE_WITH_CONCERNS** | **BLOCKED** | **NEEDS_
 - **One repo only** — work exclusively in `{REPO_DIR}`
 - Implement spec exactly — no scope creep
 - Ambiguous spec → conservative interpretation + comment
-- All polling/claiming through the API
+- All task management via GitHub Issues + `gh` CLI — no external API
 - Do NOT skip the poll step
+
+## Label Convention
+
+| Label | Meaning |
+|-------|---------|
+| `agent:fe`, `agent:be`, etc. | Which role should work on this |
+| `agent:arch` | Routed to ARCH for triage/merge |
+| `status:ready` | Available for claiming |
+| `status:in-progress` | Claimed by an agent |
+| `status:blocked` | Waiting on dependencies |
+| `status:done` | Completed (issue should be closed) |
 
 ## Role Reference
 
