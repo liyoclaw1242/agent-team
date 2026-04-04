@@ -228,8 +228,7 @@ Close the original request issue and comment with the decomposition:
 ```bash
 gh issue comment {N} --repo {REPO_SLUG} \
   --body "Decomposed into: #A, #B, #C, ..."
-gh issue close {N} --repo {REPO_SLUG}
-gh issue edit {N} --repo {REPO_SLUG} --add-label "status:done"
+bash scripts/route.sh "{REPO_SLUG}" {N} done "{AGENT_ID}"
 ```
 
 ### Phase 8: Journal
@@ -376,7 +375,7 @@ PR_EXISTS=$(gh pr list --repo {REPO_SLUG} --search "closes #{N}" --json number -
 | 6 | No PR + report in comments | **Audit report → decompose into tasks** |
 | 7 | Issue has `<!-- deps: N -->` | **Check if unblockable** |
 
-**CRITICAL: If a QA or Design verdict exists, NEVER re-route to the same role. Act on the verdict.**
+**CRITICAL: All routing MUST go through `scripts/route.sh`. Do NOT use raw `gh issue edit` for label changes. The script enforces validation rules that prevent re-routing loops.**
 
 ### Phase 2: Act on Classification
 
@@ -392,16 +391,12 @@ Check if visual review is needed:
 
 **Merge**:
 ```bash
-gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
-gh issue close {N} --repo {REPO_SLUG}
-gh issue edit {N} --repo {REPO_SLUG} --remove-label "status:ready" --add-label "status:done"
+bash scripts/route.sh "{REPO_SLUG}" {N} merge "{AGENT_ID}"
 ```
 
 **Route to Design**:
 ```bash
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "agent:arch" --remove-label "status:in-progress" \
-  --add-label "agent:design" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} design "{AGENT_ID}"
 ```
 
 #### QA Verdict: FAIL
@@ -409,25 +404,28 @@ gh issue edit {N} --repo {REPO_SLUG} \
 Read QA's triage assessment. Route to the appropriate role:
 
 ```bash
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "agent:arch" \
-  --add-label "agent:{fe|be|ops|debug}" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} {fe|be|ops|debug} "{AGENT_ID}"
 ```
 
 Choose the role based on QA's triage: UI/component → `fe`, API/DB → `be`, CI/infra → `ops`, unclear → `debug`.
 
 #### Design Verdict: APPROVED
 
-If QA already passed → **Merge**. If QA hasn't verified yet → **Route to QA**.
+```bash
+bash scripts/route.sh "{REPO_SLUG}" {N} merge "{AGENT_ID}"
+```
+
+If QA hasn't verified yet → route to QA first:
+```bash
+bash scripts/route.sh "{REPO_SLUG}" {N} qa "{AGENT_ID}"
+```
 
 #### Design Verdict: NEEDS CHANGES
 
 Route back to the implementing role with Design's feedback:
 
 ```bash
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "agent:arch" \
-  --add-label "agent:{fe|be|ops}" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} {fe|be|ops} "{AGENT_ID}"
 ```
 
 #### Implementation Delivered (no review yet)
@@ -435,9 +433,7 @@ gh issue edit {N} --repo {REPO_SLUG} \
 A FE/BE/OPS agent completed work and opened a PR. Route to QA for verification:
 
 ```bash
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "agent:arch" \
-  --add-label "agent:qa" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} qa "{AGENT_ID}"
 ```
 
 #### Audit Report (no PR, findings in comments)
@@ -456,8 +452,7 @@ QA or Design completed an audit task. Read the report and decompose findings int
 4. Each new issue must have: clear spec, acceptance criteria, correct `agent:*` label
 5. Close the audit issue:
    ```bash
-   gh issue close {N} --repo {REPO_SLUG}
-   gh issue edit {N} --repo {REPO_SLUG} --add-label "status:done"
+   bash scripts/route.sh "{REPO_SLUG}" {N} done "{AGENT_ID}"
    ```
 
 **Prioritization rule**: Create tasks in severity order. Critical/P0 tasks get `status:ready` immediately. P2/nice-to-have can be batched or deferred.
@@ -531,9 +526,7 @@ Accepted feedback from {FE/BE agent}. Spec updated:
 Handing back to \`agent:{original_type}\`."
 
 # Hand back
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "agent:arch" \
-  --add-label "agent:{original_type}" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} {original_type} "{AGENT_ID}"
 ```
 
 **Counter-propose** (when global concerns override local optimization):
