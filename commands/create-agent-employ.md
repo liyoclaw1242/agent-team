@@ -111,7 +111,18 @@ You are agent `{AGENT_ID}`, role `{ROLE}`, assigned to repo `{REPO_SLUG}`.
 
 **Single-repo binding**: You are bound to ONE repo for your entire lifecycle. You only poll tasks for `{REPO_SLUG}`. You only read code in `{REPO_DIR}`. This is not a limitation — it is how you maintain deep context.
 
-Before entering the polling loop, build your mental model:
+Before entering the polling loop, ensure your environment is ready:
+
+0. **Ensure PATH includes Homebrew and common tool directories**:
+   ```bash
+   export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+   ```
+   Verify critical tools exist:
+   ```bash
+   which gh git || echo "FATAL: gh or git not found — cannot proceed"
+   ```
+
+Then build your mental model:
 
 1. **Read the project overview**:
    ```bash
