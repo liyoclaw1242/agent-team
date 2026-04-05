@@ -12,44 +12,180 @@
 </head>
 <body>
 
-<!-- Draggable title bar -->
-<div class="titlebar">
-  <span id="health-text">Agent Team</span>
-  <div class="titlebar-actions">
-    <button class="titlebar-btn" id="btn-settings">Settings</button>
-  </div>
-</div>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Layout: Sidebar | Main Area (Breadcrumb + Content + Properties)
+     ═══════════════════════════════════════════════════════════════════════ -->
 
-<!-- Main layout: Bounties (left) | Terminal (center) | Repos (right) -->
 <div class="layout">
 
-  <!-- Left: Tasks panel (GitHub issues with agent labels) -->
-  <div class="bounty-panel">
-    <div class="panel-header">
-      <span class="panel-title">Tasks</span>
-      <button class="btn-icon" id="btn-refresh-bounties" title="Refresh">&#8635;</button>
-    </div>
-    <div class="bounty-summary" id="bounties-summary"></div>
-    <div class="bounty-list" id="bounties-list">Loading...</div>
-  </div>
+  <!-- ─── Sidebar (240px, fixed left) ─── -->
+  <div class="sidebar">
 
-  <!-- Center: Terminal -->
-  <div class="main-panel">
-    <div class="terminal" id="terminal">
-      <div class="terminal-welcome">
-        <div class="welcome-title">Agent Team Supervisor</div>
-        <div class="welcome-hint">Click <span class="kbd">+</span> next to a repo to create an agent</div>
+    <div class="sidebar-header">
+      <span class="sidebar-title">Agent Team</span>
+      <div class="sidebar-header-actions">
+        <button class="btn-icon" id="btn-settings" title="Settings">&#9881;</button>
       </div>
     </div>
+
+    <div class="sidebar-scroll">
+
+      <!-- Inbox -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-label">Inbox</span>
+        </div>
+        <div class="sidebar-inbox-item" id="inbox-item">
+          <span>&#9993; Approvals</span>
+          <span class="inbox-badge" id="inbox-badge">0</span>
+        </div>
+      </div>
+
+      <!-- Tasks (collapsible) -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-label">Tasks</span>
+          <div class="sidebar-section-actions">
+            <button class="btn-icon" id="btn-refresh-bounties" title="Refresh tasks">&#8635;</button>
+          </div>
+        </div>
+        <div class="bounty-summary" id="bounties-summary"></div>
+        <div class="bounty-list" id="bounties-list"></div>
+      </div>
+
+      <!-- Repos -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-label">Repos</span>
+          <div class="sidebar-section-actions">
+            <button class="btn-icon" id="btn-refresh-repos" title="Refresh repos">&#8635;</button>
+          </div>
+        </div>
+        <div class="repos-list" id="repos-list"></div>
+      </div>
+
+    </div>
   </div>
 
-  <!-- Right: Repos accordion with agents -->
-  <div class="repos-panel">
-    <div class="panel-header">
-      <span class="panel-title">Repos &amp; Agents</span>
-      <button class="btn-icon" id="btn-refresh-repos" title="Refresh">&#8635;</button>
+  <!-- ─── Main Area ─── -->
+  <div class="main-area">
+
+    <!-- Breadcrumb bar -->
+    <div class="breadcrumb-bar">
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="side-muted">No agent selected</span>
+      </div>
+      <div class="breadcrumb-shortcuts">
+        <span><kbd>&#8984;K</kbd> search</span>
+        <span><kbd>N</kbd> new agent</span>
+        <span><kbd>R</kbd> refresh</span>
+        <span><kbd>1-9</kbd> switch</span>
+        <span><kbd>Esc</kbd> deselect</span>
+      </div>
     </div>
-    <div class="repos-list" id="repos-list"></div>
+
+    <!-- Content zone: main content + properties panel -->
+    <div class="content-zone">
+
+      <!-- Main content (terminal or dashboard) -->
+      <div class="main-content">
+        <div class="terminal" id="terminal">
+          <!-- Dashboard shown when no agent selected -->
+          <div class="dashboard" id="dashboard">
+            <div class="welcome-title">Agent Team Supervisor</div>
+            <div class="dashboard-cards" id="dashboard-cards">
+              <div class="dashboard-card">
+                <span class="dashboard-card-label">Agents</span>
+                <span class="dashboard-card-value" id="dash-agents">0/0</span>
+                <span class="dashboard-card-sub">alive / total</span>
+              </div>
+              <div class="dashboard-card">
+                <span class="dashboard-card-label">Cost</span>
+                <span class="dashboard-card-value" id="dash-cost">$0.00</span>
+                <span class="dashboard-card-sub">session total</span>
+              </div>
+              <div class="dashboard-card">
+                <span class="dashboard-card-label">Tasks</span>
+                <span class="dashboard-card-value" id="dash-tasks">0</span>
+                <span class="dashboard-card-sub">active</span>
+              </div>
+            </div>
+            <div class="dashboard-tasks" id="dashboard-task-badges"></div>
+            <div class="props-section" style="width:100%;max-width:640px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md)">
+              <div class="props-section-title">Pending Approvals</div>
+              <div class="side-muted" style="padding:4px 0">No pending approvals</div>
+              <div class="props-actions" style="margin-top:8px">
+                <button class="btn-action" disabled style="opacity:0.4;cursor:not-allowed">&#10003; Approve</button>
+                <button class="btn-action" disabled style="opacity:0.4;cursor:not-allowed">&#10007; Reject</button>
+              </div>
+            </div>
+            <div class="welcome-hint">Click <span class="kbd">+</span> next to a repo to create an agent, or press <span class="kbd">N</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Properties panel (slides in when agent selected) -->
+      <div class="properties-panel" id="properties-panel">
+        <div class="properties-header">
+          <div class="properties-role" id="props-role">--</div>
+          <div class="properties-agent-id" id="props-agent-id">--</div>
+        </div>
+        <div class="properties-scroll">
+
+          <div class="props-section">
+            <div class="props-section-title">Status</div>
+            <div class="props-row">
+              <span class="props-label">State</span>
+              <span class="props-value" id="props-status">
+                <span class="props-status-dot" id="props-status-dot"></span>
+                <span id="props-status-text">--</span>
+              </span>
+            </div>
+            <div class="props-row">
+              <span class="props-label">Uptime</span>
+              <span class="props-value" id="props-uptime">--</span>
+            </div>
+            <div class="props-row">
+              <span class="props-label">Cycle</span>
+              <span class="props-value" id="props-cycle">--</span>
+            </div>
+            <div class="props-row">
+              <span class="props-label">Restarts</span>
+              <span class="props-value" id="props-restarts">0</span>
+            </div>
+          </div>
+
+          <div class="props-section">
+            <div class="props-section-title">Cost</div>
+            <div class="props-row">
+              <span class="props-label">Session</span>
+              <span class="props-value" id="props-cost">$0.00</span>
+            </div>
+            <div class="cost-bar-track">
+              <div class="cost-bar-fill" id="props-cost-bar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div class="props-section" id="props-task-section" style="display:none">
+            <div class="props-section-title">Current Task</div>
+            <a class="props-task-link" id="props-task-link" href="#" target="_blank">
+              <span class="task-number" id="props-task-number">--</span>
+              <span id="props-task-title">--</span>
+            </a>
+          </div>
+
+          <div class="props-section">
+            <div class="props-section-title">Actions</div>
+            <div class="props-actions">
+              <button class="btn-action btn-action-stop" id="props-btn-stop">&#9632; Stop</button>
+              <button class="btn-action btn-action-restart" id="props-btn-restart">&#8635; Restart</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </div>
@@ -193,18 +329,157 @@ function statusDot(status) {
   return 'dot-dead';
 }
 
+function statusColor(status) {
+  if (['polling', 'working', 'sleeping'].includes(status)) return 'var(--status-ready)';
+  if (status === 'starting' || status === 'restarting') return 'var(--accent)';
+  if (status === 'rate_limited') return 'var(--status-in-progress)';
+  if (status === 'error') return 'var(--status-error)';
+  return 'hsl(220, 10%, 30%)';
+}
+
 function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ---------------------------------------------------------------------------
-// Bounties panel (left)
+// Breadcrumb
+// ---------------------------------------------------------------------------
+
+function renderBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  if (!activeAgentId || !agents[activeAgentId]) {
+    el.innerHTML = '<span class="side-muted">No agent selected</span>';
+    return;
+  }
+  const a = agents[activeAgentId];
+  const repoName = a.repo ? (a.repo.split('/')[1] || a.repo) : 'unknown';
+  let html = `<span>${escapeHtml(repoName)}</span>`;
+  html += `<span class="breadcrumb-sep">&#9656;</span>`;
+  html += `<span class="breadcrumb-active">${a.role.toUpperCase()} ${a.agent_id.slice(0, 8)}</span>`;
+  if (a.current_task) {
+    html += `<span class="breadcrumb-sep">&#9656;</span>`;
+    html += `<span>#${a.current_task.number || '?'}</span>`;
+  }
+  el.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+function renderDashboard() {
+  const agentList = Object.values(agents);
+  const alive = agentList.filter(a => !['dead', 'error'].includes(a.status)).length;
+  const total = agentList.length;
+  const cost = agentList.reduce((s, a) => s + (a.cost_usd || 0), 0);
+
+  document.getElementById('dash-agents').textContent = `${alive}/${total}`;
+  document.getElementById('dash-cost').textContent = `$${cost.toFixed(2)}`;
+
+  let ready = 0, inProgress = 0, blocked = 0;
+  if (trackerState && trackerState.repo_statuses) {
+    for (const rs of trackerState.repo_statuses) {
+      ready += rs.tasks?.ready || 0;
+      inProgress += rs.tasks?.in_progress || 0;
+      blocked += rs.tasks?.blocked || 0;
+    }
+  }
+
+  document.getElementById('dash-tasks').textContent = `${ready + inProgress + blocked}`;
+
+  const badgesEl = document.getElementById('dashboard-task-badges');
+  badgesEl.innerHTML = '';
+  if (ready > 0) badgesEl.innerHTML += `<span class="badge badge-green">${ready} ready</span>`;
+  if (inProgress > 0) badgesEl.innerHTML += `<span class="badge badge-yellow">${inProgress} in-progress</span>`;
+  if (blocked > 0) badgesEl.innerHTML += `<span class="badge badge-amber">${blocked} blocked</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// Properties panel
+// ---------------------------------------------------------------------------
+
+function renderProperties() {
+  const panel = document.getElementById('properties-panel');
+  if (!activeAgentId || !agents[activeAgentId]) {
+    panel.classList.remove('open');
+    return;
+  }
+
+  panel.classList.add('open');
+  const a = agents[activeAgentId];
+
+  document.getElementById('props-role').textContent = a.role.toUpperCase();
+  document.getElementById('props-agent-id').textContent = a.agent_id;
+
+  // Status
+  const dot = document.getElementById('props-status-dot');
+  dot.style.background = statusColor(a.status);
+  if (['polling', 'working', 'sleeping'].includes(a.status)) {
+    dot.style.boxShadow = `0 0 5px ${statusColor(a.status)}`;
+  } else {
+    dot.style.boxShadow = 'none';
+  }
+  document.getElementById('props-status-text').textContent = a.status || '--';
+
+  // Uptime
+  document.getElementById('props-uptime').textContent = a.created_at ? formatUptime(Date.now() - a.created_at) : '--';
+
+  // Cycle
+  document.getElementById('props-cycle').textContent = a.cycle || 0;
+
+  // Restarts
+  document.getElementById('props-restarts').textContent = a.restart_count || 0;
+
+  // Cost — $10 budget, green < 60%, yellow 60-80%, red > 80%
+  const costVal = a.cost_usd || 0;
+  document.getElementById('props-cost').textContent = `$${costVal.toFixed(2)}`;
+  const budgetPct = Math.min(costVal / 10.0 * 100, 100);
+  const costBar = document.getElementById('props-cost-bar');
+  costBar.style.width = budgetPct + '%';
+  costBar.className = 'cost-bar-fill' + (budgetPct > 80 ? ' danger' : budgetPct > 60 ? ' warning' : '');
+
+  // Current task
+  const taskSection = document.getElementById('props-task-section');
+  if (a.current_task && a.current_task.number) {
+    taskSection.style.display = '';
+    const taskLink = document.getElementById('props-task-link');
+    taskLink.href = a.current_task.url || '#';
+    document.getElementById('props-task-number').textContent = `#${a.current_task.number} `;
+    document.getElementById('props-task-title').textContent = a.current_task.title || '';
+  } else {
+    taskSection.style.display = 'none';
+  }
+}
+
+// Properties action buttons
+document.getElementById('props-btn-stop').addEventListener('click', () => {
+  if (activeAgentId) stopAgent(activeAgentId);
+});
+
+document.getElementById('props-btn-restart').addEventListener('click', async () => {
+  if (!activeAgentId || !agents[activeAgentId]) return;
+  const a = agents[activeAgentId];
+  await stopAgent(activeAgentId);
+  try {
+    const result = await api.createAgent(a.role, a.repo);
+    if (result.ok) {
+      setTimeout(async () => {
+        await refreshAgents();
+        selectAgent(result.agent_id);
+      }, 300);
+    }
+  } catch (err) {
+    console.error('restart error:', err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bounties / Tasks (sidebar)
 // ---------------------------------------------------------------------------
 
 function renderBounties() {
   if (!trackerState) return;
 
-  // Collect all agent-labeled issues across repos
   const tasks = [];
   for (const rs of (trackerState.repo_statuses || [])) {
     for (const issue of (rs.issues || [])) {
@@ -224,7 +499,7 @@ function renderBounties() {
   summaryEl.innerHTML = `
     <span class="badge badge-green">${ready} ready</span>
     <span class="badge badge-purple">${inProgress} active</span>
-    <span class="badge badge-yellow">${blocked} blocked</span>
+    <span class="badge badge-amber">${blocked} blocked</span>
     <span class="badge badge-blue">${review} review</span>
   `;
 
@@ -235,7 +510,7 @@ function renderBounties() {
       return (order[a.status] ?? 5) - (order[b.status] ?? 5);
     });
     listEl.innerHTML = sorted.slice(0, 50).map(t => {
-      const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[t.status] || '';
+      const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-amber', review: 'badge-blue' }[t.status] || '';
       const repo = (t._repo || '').split('/')[1] || '';
       return `
         <a class="side-item side-link" href="${t.url}" target="_blank">
@@ -249,29 +524,28 @@ function renderBounties() {
       `;
     }).join('');
   } else if (trackerState.error) {
-    listEl.innerHTML = `<div class="side-muted" style="padding:8px">${escapeHtml(trackerState.error)}</div>`;
+    listEl.innerHTML = `<div class="side-muted" style="padding:8px 14px">${escapeHtml(trackerState.error)}</div>`;
   } else {
-    listEl.innerHTML = '<div class="side-muted" style="padding:8px">No tasks</div>';
+    listEl.innerHTML = '<div class="side-muted" style="padding:8px 14px">No tasks</div>';
   }
 }
 
 // ---------------------------------------------------------------------------
-// Repos + Agents panel (center-left accordion)
+// Repos + Agents (sidebar accordion)
 // ---------------------------------------------------------------------------
 
 let lastReposKey = '';
+let byRepoMap = {};
 
 function renderRepos() {
   const listEl = document.getElementById('repos-list');
   const agentList = Object.values(agents);
 
-  // All tracked repos (already merged: configured + agent repos)
   const allRepos = (trackerState && trackerState.repos) ? [...trackerState.repos] : [];
   for (const a of agentList) {
     if (a.repo && !allRepos.includes(a.repo)) allRepos.push(a.repo);
   }
 
-  // Bounty & issue counts per repo
   const repoInfo = {};
   if (trackerState && trackerState.repo_statuses) {
     for (const rs of trackerState.repo_statuses) {
@@ -279,7 +553,6 @@ function renderRepos() {
     }
   }
 
-  // Group agents by repo
   const byRepo = {};
   for (const repo of allRepos) byRepo[repo] = [];
   for (const a of agentList) {
@@ -287,13 +560,14 @@ function renderRepos() {
     if (!byRepo[repo]) byRepo[repo] = [];
     byRepo[repo].push(a);
   }
+  byRepoMap = byRepo;
 
   const reposKey = JSON.stringify({ allRepos, ag: agentList.map(a => `${a.agent_id}:${a.status}:${a.cycle}`), activeAgentId, collapsedRepos });
   if (reposKey === lastReposKey) return;
   lastReposKey = reposKey;
 
   if (allRepos.length === 0) {
-    listEl.innerHTML = '<div style="padding:20px 10px;color:#444;font-size:11px;text-align:center">No repos registered</div>';
+    listEl.innerHTML = '<div style="padding:16px 14px;color:var(--text-secondary);font-size:11px;text-align:center">No repos registered</div>';
     return;
   }
 
@@ -306,12 +580,11 @@ function renderRepos() {
     const rs = repoInfo[repo];
     const ghBase = `https://github.com/${repo}`;
 
-    // Collapsed summary
     const summaryParts = [];
     if (repoAgents.length > 0) summaryParts.push(`${aliveCount} agent${aliveCount !== 1 ? 's' : ''}`);
     if (rs && rs.tasks.ready > 0) summaryParts.push(`${rs.tasks.ready} ready`);
     if (rs && rs.issues_open > 0) summaryParts.push(`${rs.issues_open} issues`);
-    const summaryText = summaryParts.join(' · ') || 'empty';
+    const summaryText = summaryParts.join(' \u00b7 ') || 'empty';
 
     html += `
       <div class="repo-group ${isCollapsed ? '' : 'repo-group-open'}">
@@ -328,7 +601,6 @@ function renderRepos() {
     if (!isCollapsed) {
       html += '<div class="repo-group-body">';
 
-      // Repo links
       html += `
         <div class="repo-detail-links">
           <a href="${ghBase}" target="_blank">GitHub</a>
@@ -337,7 +609,6 @@ function renderRepos() {
         </div>
       `;
 
-      // Active issues (agent-labeled from GitHub)
       if (rs && rs.tasks.total > 0) {
         const agentIssues = (rs.issues || []).filter(i => i.labels.some(l => l.startsWith('agent:')));
         if (agentIssues.length > 0) {
@@ -345,7 +616,7 @@ function renderRepos() {
           for (const issue of agentIssues.slice(0, 8)) {
             const statusLabel = issue.labels.find(l => l.startsWith('status:'));
             const status = statusLabel ? statusLabel.replace('status:', '') : 'open';
-            const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[status] || '';
+            const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-amber', review: 'badge-blue' }[status] || '';
             html += `
               <a class="repo-detail-item side-link" href="${issue.url}" target="_blank">
                 <span class="repo-detail-item-title">#${issue.number} ${escapeHtml(issue.title || '')}</span>
@@ -356,7 +627,6 @@ function renderRepos() {
         }
       }
 
-      // Agent tabs
       if (repoAgents.length > 0) {
         html += '<div class="repo-detail-section-title">Agents</div>';
         for (const a of repoAgents) {
@@ -388,16 +658,16 @@ function renderRepos() {
         html += '<div class="repo-group-empty">No activity</div>';
       }
 
-      html += '</div>'; // repo-group-body
+      html += '</div>';
     }
 
-    html += '</div>'; // repo-group
+    html += '</div>';
   }
 
   listEl.innerHTML = html;
 }
 
-// Event delegation for repos panel
+// Event delegation for repos list
 document.getElementById('repos-list').addEventListener('click', (e) => {
   const addBtn = e.target.closest('[data-add-repo]');
   if (addBtn) {
@@ -432,10 +702,10 @@ function getOrCreateTerminal(agentId) {
 
   const term = new window.Terminal({
     theme: {
-      background: '#0e0e0e',
-      foreground: '#e0e0e0',
-      cursor: '#4ade80',
-      selectionBackground: '#4ade8033',
+      background: 'hsl(220, 13%, 10%)',
+      foreground: 'hsl(220, 10%, 90%)',
+      cursor: 'hsl(220, 80%, 60%)',
+      selectionBackground: 'hsla(220, 80%, 60%, 0.2)',
     },
     fontSize: 12,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
@@ -457,19 +727,16 @@ function getOrCreateTerminal(agentId) {
 
 function renderTerminal() {
   const container = document.getElementById('terminal');
+  const dashboard = document.getElementById('dashboard');
 
   if (!activeAgentId) {
     Object.values(terminals).forEach(t => { if (t.term.element) t.term.element.parentElement.style.display = 'none'; });
-    container.innerHTML = `
-      <div class="terminal-welcome">
-        <div class="welcome-title">Agent Team Supervisor</div>
-        <div class="welcome-hint">Click <span class="kbd">+</span> next to a repo to create an agent</div>
-      </div>`;
+    dashboard.style.display = '';
+    renderDashboard();
     return;
   }
 
-  const welcome = container.querySelector('.terminal-welcome');
-  if (welcome) welcome.remove();
+  dashboard.style.display = 'none';
 
   const { term, fitAddon } = getOrCreateTerminal(activeAgentId);
 
@@ -496,20 +763,20 @@ function renderTerminal() {
 }
 
 function updateHealthBar() {
-  const ht = document.getElementById('health-text');
-  const agentList = Object.values(agents);
-  const alive = agentList.filter(a => !['dead','restarting'].includes(a.status)).length;
-  const total = agentList.length;
-  const cost = agentList.reduce((s, a) => s + (a.cost_usd || 0), 0);
+  renderDashboard();
+  renderBreadcrumb();
+}
 
-  const parts = [];
-  if (total > 0) parts.push(`${alive}/${total} alive`);
-  if (cost > 0) parts.push(`$${cost.toFixed(2)}`);
-  if (trackerState && trackerState.repo_statuses) {
-    const ready = trackerState.repo_statuses.reduce((s, rs) => s + (rs.tasks?.ready || 0), 0);
-    if (ready > 0) parts.push(`${ready} tasks ready`);
-  }
-  ht.textContent = parts.length > 0 ? parts.join(' · ') : 'Agent Team';
+// ---------------------------------------------------------------------------
+// Render all
+// ---------------------------------------------------------------------------
+
+function renderAll() {
+  renderBreadcrumb();
+  renderRepos();
+  renderTerminal();
+  renderProperties();
+  renderDashboard();
 }
 
 // ---------------------------------------------------------------------------
@@ -518,8 +785,7 @@ function updateHealthBar() {
 
 async function selectAgent(id) {
   activeAgentId = id;
-  renderRepos();
-  renderTerminal();
+  renderAll();
 }
 
 async function stopAgent(id) {
@@ -537,8 +803,7 @@ async function stopAgent(id) {
     activeAgentId = remaining.length > 0 ? remaining[0] : null;
   }
   await refreshAgents();
-  renderRepos();
-  renderTerminal();
+  renderAll();
 }
 
 async function refreshAgents() {
@@ -547,6 +812,7 @@ async function refreshAgents() {
   for (const a of list) agents[a.agent_id] = a;
   updateHealthBar();
   renderRepos();
+  renderProperties();
 }
 
 // ---------------------------------------------------------------------------
@@ -565,6 +831,7 @@ api.onStatusUpdate((agentId, data) => {
   }
   updateHealthBar();
   renderRepos();
+  renderProperties();
 });
 
 api.onTrackerUpdate((state) => {
@@ -572,6 +839,7 @@ api.onTrackerUpdate((state) => {
   updateHealthBar();
   renderBounties();
   renderRepos();
+  renderDashboard();
 });
 
 new ResizeObserver(() => {
@@ -581,6 +849,41 @@ new ResizeObserver(() => {
 }).observe(document.getElementById('terminal'));
 
 // ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    alert('Command palette \u2014 coming soon');
+  }
+
+  if (e.key === 'n' && !e.metaKey && !e.ctrlKey && document.activeElement === document.body) {
+    const firstRepo = Object.keys(byRepoMap)[0];
+    if (firstRepo) {
+      const firstAddBtn = document.querySelector(`[data-add-repo="${firstRepo}"]`);
+      if (firstAddBtn) showRolePicker(firstRepo, firstAddBtn);
+    }
+  }
+
+  if (e.key >= '1' && e.key <= '9' && !e.metaKey && !e.ctrlKey && document.activeElement === document.body) {
+    const agentList = Object.values(agents);
+    const idx = parseInt(e.key) - 1;
+    if (agentList[idx]) selectAgent(agentList[idx].agent_id);
+  }
+
+  if (e.key === 'Escape') {
+    activeAgentId = null;
+    renderAll();
+  }
+
+  if (e.key === 'r' && !e.metaKey && !e.ctrlKey && document.activeElement === document.body) {
+    refreshAgents();
+    api.refreshTracker();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
@@ -588,7 +891,7 @@ document.getElementById('btn-save-token').addEventListener('click', () => {
   const token = document.getElementById('input-gh-token').value.trim();
   api.setGitHubToken(token);
   document.getElementById('input-gh-token').value = '';
-  document.getElementById('input-gh-token').placeholder = '••••••••  (saved)';
+  document.getElementById('input-gh-token').placeholder = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (saved)';
 });
 
 document.getElementById('btn-add-repo').addEventListener('click', () => {
@@ -641,6 +944,7 @@ api.getTracker().then(state => {
   updateHealthBar();
   renderBounties();
   renderRepos();
+  renderDashboard();
 });
 setInterval(refreshAgents, 10_000);
 setInterval(() => {
@@ -653,6 +957,10 @@ setInterval(() => {
       el.textContent = formatUptime(Date.now() - a.created_at);
     }
   });
+  if (activeAgentId && agents[activeAgentId] && agents[activeAgentId].created_at) {
+    const propsUptime = document.getElementById('props-uptime');
+    if (propsUptime) propsUptime.textContent = formatUptime(Date.now() - agents[activeAgentId].created_at);
+  }
 }, 1000);
 
 </script>
