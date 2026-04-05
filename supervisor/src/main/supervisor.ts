@@ -162,7 +162,7 @@ class ManagedAgent {
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 
         // Auto-confirm workspace trust dialog
-        if (!trustConfirmed && clean.includes("trust this folder")) {
+        if (!trustConfirmed && (clean.includes("trust this folder") || clean.includes("you trust") || clean.includes("Yes, I trust"))) {
           trustConfirmed = true;
           console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust`);
           proc.write("\r");
