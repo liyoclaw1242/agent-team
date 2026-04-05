@@ -147,7 +147,23 @@ class ManagedAgent {
 
       let trustConfirmed = false;
       let promptSent = false;
-      let trustBuffer = "";
+
+      // Auto-confirm workspace trust dialog via timed Enter presses.
+      // The trust prompt is always the first thing shown after spawn.
+      // Default selection is "Yes, I trust this folder", so Enter confirms it.
+      // Send Enter at 2s and 4s to cover varying render times.
+      const trustTimer1 = setTimeout(() => {
+        if (!trustConfirmed) {
+          console.log(`[AGENT:${this.agentId}] Auto-confirm trust (2s)`);
+          proc.write("\r");
+        }
+      }, 2000);
+      const trustTimer2 = setTimeout(() => {
+        if (!trustConfirmed) {
+          console.log(`[AGENT:${this.agentId}] Auto-confirm trust (4s)`);
+          proc.write("\r");
+        }
+      }, 4000);
 
       proc.onData((data: string) => {
         this.state.last_activity = Date.now();
@@ -162,24 +178,12 @@ class ManagedAgent {
           .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, "")
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 
-        // Auto-confirm workspace trust dialog (buffer to handle split chunks)
-        if (!trustConfirmed) {
-          trustBuffer += clean;
-          // Keep buffer from growing indefinitely
-          if (trustBuffer.length > 4000) trustBuffer = trustBuffer.slice(-4000);
-
-          // Wait until "Enter to confirm" appears — that means the selector is ready
-          if (trustBuffer.includes("Enter to confirm") && (trustBuffer.includes("you trust") || trustBuffer.includes("I trust this"))) {
-            trustConfirmed = true;
-            console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust (Enter to confirm detected)`);
-            // Small delay to ensure the interactive selector is fully rendered
-            setTimeout(() => proc.write("\r"), 300);
-            return;
-          }
-        }
-
         // Send initial prompt once we see the input prompt (❯)
-        if (!promptSent && trustConfirmed && clean.includes("❯")) {
+        // This means trust was confirmed (either by timer or manually)
+        if (!promptSent && clean.includes("❯")) {
+          trustConfirmed = true;
+          clearTimeout(trustTimer1);
+          clearTimeout(trustTimer2);
           promptSent = true;
           console.log(`[AGENT:${this.agentId}] Sending initial prompt`);
           proc.write(prompt + "\r");
