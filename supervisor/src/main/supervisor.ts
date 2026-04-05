@@ -419,8 +419,11 @@ export class Supervisor extends EventEmitter {
       const reason = managed.state.end_reason;
       const shouldRestart = this.shouldAutoRestart(reason, managed.state);
       if (shouldRestart) {
-        console.log(`[supervisor] Auto-restarting ${agentId} (reason: ${reason}, cycles: ${managed.state.cycle})`);
-        setTimeout(() => this.doRestart(agentId), 5000);
+        // Exponential backoff: 5s, 15s, 45s, 135s, 405s (cap at 5min)
+        const attempt = managed.state.restart_count + 1;
+        const delay = Math.min(5000 * Math.pow(3, attempt - 1), 5 * 60_000);
+        console.log(`[supervisor] Auto-restarting ${agentId} in ${Math.round(delay/1000)}s (attempt ${attempt}/${this.maxRestarts}, reason: ${reason})`);
+        setTimeout(() => this.doRestart(agentId), delay);
       } else {
         console.log(`[supervisor] NOT restarting ${agentId} (reason: ${reason})`);
       }
