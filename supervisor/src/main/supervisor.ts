@@ -145,15 +145,30 @@ class ManagedAgent {
       this.ptyProcess = proc;
       console.log(`[AGENT] Spawned claude PTY pid=${proc.pid} for ${this.agentId}`);
 
-      let trustHandled = false;
       let promptSent = false;
-      let dataBuffer = "";
+      let rawBuffer = "";
+
+      // Auto-confirm trust dialog: send Enter at 3s, 5s, 7s after spawn.
+      // The trust prompt default is "Yes, I trust this folder" — Enter confirms it.
+      // Extra Enters after trust is confirmed are harmless (empty input to Claude).
+      for (const delay of [3000, 5000, 7000]) {
+        setTimeout(() => {
+          if (!promptSent) {
+            console.log(`[AGENT:${this.agentId}] Trust auto-Enter at ${delay}ms`);
+            proc.write("\r");
+          }
+        }, delay);
+      }
 
       proc.onData((data: string) => {
         this.state.last_activity = Date.now();
 
         // Forward raw PTY data to renderer for xterm.js
         this.onPtyData(this.agentId, data);
+
+        // Accumulate raw data for prompt detection (use raw to avoid ANSI issues)
+        rawBuffer += data;
+        if (rawBuffer.length > 10000) rawBuffer = rawBuffer.slice(-10000);
 
         // Strip ANSI for status inference only
         const clean = data
@@ -162,27 +177,12 @@ class ManagedAgent {
           .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, "")
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 
-        // Accumulate buffer for multi-chunk detection
-        dataBuffer += clean;
-        if (dataBuffer.length > 5000) dataBuffer = dataBuffer.slice(-5000);
-
-        // Phase 1: Handle trust prompt
-        // The trust prompt contains "❯ 1. Yes, I trust" — don't confuse with Claude's "❯" input prompt
-        if (!trustHandled) {
-          // Detect the trust prompt selector is ready (has both the question and the confirm hint)
-          if (dataBuffer.includes("Esc to cancel")) {
-            trustHandled = true;
-            console.log(`[AGENT:${this.agentId}] Trust prompt detected — sending Enter`);
-            setTimeout(() => proc.write("\r"), 500);
-          }
-          return; // Don't process anything else until trust is handled
-        }
-
-        // Phase 2: Send initial prompt once Claude's input prompt appears
-        // After trust is confirmed, Claude shows "❯" as a bare input prompt (not "❯ 1. Yes")
-        if (!promptSent && clean.includes("❯") && !clean.includes("1.") && !clean.includes("2.")) {
+        // Detect Claude's input prompt and send the initial command.
+        // Wait at least 8s from spawn to ensure trust dialog is fully past.
+        const elapsed = Date.now() - this.state.created_at;
+        if (!promptSent && elapsed > 8000 && rawBuffer.includes("\u276F")) {
           promptSent = true;
-          console.log(`[AGENT:${this.agentId}] Sending initial prompt`);
+          console.log(`[AGENT:${this.agentId}] Sending initial prompt (${elapsed}ms after spawn)`);
           proc.write(prompt + "\r");
         }
 
