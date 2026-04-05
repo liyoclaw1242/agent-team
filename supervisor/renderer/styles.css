@@ -51,7 +51,7 @@ body {
 
 .titlebar-btn:hover { background: #333; color: #ccc; }
 
-/* ─── Layout: Bounties (left) | Terminal (center) | Repos (right) ─── */
+/* ─── Layout: Sidebar (left) | Main Area (center+right) ─── */
 
 .layout {
   flex: 1;
@@ -59,9 +59,9 @@ body {
   overflow: hidden;
 }
 
-/* ─── Bounty panel (left, always visible) ─── */
+/* ─── Sidebar (left, 240px) ─── */
 
-.bounty-panel {
+.sidebar {
   width: 240px;
   flex-shrink: 0;
   display: flex;
@@ -71,7 +71,8 @@ body {
   overflow: hidden;
 }
 
-.panel-header {
+.sidebar-header {
+  -webkit-app-region: drag;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -80,38 +81,116 @@ body {
   flex-shrink: 0;
 }
 
-.panel-title {
+.sidebar-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.sidebar-header-actions {
+  -webkit-app-region: no-drag;
+  display: flex;
+  gap: 4px;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.sidebar-section-title {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #555;
   font-weight: 600;
+  padding: 8px 10px 4px;
 }
 
-.bounty-summary {
+/* Sidebar inbox */
+
+.sidebar-inbox-item {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  padding: 8px 10px;
-  border-bottom: 1px solid #1e1e1e;
-  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
 }
 
-.bounty-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
+.sidebar-inbox-item:hover { background: #1e1e1e; }
+
+.inbox-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  background: #222;
+  color: #555;
 }
 
-/* ─── Terminal (center) ─── */
+.inbox-badge.has-items {
+  background: #0a1a2e;
+  color: #60a5fa;
+}
 
-.main-panel {
+/* ─── Main area (center, flex-1) ─── */
+
+.main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
 }
+
+/* ─── Breadcrumb bar ─── */
+
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #555;
+  background: #141414;
+}
+
+.breadcrumb { display: flex; align-items: center; gap: 4px; }
+.breadcrumb-sep { color: #333; margin: 0 2px; }
+.breadcrumb-active { color: #ccc; font-weight: 600; }
+
+.breadcrumb-shortcuts {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #444;
+}
+
+/* ─── Content zone (main + properties) ─── */
+
+.content-zone {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ─── Terminal ─── */
 
 .terminal {
   flex: 1;
@@ -147,17 +226,210 @@ body {
   color: #4ade80;
 }
 
-/* ─── Repos + Agents panel (right, accordion) ─── */
+/* ─── Dashboard (no agent selected) ─── */
 
-.repos-panel {
-  width: 260px;
+.dashboard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.dashboard-card {
+  background: #181818;
+  border-radius: 8px;
+  padding: 16px;
+  ring: 1px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-card-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.dashboard-card-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e0e0e0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ─── Properties panel (right, 320px, conditional) ─── */
+
+.properties-panel {
+  width: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #161616;
+  background: #141414;
   border-left: 1px solid #2a2a2a;
   overflow: hidden;
-  order: 3; /* Ensure it stays on the right */
+  transition: width 0.2s ease;
+}
+
+.properties-panel.open {
+  width: 320px;
+}
+
+.properties-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.properties-header-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.properties-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.props-section {
+  padding: 8px 12px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.props-section-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.props-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.props-label {
+  font-size: 11px;
+  color: #666;
+}
+
+.props-value {
+  font-size: 11px;
+  color: #ccc;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cost bar */
+
+.cost-bar-track {
+  width: 100%;
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.cost-bar-fill {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.cost-bar-fill.warning { background: #facc15; }
+.cost-bar-fill.danger { background: #f87171; }
+
+/* Properties action buttons */
+
+.props-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+
+.btn-action {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: #222;
+  color: #888;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-action:hover { background: #2a2a2a; color: #ccc; }
+
+.btn-action-stop { border-color: #4a2020; color: #f87171; }
+.btn-action-stop:hover { background: #2a1515; color: #fca5a5; }
+
+.btn-action-restart { border-color: #4a3a10; color: #facc15; }
+.btn-action-restart:hover { background: #2a2510; color: #fde047; }
+
+/* ─── Panel header (shared) ─── */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  font-weight: 600;
+}
+
+/* ─── Task summary badges (sidebar) ─── */
+
+.bounty-summary {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-bottom: 1px solid #1e1e1e;
+  flex-shrink: 0;
+}
+
+.bounty-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .repos-list {
