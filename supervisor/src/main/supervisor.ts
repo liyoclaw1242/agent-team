@@ -147,6 +147,7 @@ class ManagedAgent {
 
       let trustConfirmed = false;
       let promptSent = false;
+      let trustBuffer = "";
 
       proc.onData((data: string) => {
         this.state.last_activity = Date.now();
@@ -161,12 +162,18 @@ class ManagedAgent {
           .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, "")
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 
-        // Auto-confirm workspace trust dialog
-        if (!trustConfirmed && (clean.includes("trust this folder") || clean.includes("you trust") || clean.includes("Yes, I trust"))) {
-          trustConfirmed = true;
-          console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust`);
-          proc.write("\r");
-          return;
+        // Auto-confirm workspace trust dialog (buffer to handle split chunks)
+        if (!trustConfirmed) {
+          trustBuffer += clean;
+          // Keep buffer from growing indefinitely
+          if (trustBuffer.length > 2000) trustBuffer = trustBuffer.slice(-2000);
+
+          if (trustBuffer.includes("trust this folder") || trustBuffer.includes("you trust") || trustBuffer.includes("Yes, I trust") || trustBuffer.includes("I trust this")) {
+            trustConfirmed = true;
+            console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust`);
+            proc.write("\r");
+            return;
+          }
         }
 
         // Send initial prompt once we see the input prompt (❯)
