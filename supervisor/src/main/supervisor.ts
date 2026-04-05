@@ -166,12 +166,14 @@ class ManagedAgent {
         if (!trustConfirmed) {
           trustBuffer += clean;
           // Keep buffer from growing indefinitely
-          if (trustBuffer.length > 2000) trustBuffer = trustBuffer.slice(-2000);
+          if (trustBuffer.length > 4000) trustBuffer = trustBuffer.slice(-4000);
 
-          if (trustBuffer.includes("trust this folder") || trustBuffer.includes("you trust") || trustBuffer.includes("Yes, I trust") || trustBuffer.includes("I trust this")) {
+          // Wait until "Enter to confirm" appears — that means the selector is ready
+          if (trustBuffer.includes("Enter to confirm") && (trustBuffer.includes("you trust") || trustBuffer.includes("I trust this"))) {
             trustConfirmed = true;
-            console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust`);
-            proc.write("\r");
+            console.log(`[AGENT:${this.agentId}] Auto-confirming workspace trust (Enter to confirm detected)`);
+            // Small delay to ensure the interactive selector is fully rendered
+            setTimeout(() => proc.write("\r"), 300);
             return;
           }
         }
