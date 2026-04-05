@@ -333,7 +333,7 @@ class ManagedAgent {
   private inferStatusFromTool(name: string, input: any): void {
     if (name === "Bash") {
       const cmd = typeof input === "string" ? input : input?.command ?? "";
-      if (cmd.includes("/bounties?") || cmd.includes("/repos")) {
+      if (cmd.includes("gh issue list") || cmd.includes("gh search issues")) {
         this.state.status = "polling";
         this.state.detail = "Polling for tasks...";
       } else if (cmd.includes("git push") || cmd.includes("gh pr create")) {
@@ -372,9 +372,9 @@ export class Supervisor extends EventEmitter {
   private startedAt = Date.now();
 
   private staleTimeouts: Record<string, number> = {
-    starting: 3 * 60_000,
-    polling: 10 * 60_000,
-    working: 90 * 60_000,
+    starting: 5 * 60_000,
+    polling: 45 * 60_000,    // agents sleep 30min between polls
+    working: 120 * 60_000,
     sleeping: 45 * 60_000,
     rate_limited: 120 * 60_000,
     error: 30 * 60_000,
