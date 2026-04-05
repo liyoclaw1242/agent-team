@@ -75,7 +75,7 @@ function updateTrayMenu(): void {
     : [{ label: "No agents", enabled: false }];
 
   const createSubmenu: Electron.MenuItemConstructorOptions[] = [
-    "be", "fe", "ops", "arch", "design", "qa", "debug", "pm",
+    "be", "fe", "ops", "arch", "design", "qa", "debug",
   ].map((role) => ({
     label: role.toUpperCase(),
     click: () => {
@@ -154,6 +154,16 @@ app.whenReady().then(() => {
 
   tracker = new Tracker();
   tracker.start();
+
+  // Sync agent repos → tracker so their repos always appear
+  const syncAgentRepos = () => {
+    if (!supervisor || !tracker) return;
+    const repos = [...new Set(supervisor.getAllAgents().map((a) => a.repo).filter(Boolean))];
+    tracker.setAgentRepos(repos);
+  };
+  supervisor.on("agent:update", syncAgentRepos);
+  supervisor.on("agent:created", syncAgentRepos);
+  supervisor.on("agent:stopped", syncAgentRepos);
 
   createWindow();
   createTray();
