@@ -155,15 +155,7 @@ app.whenReady().then(() => {
   tracker = new Tracker();
   tracker.start();
 
-  // Auto-add agent repos to tracker so they always appear in sidebar
-  const syncAgentRepos = () => {
-    if (!supervisor || !tracker) return;
-    const repos = [...new Set(supervisor.getAllAgents().map((a) => a.repo).filter(Boolean))];
-    for (const repo of repos) {
-      tracker.addRepo(repo);
-    }
-  };
-  supervisor.on("agent:created", syncAgentRepos);
+  // Repos are managed manually via Settings — no auto-add from agents
 
   createWindow();
   createTray();
