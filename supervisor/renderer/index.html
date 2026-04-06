@@ -504,12 +504,16 @@ function renderRepos() {
   const listEl = document.getElementById('repos-list');
   const agentList = getAllAgentsList();
 
-  const allRepos = (trackerState && trackerState.repos)
-    ? trackerState.repos.map(r => typeof r === 'string' ? r : r.slug)
-    : [];
-  for (const a of agentList) {
-    if (a.repo && !allRepos.includes(a.repo)) allRepos.push(a.repo);
+  const repoSet = new Set();
+  if (trackerState && trackerState.repos) {
+    for (const r of trackerState.repos) {
+      repoSet.add(typeof r === 'string' ? r : r.slug);
+    }
   }
+  for (const a of agentList) {
+    if (a.repo) repoSet.add(a.repo);
+  }
+  const allRepos = [...repoSet];
 
   const repoInfo = {};
   if (trackerState && trackerState.repo_statuses) {
