@@ -582,6 +582,46 @@ body {
   white-space: nowrap;
 }
 
+/* Tooltip */
+
+.has-tooltip {
+  position: relative;
+}
+
+.item-tooltip {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  margin-left: 8px;
+  z-index: 50;
+  background: var(--surface, hsl(220, 13%, 13%));
+  border: 1px solid var(--border, hsl(220, 10%, 22%));
+  border-radius: 6px;
+  padding: 8px 10px;
+  width: 280px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+.has-tooltip:hover .item-tooltip {
+  display: block;
+}
+
+.item-tooltip-title {
+  font-size: 12px;
+  color: var(--text-primary, #e0e0e0);
+  line-height: 1.4;
+  margin-bottom: 6px;
+  word-wrap: break-word;
+}
+
+.item-tooltip-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 .repo-detail-item-badges {
   display: flex;
   gap: 3px;

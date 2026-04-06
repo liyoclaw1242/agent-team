@@ -563,23 +563,36 @@ function renderRepos() {
           const agent = agentLabel ? agentLabel.replace('agent:', '') : '';
           const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[status] || '';
 
-          const tooltip = `#${issue.number} ${escapeHtml(issue.title || '')}${status ? ' [' + status + ']' : ''}${agent ? ' [' + agent + ']' : ''}`;
           html += `
-            <a class="repo-detail-item side-link" href="${issue.url}" target="_blank" title="${tooltip}">
+            <a class="repo-detail-item side-link has-tooltip" href="${issue.url}" target="_blank">
               <span class="repo-detail-item-title">#${issue.number} ${escapeHtml(issue.title || '')}</span>
               <span class="repo-detail-item-badges">
                 ${status ? `<span class="badge ${statusCls}">${status}</span>` : ''}
                 ${agent ? `<span class="badge">${agent}</span>` : ''}
               </span>
+              <div class="item-tooltip">
+                <div class="item-tooltip-title">#${issue.number} ${escapeHtml(issue.title || '')}</div>
+                <div class="item-tooltip-tags">
+                  ${issue.labels.map(l => `<span class="badge ${l.startsWith('status:') ? ({ 'status:ready': 'badge-green', 'status:in-progress': 'badge-purple', 'status:blocked': 'badge-yellow' }[l] || '') : ''}">${escapeHtml(l)}</span>`).join(' ')}
+                </div>
+              </div>
             </a>
           `;
         }
         // PRs
         for (const pr of prs.slice(0, 10)) {
           html += `
-            <a class="repo-detail-item side-link" href="${pr.url}" target="_blank" title="PR #${pr.number} ${escapeHtml(pr.title || '')} [${escapeHtml(pr.author || '')}]">
+            <a class="repo-detail-item side-link has-tooltip" href="${pr.url}" target="_blank">
               <span class="repo-detail-item-title">PR #${pr.number} ${escapeHtml(pr.title || '')}</span>
               <span class="badge badge-blue">PR</span>
+              <div class="item-tooltip">
+                <div class="item-tooltip-title">PR #${pr.number} ${escapeHtml(pr.title || '')}</div>
+                <div class="item-tooltip-tags">
+                  <span class="badge badge-blue">PR</span>
+                  ${pr.author ? `<span class="badge">${escapeHtml(pr.author)}</span>` : ''}
+                  ${pr.head ? `<span class="badge" style="color:#888">${escapeHtml(pr.head)}</span>` : ''}
+                </div>
+              </div>
             </a>
           `;
         }
