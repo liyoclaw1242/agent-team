@@ -563,8 +563,9 @@ function renderRepos() {
           const agent = agentLabel ? agentLabel.replace('agent:', '') : '';
           const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[status] || '';
 
+          const tooltip = `#${issue.number} ${escapeHtml(issue.title || '')}${status ? ' [' + status + ']' : ''}${agent ? ' [' + agent + ']' : ''}`;
           html += `
-            <a class="repo-detail-item side-link" href="${issue.url}" target="_blank">
+            <a class="repo-detail-item side-link" href="${issue.url}" target="_blank" title="${tooltip}">
               <span class="repo-detail-item-title">#${issue.number} ${escapeHtml(issue.title || '')}</span>
               <span class="repo-detail-item-badges">
                 ${status ? `<span class="badge ${statusCls}">${status}</span>` : ''}
@@ -576,7 +577,7 @@ function renderRepos() {
         // PRs
         for (const pr of prs.slice(0, 10)) {
           html += `
-            <a class="repo-detail-item side-link" href="${pr.url}" target="_blank">
+            <a class="repo-detail-item side-link" href="${pr.url}" target="_blank" title="PR #${pr.number} ${escapeHtml(pr.title || '')} [${escapeHtml(pr.author || '')}]">
               <span class="repo-detail-item-title">PR #${pr.number} ${escapeHtml(pr.title || '')}</span>
               <span class="badge badge-blue">PR</span>
             </a>
