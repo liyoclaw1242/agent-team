@@ -155,15 +155,15 @@ app.whenReady().then(() => {
   tracker = new Tracker();
   tracker.start();
 
-  // Sync agent repos → tracker so their repos always appear
+  // Auto-add agent repos to tracker so they always appear in sidebar
   const syncAgentRepos = () => {
     if (!supervisor || !tracker) return;
     const repos = [...new Set(supervisor.getAllAgents().map((a) => a.repo).filter(Boolean))];
-    tracker.setAgentRepos(repos);
+    for (const repo of repos) {
+      tracker.addRepo(repo);
+    }
   };
-  supervisor.on("agent:update", syncAgentRepos);
   supervisor.on("agent:created", syncAgentRepos);
-  supervisor.on("agent:stopped", syncAgentRepos);
 
   createWindow();
   createTray();
