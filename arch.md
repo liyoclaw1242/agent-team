@@ -6,7 +6,7 @@
 
 - **Agent Lifecycle**: creation, onboarding, polling, execution, delivery, restart, death
 - **Skill System**: role-based skill packs (workflow, rules, validate, actions, cases, log)
-- **Task Pipeline**: bounty board API → poll → claim → execute → deliver → QA/Design review → merge
+- **Task Pipeline**: GitHub Issues + Labels → poll (gh CLI) → claim → execute → deliver → ARCH triage → merge
 - **Supervision**: heartbeat monitoring, stale detection, auto-restart, dashboard UI
 - **Tracking**: bounty status, GitHub repo status, PR tracking
 
@@ -15,12 +15,11 @@
 ```mermaid
 graph LR
   CLI[CLI Context<br>commands/ + skills/] --> |create-agent-employ| Agent[Agent Lifecycle<br>polling loop]
-  Agent --> |poll/claim/deliver| API[Bounty Board API<br>localhost:8000]
-  Agent --> |PR/issue| GitHub[GitHub<br>gh CLI]
-  Supervisor[Supervisor Context<br>supervisor/] --> |SDK query| Agent
-  Supervisor --> |track| API
+  Agent --> |poll/claim/deliver| GitHub[GitHub Issues + Labels<br>gh CLI]
+  Supervisor[Supervisor Context<br>supervisor/] --> |PTY spawn| Agent
   Supervisor --> |track| GitHub
   Skills[Skill Packs<br>skills/*/] --> |workflow + rules| Agent
+  Scripts[Shared Scripts<br>scripts/] --> |claims/route/verify| Agent
 ```
 
 ### Aggregate Roots
@@ -29,7 +28,7 @@ graph LR
 |-----------|-------------|------------|
 | Agent | AgentState, ManagedAgent, LogEntry | One repo per lifecycle, unique agent_id |
 | Skill Pack | SKILL.md, workflow, rules, validate, actions, cases, log | Each role has exactly one skill pack |
-| Bounty | Issue, Claim, Status | One claim per issue at a time |
+| Task (GitHub Issue) | Issue, Labels (agent:*, status:*) | One agent per issue (label-based claim) |
 | Supervisor | Electron App, Tray, Dashboard, Tracker | One supervisor instance manages all agents |
 
 ## System Architecture
@@ -45,8 +44,8 @@ graph LR
 | Design Tool | Pencil CLI (@pencil.dev/cli) | Canvas design for Design agents |
 | Screenshot | Playwright | Visual capture for Design/QA |
 | Sync | Bash (sync.sh) | Install to ~/.claude/ |
-| External API | Bounty Board (localhost:8000) | Task polling, claiming, status |
-| External API | GitHub (gh CLI) | PR, issue, repo operations |
+| Task Management | GitHub Issues + Labels | Polling, claiming, routing, status (via gh CLI) |
+| Shared Scripts | Bash (claims.sh, route.sh, verify-labels.sh) | Claim locking, routing validation, label enforcement |
 
 ### Component Architecture
 
@@ -108,21 +107,30 @@ sequenceDiagram
 
 ## API Contracts
 
-### Bounty Board API (External — localhost:8000)
+### Task Management (GitHub-native — no external API)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /repos | List registered repos |
-| GET | /repos/{slug} | Get repo details (local_dir) |
-| GET | /bounties | List all bounties |
-| GET | /bounties?status=ready&agent_type=fe&repo_slug=... | Poll for tasks |
-| POST | /bounties | Create new bounty |
-| PATCH | /bounties/{slug}/issues/{n} | Update bounty status |
-| POST | /claims | Claim a bounty |
-| DELETE | /claims/{slug}/issues/{n}?agent_id=... | Release claim |
-| GET | /requests?status=pending | Poll for pending requests (ARCH) |
-| POST | /requests/{id}/claim | Claim a request (ARCH) |
-| PATCH | /requests/{id} | Update request status |
+All task management uses GitHub Issues + Labels via `gh` CLI. No bounty board API.
+
+| Operation | Command | Script |
+|-----------|---------|--------|
+| Poll for tasks | `gh issue list --label "agent:{role}" --label "status:ready"` | — |
+| Claim task | Label swap: `status:ready` → `status:in-progress` | `scripts/claims.sh` |
+| Release claim | Label swap: `status:in-progress` → `status:ready` | `scripts/release-claim.sh` |
+| Route to role | Remove old `agent:*`, add new `agent:{role}` + `status:ready` | `scripts/route.sh` |
+| Create task | `gh issue create --label "agent:{role}" --label "status:ready"` | — |
+| Merge + close | `gh pr merge` + `gh issue close` + add `status:done` | `scripts/route.sh merge` |
+| Verify labels | Check exactly 1 `agent:*` + 1 `status:*` | `scripts/verify-labels.sh` |
+
+### Label Convention
+
+| Label | Meaning |
+|-------|---------|
+| `agent:fe`, `agent:be`, etc. | Which role should work on this |
+| `agent:arch` | Routed to ARCH for triage/merge decision |
+| `status:ready` | Available for claiming |
+| `status:in-progress` | Claimed by an agent |
+| `status:blocked` | Waiting on dependencies |
+| `status:done` | Completed (issue closed) |
 
 ### Supervisor IPC (Internal — Electron)
 
@@ -181,7 +189,7 @@ MVP — core skill packs defined, supervisor functional, basic bounty integratio
 | DevTools auto-opens in supervisor | Should be dev-only | Low |
 | sync.sh overwrites skill customizations | Users lose edits on re-sync | Medium |
 | No log rotation for agent journals | Disk fills up over time | Low |
-| Bounty Board API assumed at localhost:8000 | Not configurable per-agent | Low (config exists) |
+| ~~Bounty Board API~~ | Removed — now GitHub-native | Done |
 
 ### Planned Features
 

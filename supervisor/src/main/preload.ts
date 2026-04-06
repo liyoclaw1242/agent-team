@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld("bridge", {
   // Tracker
   getTracker: () => ipcRenderer.invoke("get-tracker"),
   setGitHubToken: (token: string) => ipcRenderer.invoke("set-github-token", token),
-  setApiUrl: (url: string) => ipcRenderer.invoke("set-api-url", url),
+  // setApiUrl removed — no bounty board API
   refreshTracker: () => ipcRenderer.invoke("refresh-tracker"),
   addRepo: (slug: string) => ipcRenderer.invoke("add-repo", slug),
   removeRepo: (slug: string) => ipcRenderer.invoke("remove-repo", slug),

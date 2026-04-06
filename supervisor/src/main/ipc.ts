@@ -30,10 +30,7 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
     tracker.setGitHubToken(token);
     return { ok: true };
   });
-  ipcMain.handle("set-api-url", (_e, url: string) => {
-    tracker.setApiUrl(url);
-    return { ok: true };
-  });
+  // set-api-url removed — no bounty board API
   ipcMain.handle("refresh-tracker", async () => {
     await tracker.refresh();
     return { ok: true };
