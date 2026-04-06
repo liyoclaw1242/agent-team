@@ -33,8 +33,11 @@
       </div>
     </div>
     <div class="sidebar-scroll">
-      <!-- Inbox -->
+      <!-- Home -->
       <div class="sidebar-section">
+        <div class="sidebar-nav-item" id="btn-dashboard">
+          <span>&#9776; Dashboard</span>
+        </div>
         <div class="sidebar-inbox-item" id="inbox-item">
           <span>Pending Approvals</span>
           <span class="inbox-badge" id="inbox-badge">0</span>
@@ -943,6 +946,11 @@ document.getElementById('settings-repo-list').addEventListener('click', (e) => {
 document.getElementById('btn-refresh-sidebar').addEventListener('click', () => {
   refreshAgents();
   api.refreshTracker();
+});
+
+document.getElementById('btn-dashboard').addEventListener('click', () => {
+  activeAgentId = null;
+  renderAll();
 });
 
 refreshAgents();
