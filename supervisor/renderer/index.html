@@ -43,16 +43,10 @@
           <span class="inbox-badge" id="inbox-badge">0</span>
         </div>
       </div>
-      <!-- Repos accordion -->
+      <!-- Repos accordion (agents + issues + PRs integrated) -->
       <div class="sidebar-section">
         <div class="sidebar-section-title">Repos</div>
         <div class="repos-list" id="repos-list"></div>
-      </div>
-      <!-- Tasks -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">Tasks</div>
-        <div class="bounty-summary" id="bounties-summary"></div>
-        <div class="bounty-list" id="bounties-list">Loading...</div>
       </div>
     </div>
   </div>
@@ -139,7 +133,7 @@ const ROLES = ['be', 'fe', 'ops', 'arch', 'design', 'qa', 'debug'];
 let activeAgentId = null;
 let agents = {};
 let trackerState = null;
-let collapsedRepos = {};
+// collapsedRepos removed — using single-expand (expandedRepo) in renderRepos
 
 const terminals = {};
 
@@ -441,66 +435,10 @@ document.getElementById('btn-close-props').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tasks panel (sidebar)
+// Repos accordion (single-expand, agents + issues + PRs integrated)
 // ---------------------------------------------------------------------------
 
-function renderBounties() {
-  if (!trackerState) return;
-
-  const tasks = [];
-  for (const rs of (trackerState.repo_statuses || [])) {
-    for (const issue of (rs.issues || [])) {
-      const agentLabel = issue.labels.find(l => l.startsWith('agent:'));
-      if (!agentLabel) continue;
-      const statusLabel = issue.labels.find(l => l.startsWith('status:')) || '';
-      const status = statusLabel.replace('status:', '') || 'open';
-      tasks.push({ ...issue, _repo: rs.slug, agent_type: agentLabel.replace('agent:', ''), status });
-    }
-  }
-
-  const summaryEl = document.getElementById('bounties-summary');
-  const ready = tasks.filter(t => t.status === 'ready').length;
-  const blocked = tasks.filter(t => t.status === 'blocked').length;
-  const review = tasks.filter(t => t.status === 'review').length;
-  const inProgress = tasks.filter(t => t.status === 'in-progress').length;
-  summaryEl.innerHTML = `
-    <span class="badge badge-green">${ready} ready</span>
-    <span class="badge badge-purple">${inProgress} active</span>
-    <span class="badge badge-yellow">${blocked} blocked</span>
-    <span class="badge badge-blue">${review} review</span>
-  `;
-
-  const listEl = document.getElementById('bounties-list');
-  if (tasks.length > 0) {
-    const sorted = [...tasks].sort((a, b) => {
-      const order = { ready: 0, 'in-progress': 1, blocked: 2, review: 3, done: 4 };
-      return (order[a.status] ?? 5) - (order[b.status] ?? 5);
-    });
-    listEl.innerHTML = sorted.slice(0, 50).map(t => {
-      const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[t.status] || '';
-      const repo = (t._repo || '').split('/')[1] || '';
-      return `
-        <a class="side-item side-link" href="${t.url}" target="_blank">
-          <div class="side-item-title">#${t.number} ${escapeHtml(t.title || '')}</div>
-          <div class="side-item-meta">
-            <span class="badge ${statusCls}">${t.status}</span>
-            <span class="badge">${t.agent_type}</span>
-            <span class="side-muted">${repo}</span>
-          </div>
-        </a>
-      `;
-    }).join('');
-  } else if (trackerState.error) {
-    listEl.innerHTML = `<div class="side-muted" style="padding:8px">${escapeHtml(trackerState.error)}</div>`;
-  } else {
-    listEl.innerHTML = '<div class="side-muted" style="padding:8px">No tasks</div>';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Repos + Agents (sidebar accordion)
-// ---------------------------------------------------------------------------
-
+let expandedRepo = null; // only one repo open at a time
 let lastReposKey = '';
 
 function renderRepos() {
@@ -532,35 +470,41 @@ function renderRepos() {
     if (!byRepo[repo]) byRepo[repo] = [];
     byRepo[repo].push(a);
   }
+  byRepoMap = byRepo;
 
-  const reposKey = JSON.stringify({ allRepos, ag: agentList.map(a => `${a.agent_id}:${a.status}:${a.cycle}`), activeAgentId, collapsedRepos });
+  const reposKey = JSON.stringify({ allRepos, ag: agentList.map(a => `${a.agent_id}:${a.status}:${a.cycle}`), activeAgentId, expandedRepo, ts: trackerState?.last_updated });
   if (reposKey === lastReposKey) return;
   lastReposKey = reposKey;
 
   if (allRepos.length === 0) {
-    listEl.innerHTML = '<div style="padding:20px 10px;color:#444;font-size:11px;text-align:center">No repos registered</div>';
+    listEl.innerHTML = '<div style="padding:20px 10px;color:#444;font-size:11px;text-align:center">No repos — add in Settings</div>';
     return;
+  }
+
+  // Auto-expand first repo if none expanded
+  if (!expandedRepo || !allRepos.includes(expandedRepo)) {
+    expandedRepo = allRepos[0];
   }
 
   let html = '';
   for (const repo of allRepos) {
     const repoAgents = byRepo[repo] || [];
     const repoName = repo.split('/')[1] || repo;
-    const isCollapsed = collapsedRepos[repo];
+    const isOpen = expandedRepo === repo;
     const aliveCount = repoAgents.filter(a => !['dead', 'error'].includes(a.status)).length;
     const rs = repoInfo[repo];
     const ghBase = `https://github.com/${repo}`;
 
     const summaryParts = [];
     if (repoAgents.length > 0) summaryParts.push(`${aliveCount} agent${aliveCount !== 1 ? 's' : ''}`);
-    if (rs && rs.tasks.ready > 0) summaryParts.push(`${rs.tasks.ready} ready`);
     if (rs && rs.issues_open > 0) summaryParts.push(`${rs.issues_open} issues`);
+    if (rs && rs.prs_open > 0) summaryParts.push(`${rs.prs_open} PRs`);
     const summaryText = summaryParts.join(' \u00b7 ') || 'empty';
 
     html += `
-      <div class="repo-group ${isCollapsed ? '' : 'repo-group-open'}">
+      <div class="repo-group ${isOpen ? 'repo-group-open' : ''}">
         <div class="repo-group-header" data-repo="${repo}">
-          <span class="repo-group-chevron ${isCollapsed ? 'collapsed' : ''}">&#9662;</span>
+          <span class="repo-group-chevron ${isOpen ? '' : 'collapsed'}">&#9662;</span>
           <div class="repo-group-title">
             <span class="repo-group-name">${escapeHtml(repoName)}</span>
             <span class="repo-group-summary">${summaryText}</span>
@@ -569,37 +513,12 @@ function renderRepos() {
         </div>
     `;
 
-    if (!isCollapsed) {
+    if (isOpen) {
       html += '<div class="repo-group-body">';
 
-      html += `
-        <div class="repo-detail-links">
-          <a href="${ghBase}" target="_blank">GitHub</a>
-          <a href="${ghBase}/issues" target="_blank">${rs ? rs.issues_open : '?'} issues</a>
-          <a href="${ghBase}/pulls" target="_blank">${rs ? rs.prs_open : '?'} PRs</a>
-        </div>
-      `;
-
-      if (rs && rs.tasks.total > 0) {
-        const agentIssues = (rs.issues || []).filter(i => i.labels.some(l => l.startsWith('agent:')));
-        if (agentIssues.length > 0) {
-          html += '<div class="repo-detail-section-title">Active Tasks</div>';
-          for (const issue of agentIssues.slice(0, 8)) {
-            const statusLabel = issue.labels.find(l => l.startsWith('status:'));
-            const status = statusLabel ? statusLabel.replace('status:', '') : 'open';
-            const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[status] || '';
-            html += `
-              <a class="repo-detail-item side-link" href="${issue.url}" target="_blank">
-                <span class="repo-detail-item-title">#${issue.number} ${escapeHtml(issue.title || '')}</span>
-                <span class="badge ${statusCls}">${status}</span>
-              </a>
-            `;
-          }
-        }
-      }
-
+      // ── Agents section ──
+      html += '<div class="repo-detail-section-title">Agents</div>';
       if (repoAgents.length > 0) {
-        html += '<div class="repo-detail-section-title">Agents</div>';
         for (const a of repoAgents) {
           const isActive = a.agent_id === activeAgentId;
           const alive = !['dead', 'error'].includes(a.status);
@@ -623,16 +542,52 @@ function renderRepos() {
             </div>
           `;
         }
+      } else {
+        html += '<div class="repo-group-empty">No agents running</div>';
       }
 
-      if (repoAgents.length === 0 && (!rs || rs.tasks.total === 0)) {
-        html += '<div class="repo-group-empty">No activity</div>';
+      // ── Issues & PRs section ──
+      html += '<div class="repo-detail-section-title">Issues &amp; PRs</div>';
+
+      const issues = rs ? (rs.issues || []) : [];
+      const prs = rs ? (rs.prs || []) : [];
+
+      if (issues.length === 0 && prs.length === 0) {
+        html += '<div class="repo-group-empty">No open issues or PRs</div>';
+      } else {
+        // Issues
+        for (const issue of issues.slice(0, 15)) {
+          const statusLabel = issue.labels.find(l => l.startsWith('status:'));
+          const agentLabel = issue.labels.find(l => l.startsWith('agent:'));
+          const status = statusLabel ? statusLabel.replace('status:', '') : '';
+          const agent = agentLabel ? agentLabel.replace('agent:', '') : '';
+          const statusCls = { ready: 'badge-green', 'in-progress': 'badge-purple', blocked: 'badge-yellow', review: 'badge-blue' }[status] || '';
+
+          html += `
+            <a class="repo-detail-item side-link" href="${issue.url}" target="_blank">
+              <span class="repo-detail-item-title">#${issue.number} ${escapeHtml(issue.title || '')}</span>
+              <span class="repo-detail-item-badges">
+                ${status ? `<span class="badge ${statusCls}">${status}</span>` : ''}
+                ${agent ? `<span class="badge">${agent}</span>` : ''}
+              </span>
+            </a>
+          `;
+        }
+        // PRs
+        for (const pr of prs.slice(0, 10)) {
+          html += `
+            <a class="repo-detail-item side-link" href="${pr.url}" target="_blank">
+              <span class="repo-detail-item-title">PR #${pr.number} ${escapeHtml(pr.title || '')}</span>
+              <span class="badge badge-blue">PR</span>
+            </a>
+          `;
+        }
       }
 
-      html += '</div>';
+      html += '</div>'; // repo-group-body
     }
 
-    html += '</div>';
+    html += '</div>'; // repo-group
   }
 
   listEl.innerHTML = html;
@@ -655,7 +610,8 @@ document.getElementById('repos-list').addEventListener('click', (e) => {
   const repoHeader = e.target.closest('.repo-group-header');
   if (repoHeader && !e.target.closest('.repo-group-add')) {
     const repo = repoHeader.dataset.repo;
-    collapsedRepos[repo] = !collapsedRepos[repo];
+    // Single-expand: toggle clicked, close others
+    expandedRepo = (expandedRepo === repo) ? null : repo;
     lastReposKey = '';
     renderRepos();
     return;
@@ -881,7 +837,7 @@ api.onStatusUpdate((agentId, data) => {
 
 api.onTrackerUpdate((state) => {
   trackerState = state;
-  renderBounties();
+  renderRepos();
   renderAll();
 });
 
@@ -957,7 +913,7 @@ refreshAgents();
 api.getTracker().then(state => {
   trackerState = state;
   renderAll();
-  renderBounties();
+  renderRepos();
 });
 setInterval(refreshAgents, 10_000);
 setInterval(() => {
