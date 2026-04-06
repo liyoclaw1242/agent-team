@@ -634,6 +634,39 @@ document.getElementById('repos-list').addEventListener('click', (e) => {
   if (tab) selectAgent(tab.dataset.agentId);
 });
 
+// Tooltip positioning (fixed, outside sidebar flow)
+let activeTooltip = null;
+
+document.getElementById('repos-list').addEventListener('mouseenter', (e) => {
+  const item = e.target.closest('.has-tooltip');
+  if (!item) return;
+  const tip = item.querySelector('.item-tooltip');
+  if (!tip) return;
+
+  const rect = item.getBoundingClientRect();
+  tip.style.display = 'block';
+  tip.style.left = (rect.right + 8) + 'px';
+  tip.style.top = Math.max(4, rect.top) + 'px';
+
+  // Keep inside viewport
+  requestAnimationFrame(() => {
+    const tipRect = tip.getBoundingClientRect();
+    if (tipRect.bottom > window.innerHeight - 4) {
+      tip.style.top = Math.max(4, window.innerHeight - tipRect.height - 4) + 'px';
+    }
+  });
+
+  activeTooltip = tip;
+}, true);
+
+document.getElementById('repos-list').addEventListener('mouseleave', (e) => {
+  const item = e.target.closest('.has-tooltip');
+  if (!item) return;
+  const tip = item.querySelector('.item-tooltip');
+  if (tip) tip.style.display = 'none';
+  if (activeTooltip === tip) activeTooltip = null;
+}, true);
+
 // ---------------------------------------------------------------------------
 // Terminal
 // ---------------------------------------------------------------------------
