@@ -504,7 +504,9 @@ function renderRepos() {
   const listEl = document.getElementById('repos-list');
   const agentList = getAllAgentsList();
 
-  const allRepos = (trackerState && trackerState.repos) ? [...trackerState.repos] : [];
+  const allRepos = (trackerState && trackerState.repos)
+    ? trackerState.repos.map(r => typeof r === 'string' ? r : r.slug)
+    : [];
   for (const a of agentList) {
     if (a.repo && !allRepos.includes(a.repo)) allRepos.push(a.repo);
   }
