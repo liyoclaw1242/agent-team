@@ -38,6 +38,17 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
     await tracker.refresh();
     return { ok: true };
   });
+  ipcMain.handle("add-repo", (_e, slug: string) => {
+    tracker.addRepo(slug);
+    return { ok: true };
+  });
+  ipcMain.handle("remove-repo", (_e, slug: string) => {
+    tracker.removeRepo(slug);
+    return { ok: true };
+  });
+  ipcMain.handle("get-tracked-entries", () => {
+    return tracker.getTrackedEntries();
+  });
 
   // --- Push events ---
   supervisor.on("agent:log", (agentId: string, entry: LogEntry) => {

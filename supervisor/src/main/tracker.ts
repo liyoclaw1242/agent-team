@@ -100,14 +100,18 @@ export class Tracker extends EventEmitter {
         const data = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
         if (data.github_token) this._state.github_token = data.github_token;
         if (data.api_url) this._state.api_url = data.api_url;
+        if (Array.isArray(data.tracked_entries)) this._trackedEntries = data.tracked_entries;
       }
     } catch { /* ignore */ }
   }
+
+  private _trackedEntries: string[] = [];
 
   private saveConfig(): void {
     const data = {
       github_token: this._state.github_token,
       api_url: this._state.api_url,
+      tracked_entries: this._trackedEntries,
     };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2));
   }
@@ -117,6 +121,25 @@ export class Tracker extends EventEmitter {
     this.saveConfig();
     this.emit("update");
     this.refresh();
+  }
+
+  addRepo(slug: string): void {
+    if (!this._trackedEntries.includes(slug)) {
+      this._trackedEntries.push(slug);
+      this.saveConfig();
+      this.refresh();
+    }
+  }
+
+  removeRepo(slug: string): void {
+    this._trackedEntries = this._trackedEntries.filter(e => e !== slug);
+    this.saveConfig();
+    this.emit("update");
+    this.refresh();
+  }
+
+  getTrackedEntries(): string[] {
+    return [...this._trackedEntries];
   }
 
   setApiUrl(url: string): void {
@@ -378,8 +401,8 @@ export class Tracker extends EventEmitter {
   // API
   // -----------------------------------------------------------------------
 
-  getState(): TrackerState {
-    return { ...this._state };
+  getState(): TrackerState & { tracked_entries: string[] } {
+    return { ...this._state, tracked_entries: [...this._trackedEntries] };
   }
 
   hasGitHubToken(): boolean {

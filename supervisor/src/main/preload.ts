@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld("bridge", {
   setGitHubToken: (token: string) => ipcRenderer.invoke("set-github-token", token),
   setApiUrl: (url: string) => ipcRenderer.invoke("set-api-url", url),
   refreshTracker: () => ipcRenderer.invoke("refresh-tracker"),
+  addRepo: (slug: string) => ipcRenderer.invoke("add-repo", slug),
+  removeRepo: (slug: string) => ipcRenderer.invoke("remove-repo", slug),
+  getTrackedEntries: () => ipcRenderer.invoke("get-tracked-entries"),
 
   // Real-time push
   onLogEntry: (cb: (agentId: string, entry: any) => void) => {
