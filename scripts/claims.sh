@@ -20,34 +20,26 @@ fi
 gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
   --remove-label "status:ready" --add-label "status:in-progress" 2>/dev/null
 
-# 3. Post claim comment with timestamp for race detection
-CLAIM_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# 3. Post claim comment with agent ID
 gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
-  --body "Claimed by \`${AGENT_ID}\` at ${CLAIM_TS}" 2>/dev/null
+  --body "Claimed by \`${AGENT_ID}\`" 2>/dev/null
 
-# 4. Race detection: wait briefly, then check if another agent claimed within 30s of us
+# 4. Race detection: check if another agent also claimed after us
 sleep 2
-OTHER_CLAIMS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments \
-  --jq --arg me "$AGENT_ID" '[.comments[-5:][] | select(.body | startswith("Claimed by")) | select(.body | contains($me) | not) | .body] | length')
+COMMENTS_JSON=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments --jq '.comments')
 
-if [ "$OTHER_CLAIMS" -gt 0 ]; then
-  # Check if those other claims are recent (within last 60 seconds via comment order)
-  # If the other "Claimed by" is AFTER ours in the comment list, it's a real race
-  MY_IDX=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments \
-    --jq --arg me "$AGENT_ID" '[.comments | to_entries[] | select(.value.body | contains($me)) | .key] | last // -1')
-  LAST_OTHER_IDX=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments \
-    --jq --arg me "$AGENT_ID" '[.comments | to_entries[] | select(.value.body | startswith("Claimed by")) | select(.value.body | contains($me) | not) | .key] | last // -1')
+MY_IDX=$(echo "$COMMENTS_JSON" | jq --arg me "$AGENT_ID" \
+  '[to_entries[] | select(.value.body | contains($me)) | .key] | last // -1')
+LAST_OTHER_IDX=$(echo "$COMMENTS_JSON" | jq --arg me "$AGENT_ID" \
+  '[to_entries[] | select(.value.body | startswith("Claimed by")) | select(.value.body | contains($me) | not) | .key] | last // -1')
 
-  if [ "$LAST_OTHER_IDX" -gt "$MY_IDX" ]; then
-    # Someone claimed AFTER us — real race, back off
-    echo "RACE: #${ISSUE_N} claimed by another agent after us — backing off"
-    gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-      --remove-label "status:in-progress" --add-label "status:ready" 2>/dev/null
-    gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
-      --body "Released by \`${AGENT_ID}\` (race detected)" 2>/dev/null
-    exit 1
-  fi
-  # Other claims exist but are BEFORE ours — stale, not a race. Proceed.
+if [ "$LAST_OTHER_IDX" -gt "$MY_IDX" ]; then
+  echo "RACE: #${ISSUE_N} claimed by another agent after us — backing off"
+  gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
+    --remove-label "status:in-progress" --add-label "status:ready" 2>/dev/null
+  gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
+    --body "Released by \`${AGENT_ID}\` (race detected)" 2>/dev/null
+  exit 1
 fi
 
 # 5. Verify labels
