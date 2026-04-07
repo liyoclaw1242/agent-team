@@ -324,9 +324,9 @@ git add -A && git commit -m "docs: {title} (closes #{N})"
 
 ARCH is the sole merge authority and dispatcher. When any agent (FE, BE, QA, Design, OPS, DEBUG) completes work, they set `agent_type: arch` + `status: ready`. ARCH picks it up here.
 
-### Phase 0: Pre-triage Scan (run every cycle before processing tasks)
+### Phase 0: Pre-triage (MANDATORY — run before ANY judgment)
 
-Housekeeping that ARCH runs automatically — dependency unblocking and request completion:
+**Run these scripts first. They handle all deterministic cases automatically. Do NOT skip this step. Do NOT manually handle cases that the scripts already cover.**
 
 ```bash
 # 1. Unblock issues whose deps are all resolved
@@ -334,13 +334,20 @@ bash actions/scan-unblock.sh "{REPO_SLUG}"
 
 # 2. Check for completed requests (all sub-issues done)
 bash actions/scan-complete-requests.sh "{REPO_SLUG}"
+
+# 3. Auto-handle deterministic triage cases
+bash scripts/pre-triage.sh "{REPO_SLUG}"
 ```
 
-These are deterministic — if all deps are closed, unblock. If all sub-issues are done, complete the request. No judgment needed.
+`pre-triage.sh` automatically handles:
+- **QA PASS + PR open → merge + close** (no judgment needed)
+- **QA PASS + PR merged → close** (no judgment needed)
+- **Design APPROVED + QA PASS → merge + close** (no judgment needed)
+- **PR delivered + no verdict → route to QA** (no judgment needed)
 
-After the scan, proceed to classify and process incoming tasks:
+It prints which issues remain for your judgment. **Only process those remaining issues in Phase 1.**
 
-### Phase 1: Classify the Incoming Task
+### Phase 1: Classify the Remaining Issues
 
 Read the issue and all comments:
 
@@ -377,27 +384,9 @@ PR_EXISTS=$(gh pr list --repo {REPO_SLUG} --search "closes #{N}" --json number -
 
 **CRITICAL: All routing MUST go through `scripts/route.sh`. Do NOT use raw `gh issue edit` for label changes. The script enforces validation rules that prevent re-routing loops.**
 
-### Phase 2: Act on Classification
+### Phase 2: Act on Remaining Issues
 
-#### QA Verdict: PASS
-
-Check if visual review is needed:
-
-| PR changes | Action |
-|------------|--------|
-| Non-frontend (BE, OPS, infra, docs) | **Merge** |
-| Frontend bug fix (restores existing behavior) | **Merge** |
-| Frontend new/changed visual (new components, layout changes) | **Route to Design** |
-
-**Merge**:
-```bash
-bash scripts/route.sh "{REPO_SLUG}" {N} merge "{AGENT_ID}"
-```
-
-**Route to Design**:
-```bash
-bash scripts/route.sh "{REPO_SLUG}" {N} design "{AGENT_ID}"
-```
+> **QA PASS → merge** and **PR delivered → route to QA** are already handled by `pre-triage.sh`. You should NOT see these cases here. If you do, run `pre-triage.sh` again.
 
 #### QA Verdict: FAIL
 
@@ -409,17 +398,6 @@ bash scripts/route.sh "{REPO_SLUG}" {N} {fe|be|ops|debug} "{AGENT_ID}"
 
 Choose the role based on QA's triage: UI/component → `fe`, API/DB → `be`, CI/infra → `ops`, unclear → `debug`.
 
-#### Design Verdict: APPROVED
-
-```bash
-bash scripts/route.sh "{REPO_SLUG}" {N} merge "{AGENT_ID}"
-```
-
-If QA hasn't verified yet → route to QA first:
-```bash
-bash scripts/route.sh "{REPO_SLUG}" {N} qa "{AGENT_ID}"
-```
-
 #### Design Verdict: NEEDS CHANGES
 
 Route back to the implementing role with Design's feedback:
@@ -429,8 +407,6 @@ bash scripts/route.sh "{REPO_SLUG}" {N} {fe|be|ops} "{AGENT_ID}"
 ```
 
 #### Implementation Delivered (no review yet)
-
-A FE/BE/OPS agent completed work and opened a PR. Route to QA for verification:
 
 ```bash
 bash scripts/route.sh "{REPO_SLUG}" {N} qa "{AGENT_ID}"
