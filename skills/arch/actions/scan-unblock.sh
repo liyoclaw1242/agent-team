@@ -27,8 +27,8 @@ echo "$BLOCKED" | while IFS= read -r ISSUE_JSON; do
   TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
   BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
 
-  # Parse <!-- deps: 5,6,7 --> from body
-  DEPS=$(echo "$BODY" | grep -oP '<!-- deps: \K[0-9,]+' || true)
+  # Parse <!-- deps: 5,6,7 --> or <!-- deps: #5, #6, #7 --> from body
+  DEPS=$(echo "$BODY" | grep -o '<!-- deps:.*-->' | sed 's/<!-- deps://;s/-->//;s/#//g;s/ //g' || true)
 
   if [ -z "$DEPS" ]; then
     echo "  #${ISSUE_N} (${TITLE}): no deps found — skip"

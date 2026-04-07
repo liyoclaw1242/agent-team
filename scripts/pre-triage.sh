@@ -28,10 +28,10 @@ for N in $ISSUES; do
   COMMENTS=$(gh issue view "$N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null)
 
   # Detect verdicts
-  QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS"; "i"))] | last // empty')
-  QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL"; "i"))] | last // empty')
-  DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED"; "i"))] | last // empty')
-  DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES"; "i"))] | last // empty')
+  QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass"; "i"))] | last // empty')
+  QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
+  DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
+  DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
 
   # Find associated PR
   PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${N}" --json number,state --jq '.[0].number // empty' 2>/dev/null || true)
