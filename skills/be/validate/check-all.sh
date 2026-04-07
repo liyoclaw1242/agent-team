@@ -27,14 +27,14 @@ fi
 
 # 3. Security checks
 echo "── Security ──"
-SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v ".test." || true)
+SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
 if [ -n "$SECRETS" ]; then
   echo "FAIL: Potential secrets found:"
   echo "$SECRETS"
   FAILURES=$((FAILURES+1))
 fi
 
-SQL_INJECT=$(grep -rn 'query.*`.*\${' --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v ".test." || true)
+SQL_INJECT=$(grep -rn 'query.*`.*\${' --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
 if [ -n "$SQL_INJECT" ]; then
   echo "FAIL: Potential SQL injection:"
   echo "$SQL_INJECT"

@@ -65,7 +65,7 @@ if [ -n "$XSS" ]; then
   echo "$XSS"
 fi
 
-SECRETS=$(grep -rn "sk-\|ghp_\|AKIA" --include="*.ts" --include="*.tsx" . 2>/dev/null | grep -v node_modules | grep -v ".test." || true)
+SECRETS=$(grep -rn "sk-\|ghp_\|AKIA" --include="*.ts" --include="*.tsx" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
 if [ -n "$SECRETS" ]; then
   echo "FAIL: Potential secrets in source:"
   echo "$SECRETS"

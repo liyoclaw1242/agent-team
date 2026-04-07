@@ -388,6 +388,8 @@ PR_EXISTS=$(gh pr list --repo {REPO_SLUG} --search "closes #{N}" --json number -
 
 > **QA PASS → merge** and **PR delivered → route to QA** are already handled by `pre-triage.sh`. You should NOT see these cases here. If you do, run `pre-triage.sh` again.
 
+> **Design superseding PRs**: If Design opened a NEW PR (instead of just reviewing the existing one), close the older FE PR before merging the Design PR. Check: `gh pr list --repo {REPO_SLUG} --search "closes #{N}"` — if multiple PRs target the same issue, merge the newest, close the rest.
+
 #### QA Verdict: FAIL
 
 Read QA's triage assessment. Route to the appropriate role:

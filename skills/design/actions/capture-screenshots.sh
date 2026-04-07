@@ -43,30 +43,42 @@ const viewports = [
   { width: 1280, height: 800, name: "desktop" },
 ];
 
+const themes = [
+  { name: "light", colorScheme: "light" },
+  { name: "dark", colorScheme: "dark" },
+];
+
 async function main() {
   const browser = await chromium.launch();
 
   for (const route of routes) {
     for (const vp of viewports) {
-      const page = await browser.newPage({
-        viewport: { width: vp.width, height: vp.height },
-      });
+      for (const theme of themes) {
+        const page = await browser.newPage({
+          viewport: { width: vp.width, height: vp.height },
+          colorScheme: theme.colorScheme,
+        });
 
-      const url = `${baseUrl}${route}`;
-      const slug = route === "/" ? "home" : route.replace(/\//g, "-").replace(/^-/, "");
-      const filename = `${slug}_${vp.name}.png`;
+        const url = `${baseUrl}${route}`;
+        const slug = route === "/" ? "home" : route.replace(/\//g, "-").replace(/^-/, "");
+        const filename = `${slug}_${vp.name}_${theme.name}.png`;
 
-      try {
-        await page.goto(url, { waitUntil: "networkidle", timeout: 15000 });
-        // Wait a bit for animations/transitions
-        await page.waitForTimeout(1000);
-        await page.screenshot({ path: `${outputDir}/${filename}`, fullPage: true });
-        console.log(`OK: ${filename}`);
-      } catch (err) {
-        console.log(`FAIL: ${filename} — ${err.message}`);
+        try {
+          await page.goto(url, { waitUntil: "networkidle", timeout: 15000 });
+          // Toggle .dark class for frameworks that use class-based dark mode
+          if (theme.name === "dark") {
+            await page.evaluate(() => document.documentElement.classList.add("dark"));
+            await page.waitForTimeout(500);
+          }
+          await page.waitForTimeout(1000);
+          await page.screenshot({ path: `${outputDir}/${filename}`, fullPage: true });
+          console.log(`OK: ${filename}`);
+        } catch (err) {
+          console.log(`FAIL: ${filename} — ${err.message}`);
+        }
+
+        await page.close();
       }
-
-      await page.close();
     }
   }
 

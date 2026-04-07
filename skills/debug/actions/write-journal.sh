@@ -6,7 +6,7 @@ set -e
 REPO_SLUG="${1:?Repo slug required}"
 ISSUE_N="${2:?Issue number required}"
 AGENT_ID="${3:?Agent ID required}"
-ROLE="${4:-be}"
+ROLE="${4:-debug}"
 
 JOURNAL_DIR="$HOME/.agent-team/journal/$(echo "$REPO_SLUG" | tr '/' '-')"
 mkdir -p "$JOURNAL_DIR"
@@ -28,23 +28,24 @@ cat > "$FILEPATH" << EOF
 
 ## Summary
 
-(Fill in: 1-2 sentences)
+WRITE 1-2 SENTENCES HERE. Do not leave this blank.
 
 ## What Worked
 
-(Fill in: patterns or approaches that were effective)
+WRITE at least 1 bullet. What patterns or approaches were effective?
 
 ## What Didn't Work
 
-(Fill in: dead ends, false starts)
+WRITE at least 1 bullet, or "None" if nothing went wrong. Dead ends, false starts, script bugs.
 
 ## Standards Violations Found
 
-(Fill in: which checks failed initially)
+WRITE what checks failed initially, or "None".
 
 ## Lessons
 
-(Fill in: insights for future tasks in this repo)
+WRITE at least 1 insight for future tasks in this repo. If nothing new, write "No new lessons."
 EOF
 
-echo "Journal entry created: $FILEPATH"
+echo "Journal template created: $FILEPATH"
+echo "IMPORTANT: Open $FILEPATH and fill in all sections. Do not leave template text."
