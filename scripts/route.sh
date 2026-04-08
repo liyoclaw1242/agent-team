@@ -37,20 +37,21 @@ DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdic
 # ── Validation rules ──
 
 # Rule 0: Block if pre-triage already handled this issue recently
-# pre-triage.sh leaves comments containing "pre-triage" when it routes or merges.
-# If such a comment exists within the last 10 minutes, block all label changes.
-PRETRIAGE_COMMENT_TS=$(echo "$COMMENTS" | jq -r '[.[] | select(.body | test("pre-triage"; "i")) | .createdAt] | last // empty')
-if [ -n "$PRETRIAGE_COMMENT_TS" ]; then
-  AGE=$(python3 -c "
+# EXCEPTION: routing TO arch (reporting back) is always allowed — only block outward dispatch
+if [ "$TARGET" != "arch" ] && [ "$TARGET" != "merge" ] && [ "$TARGET" != "done" ]; then
+  PRETRIAGE_COMMENT_TS=$(echo "$COMMENTS" | jq -r '[.[] | select(.body | test("pre-triage"; "i")) | .createdAt] | last // empty')
+  if [ -n "$PRETRIAGE_COMMENT_TS" ]; then
+    AGE=$(python3 -c "
 from datetime import datetime, timezone
 ts = datetime.fromisoformat('${PRETRIAGE_COMMENT_TS}'.replace('Z','+00:00'))
 now = datetime.now(timezone.utc)
 print(int((now - ts).total_seconds()))
 " 2>/dev/null || echo "9999")
-  if [ "$AGE" -lt 600 ] && [ "$AGE" -ge 0 ]; then
-    echo "BLOCKED: #${ISSUE_N} was handled by pre-triage ${AGE}s ago. Cannot override."
-    echo "  Wait 10 minutes or resolve manually."
-    exit 1
+    if [ "$AGE" -lt 600 ] && [ "$AGE" -ge 0 ]; then
+      echo "BLOCKED: #${ISSUE_N} was handled by pre-triage ${AGE}s ago. Cannot re-dispatch."
+      echo "  Wait 10 minutes or resolve manually."
+      exit 1
+    fi
   fi
 fi
 
