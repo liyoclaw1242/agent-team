@@ -16,16 +16,23 @@ AGENT_ID="${4:-unknown}"
 
 # ── Gather current state ──
 LABELS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | join(",")')
-COMMENTS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments --jq '.comments')
-
-# Extract last verdict (if any)
-QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass"; "i"))] | last // empty')
-QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
-DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
-DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
 
 # Find associated PR
 PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${ISSUE_N}" --json number --jq '.[0].number // empty' 2>/dev/null || true)
+
+# Collect comments from BOTH issue AND PR (QA often posts verdict on PR)
+ISSUE_COMMENTS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
+PR_COMMENTS="[]"
+if [ -n "$PR_NUMBER" ]; then
+  PR_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
+fi
+COMMENTS=$(echo "$ISSUE_COMMENTS $PR_COMMENTS" | jq -s 'add')
+
+# Extract last verdict (if any)
+QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass|PASS.*verdict"; "i"))] | last // empty')
+QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
+DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
+DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
 
 # ── Validation rules ──
 

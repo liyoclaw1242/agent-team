@@ -25,17 +25,26 @@ REMAINING=""
 
 for N in $ISSUES; do
   TITLE=$(gh issue view "$N" --repo "$REPO_SLUG" --json title --jq '.title' 2>/dev/null)
-  COMMENTS=$(gh issue view "$N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null)
-
-  # Detect verdicts
-  QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass"; "i"))] | last // empty')
-  QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
-  DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
-  DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
 
   # Find associated PR
   PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${N}" --json number,state --jq '.[0].number // empty' 2>/dev/null || true)
   PR_STATE=""
+
+  # Collect comments from BOTH issue AND PR (QA often posts verdict on PR, not issue)
+  ISSUE_COMMENTS=$(gh issue view "$N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
+  PR_COMMENTS="[]"
+  if [ -n "$PR_NUMBER" ]; then
+    PR_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
+  fi
+  ALL_COMMENTS=$(echo "$ISSUE_COMMENTS $PR_COMMENTS" | jq -s 'add')
+
+  # Detect verdicts from combined issue + PR comments
+  QA_PASS=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass|PASS.*verdict"; "i"))] | last // empty')
+  QA_FAIL=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
+  DESIGN_APPROVED=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
+  DESIGN_NEEDS_CHANGES=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
+
+  # PR state
   if [ -n "$PR_NUMBER" ]; then
     PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
   fi
