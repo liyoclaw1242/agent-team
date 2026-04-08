@@ -774,6 +774,7 @@ function renderAll() {
 
 async function selectAgent(id) {
   activeAgentId = id;
+  userDeselected = false;
   renderAll();
 }
 
@@ -853,6 +854,7 @@ document.addEventListener('keydown', (e) => {
       return;
     }
     activeAgentId = null;
+    userDeselected = true;
     renderAll();
     return;
   }
@@ -874,12 +876,17 @@ api.onPtyData((agentId, data) => {
   t.term.write(data);
 });
 
+let userDeselected = false; // true when user explicitly clicks Dashboard or presses Esc
+
 api.onStatusUpdate((agentId, data) => {
   if (data) {
     agents[agentId] = data;
-    if (!activeAgentId) selectAgent(agentId);
+    // Only auto-select on first agent creation, not when user explicitly deselected
+    if (!activeAgentId && !userDeselected) selectAgent(agentId);
   }
-  renderAll();
+  updateHealthBar();
+  renderRepos();
+  renderProperties();
 });
 
 api.onTrackerUpdate((state) => {
@@ -953,6 +960,7 @@ document.getElementById('btn-refresh-sidebar').addEventListener('click', () => {
 
 document.getElementById('btn-dashboard').addEventListener('click', () => {
   activeAgentId = null;
+  userDeselected = true;
   renderAll();
 });
 
