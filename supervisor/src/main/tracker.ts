@@ -184,7 +184,8 @@ export class Tracker extends EventEmitter {
         if (entry.includes("/")) {
           repoSlugs.push(entry);
         } else if (this._state.github_token) {
-          const ownerRepos = await this.fetchGitHub<any[]>(`/users/${entry}/repos?per_page=100&sort=updated`);
+          // Use /user/repos (authenticated) to include private repos
+          const ownerRepos = await this.fetchGitHub<any[]>(`/user/repos?per_page=100&sort=updated&affiliation=owner`);
           for (const r of ownerRepos ?? []) {
             repoSlugs.push(r.full_name);
           }
