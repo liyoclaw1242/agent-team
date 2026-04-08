@@ -29,6 +29,24 @@ PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${ISSUE_N}" --json 
 
 # ── Validation rules ──
 
+# Rule 0: Block if pre-triage already handled this issue recently
+# pre-triage.sh leaves comments containing "pre-triage" when it routes or merges.
+# If such a comment exists within the last 10 minutes, block all label changes.
+PRETRIAGE_COMMENT_TS=$(echo "$COMMENTS" | jq -r '[.[] | select(.body | test("pre-triage"; "i")) | .createdAt] | last // empty')
+if [ -n "$PRETRIAGE_COMMENT_TS" ]; then
+  AGE=$(python3 -c "
+from datetime import datetime, timezone
+ts = datetime.fromisoformat('${PRETRIAGE_COMMENT_TS}'.replace('Z','+00:00'))
+now = datetime.now(timezone.utc)
+print(int((now - ts).total_seconds()))
+" 2>/dev/null || echo "9999")
+  if [ "$AGE" -lt 600 ] && [ "$AGE" -ge 0 ]; then
+    echo "BLOCKED: #${ISSUE_N} was handled by pre-triage ${AGE}s ago. Cannot override."
+    echo "  Wait 10 minutes or resolve manually."
+    exit 1
+  fi
+fi
+
 # Rule 1: Don't route to QA if QA already gave a verdict
 if [ "$TARGET" = "qa" ]; then
   if [ -n "$QA_PASS" ] || [ -n "$QA_FAIL" ]; then

@@ -105,6 +105,8 @@ for N in $ISSUES; do
       REMAINING="$REMAINING $N"
       continue
     }
+    gh issue comment "$N" --repo "$REPO_SLUG" \
+      --body "Routed to QA by pre-triage — PR #${PR_NUMBER} needs verification." 2>/dev/null || true
     HANDLED=$((HANDLED + 1))
     continue
   fi
