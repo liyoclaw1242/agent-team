@@ -110,16 +110,7 @@ Fix remaining issues from validation. Recapture screenshots to confirm.
 
 ### Phase 9: Deliver
 
-1. Run `actions/deliver.sh` — commit + push + open PR
-2. Route back to ARCH for decision:
-   ```bash
-   CURRENT_AGENT=$(gh issue view "$N" --repo "$REPO_SLUG" --json labels \
-     --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
-   [ -n "$CURRENT_AGENT" ] && gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
-   gh issue edit "$N" --repo "$REPO_SLUG" \
-     --remove-label "status:in-progress" \
-     --add-label "agent:arch" --add-label "status:ready"
-   ```
+1. Run `actions/deliver.sh` — commit + push + open PR + route to ARCH (deliver.sh handles routing)
 
 ### Phase 10: Journal + Distill
 
@@ -234,12 +225,7 @@ Expected: [Pencil sketch description]
 **Design does NOT merge, reject, or reassign.** Post your verdict, then route back to ARCH:
 
 ```bash
-CURRENT_AGENT=$(gh issue view "$N" --repo "$REPO_SLUG" --json labels \
-  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
-[ -n "$CURRENT_AGENT" ] && gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$CURRENT_AGENT"
-gh issue edit "$N" --repo "$REPO_SLUG" \
-  --remove-label "status:in-progress" \
-  --add-label "agent:arch" --add-label "status:ready"
+bash scripts/route.sh "{REPO_SLUG}" {N} arch "{AGENT_ID}"
 ```
 
 ARCH reads the verdict and decides: merge (if approved), route back to FE (if needs changes), or escalate.

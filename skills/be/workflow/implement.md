@@ -43,13 +43,8 @@ gh issue comment {N} --repo {REPO_SLUG} \
 ### Affected
 {which parts of the spec need revision}"
 
-# 2. Hand back to ARCH
-CURRENT_AGENT=$(gh issue view {N} --repo {REPO_SLUG} --json labels \
-  --jq '[.labels[].name | select(startswith("agent:"))] | .[0] // empty')
-[ -n "$CURRENT_AGENT" ] && gh issue edit {N} --repo {REPO_SLUG} --remove-label "$CURRENT_AGENT"
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "status:in-progress" \
-  --add-label "agent:arch" --add-label "status:ready"
+# 2. Hand back to ARCH (MUST use route.sh)
+bash scripts/route.sh "{REPO_SLUG}" {N} arch "{AGENT_ID}"
 ```
 
 Move on to next task. Don't wait.

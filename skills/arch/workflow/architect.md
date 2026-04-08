@@ -437,18 +437,10 @@ QA or Design completed an audit task. Read the report and decompose findings int
 
 #### Blocked Task Unblocking
 
-Check if the dependency is now resolved:
+This is handled automatically by `scan-unblock.sh` in Phase 0. If you see a blocked issue that should be unblocked, re-run:
 
 ```bash
-# Parse <!-- deps: M --> from issue body, check if #M is done
-gh issue view {M} --repo {REPO_SLUG} --json state,labels
-```
-
-If the dependency is complete, unblock and set ready:
-
-```bash
-gh issue edit {N} --repo {REPO_SLUG} \
-  --remove-label "status:blocked" --add-label "status:ready"
+bash actions/scan-unblock.sh "{REPO_SLUG}"
 ```
 
 ### Phase 3: Update arch.md
