@@ -324,26 +324,14 @@ git add -A && git commit -m "docs: {title} (closes #{N})"
 
 ARCH is the sole merge authority and dispatcher. When any agent (FE, BE, QA, Design, OPS, DEBUG) completes work, they set `agent_type: arch` + `status: ready`. ARCH picks it up here.
 
-### Phase 0: Pre-triage (MANDATORY — run before ANY judgment)
+### Phase 0: Pre-triage (handled automatically by poll.sh)
 
-**Run these scripts first. They handle all deterministic cases automatically. Do NOT skip this step. Do NOT manually handle cases that the scripts already cover.**
+> **You do NOT need to run pre-triage manually.** `poll.sh` (Step 8.1 in the polling loop) already runs `pre-triage.sh`, `scan-unblock.sh`, and `scan-complete-requests.sh` before returning results to you. By the time you see issues here, all deterministic cases (QA PASS → merge, unblock, etc.) have already been handled.
 
+If you see an issue that should have been auto-handled (e.g. QA PASS but not merged), something went wrong. Re-run:
 ```bash
-# 1. Unblock issues whose deps are all resolved
-bash actions/scan-unblock.sh "{REPO_SLUG}"
-
-# 2. Check for completed requests (all sub-issues done)
-bash actions/scan-complete-requests.sh "{REPO_SLUG}"
-
-# 3. Auto-handle deterministic triage cases
-bash scripts/pre-triage.sh "{REPO_SLUG}"
+bash scripts/poll.sh "{REPO_SLUG}" arch "{AGENT_ID}"
 ```
-
-`pre-triage.sh` automatically handles:
-- **QA PASS + PR open → merge + close** (no judgment needed)
-- **QA PASS + PR merged → close** (no judgment needed)
-- **Design APPROVED + QA PASS → merge + close** (no judgment needed)
-- **PR delivered + no verdict → route to QA** (no judgment needed)
 
 It prints which issues remain for your judgment. **Only process those remaining issues in Phase 1.**
 

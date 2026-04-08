@@ -157,25 +157,15 @@ Repeat until stopped (Ctrl+C):
 [{AGENT_ID}] Cycle #{N} — {current time} — next poll in {cycle_interval} min
 ```
 
-### 8.1 Housekeeping (ARCH only)
+### 8.1 Poll
 
-If your role is `arch`, run these scripts **every cycle** before polling — even if there are no arch tasks:
-
-```bash
-bash scripts/pre-triage.sh "{REPO_SLUG}"
-bash actions/scan-unblock.sh "{REPO_SLUG}"
-bash actions/scan-complete-requests.sh "{REPO_SLUG}"
-```
-
-These handle deterministic work (auto-merge QA PASS, unblock deps, complete requests) without needing a task.
-
-### 8.2 Poll
+**MUST use `poll.sh`** — this is the ONLY way to poll. Do NOT use raw `gh issue list`. The script embeds housekeeping (auto-merge, unblock, cleanup) that runs automatically for ARCH before returning results.
 
 ```bash
-gh issue list --repo {REPO_SLUG} --label "agent:{agent_type}" --label "status:ready" --json number,title --jq '.[]'
+bash scripts/poll.sh "{REPO_SLUG}" "{agent_type}" "{AGENT_ID}"
 ```
 
-### 8.3 No Tasks
+### 8.2 No Tasks
 
 ```
 [{AGENT_ID}] No tasks available. Sleeping {cycle_interval} min...
@@ -185,7 +175,7 @@ sleep {cycle_interval_seconds}
 ```
 Restart from 8.1. **CRITICAL**: Use `sleep`. Do NOT use CronCreate or end the conversation.
 
-### 8.4 Claim
+### 8.3 Claim
 
 For the first available task, run the claim script:
 
@@ -195,14 +185,14 @@ bash scripts/claims.sh "{REPO_SLUG}" {N} "{AGENT_ID}"
 
 Exit 1 → skip, try next issue. Exit 0 → `[{AGENT_ID}] Claimed #{N}: {title}`
 
-### 8.5 Execute
+### 8.4 Execute
 
 Follow your **workflow** from `skills/{role}/workflow/`:
 - Each phase has a gate — do not skip
 - In Validate phase, run `skills/{role}/validate/check-all.sh`
 - In Journal phase, write to `~/.agent-team/journal/`
 
-### 8.6 Deliver
+### 8.5 Deliver
 
 Run the deliver script which handles everything (git + PR + routing):
 
@@ -217,7 +207,7 @@ The script will:
 
 > **Why**: ARCH is the sole dispatcher and merge authority. All completed work flows back to ARCH, who decides the next step (merge, route to QA/Design, reject, or create follow-up tasks).
 
-### 8.7 Sleep
+### 8.6 Sleep
 
 ```
 [{AGENT_ID}] Task #{N} complete. Next cycle in {cycle_interval} min...
