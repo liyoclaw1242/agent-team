@@ -226,8 +226,14 @@ class ManagedAgent {
 
   stop(): void {
     if (this.ptyProcess) {
-      this.ptyProcess.kill();
+      const proc = this.ptyProcess;
       this.ptyProcess = null;
+      // Send SIGTERM first
+      proc.kill();
+      // Force kill after 5s if still alive
+      setTimeout(() => {
+        try { proc.kill("SIGKILL"); } catch { /* already dead */ }
+      }, 5000);
     }
   }
 
