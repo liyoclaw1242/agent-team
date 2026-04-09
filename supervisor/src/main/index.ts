@@ -204,20 +204,48 @@ function startAPIServer(sup: Supervisor): void {
     if (url === "/api/agents" && req.method === "POST") {
       let body = "";
       req.on("data", (chunk: Buffer) => { body += chunk; });
-      req.on("end", () => {
+      req.on("end", async () => {
         try {
           const { role, repo } = JSON.parse(body);
           const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+
+          // Validate role
           if (!role || !validRoles.includes(role)) {
             res.writeHead(400);
             res.end(JSON.stringify({ error: `invalid role, must be one of: ${validRoles.join(", ")}` }));
             return;
           }
-          if (!repo) {
+
+          // Validate repo format (owner/repo)
+          if (!repo || !/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(repo)) {
             res.writeHead(400);
-            res.end(JSON.stringify({ error: "repo required (e.g. owner/repo)" }));
+            res.end(JSON.stringify({ error: "invalid repo format, must be owner/repo" }));
             return;
           }
+
+          // Check duplicate: same role + same repo already running
+          const existing = sup.getAllAgents().find(
+            a => a.role === role && a.repo === repo && !["dead", "error"].includes(a.status)
+          );
+          if (existing) {
+            res.writeHead(409);
+            res.end(JSON.stringify({
+              error: `${role} agent already running on ${repo}`,
+              existing_agent_id: existing.agent_id,
+            }));
+            return;
+          }
+
+          // Check repo exists on GitHub
+          const { execSync } = require("child_process");
+          try {
+            execSync(`gh repo view ${repo} --json name`, { timeout: 10000, stdio: "pipe" });
+          } catch {
+            res.writeHead(404);
+            res.end(JSON.stringify({ error: `repo ${repo} not found or not accessible` }));
+            return;
+          }
+
           const agentId = sup.createAgent(role, repo);
           res.writeHead(201);
           res.end(JSON.stringify({ ok: true, agent_id: agentId }));
