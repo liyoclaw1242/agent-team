@@ -128,7 +128,7 @@ class ManagedAgent {
     };
     const cliPath = runtimePaths[this.runtime];
     const cliArgs = this.runtime === "gemini"
-      ? ["--verbose", "--dangerously-skip-permissions", "--approval-mode", "yolo"]
+      ? ["--yolo"]
       : ["--verbose", "--dangerously-skip-permissions"];
 
     const prompt = [
