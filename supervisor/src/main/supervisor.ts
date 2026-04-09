@@ -198,10 +198,14 @@ class ManagedAgent {
           promptSent = true;
           console.log(`[AGENT:${this.agentId}] Sending initial prompt (${elapsed}ms after spawn, runtime=${this.runtime})`);
           if (this.runtime === "gemini") {
-            // Gemini TUI: write prompt as single line, then Enter to submit
-            const singleLine = prompt.replace(/\n/g, " ");
-            proc.write(singleLine);
-            setTimeout(() => proc.write("\r"), 500);
+            // Gemini TUI: needs focus first, then single-line prompt, then Enter
+            proc.write(" ");           // space to focus input
+            setTimeout(() => {
+              proc.write("\x7F");       // backspace to clear the space
+              const singleLine = prompt.replace(/\n/g, " ");
+              proc.write(singleLine);
+              setTimeout(() => proc.write("\r"), 500);
+            }, 300);
           } else {
             proc.write(prompt + "\r");
           }
