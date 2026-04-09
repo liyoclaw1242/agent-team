@@ -115,7 +115,7 @@ class ManagedAgent {
   async start(): Promise<void> {
     console.log(`[AGENT] start() called for ${this.agentId}`);
 
-    const claudePath = process.env.CLAUDE_PATH || "/Users/liyoclaw/.local/bin/claude";
+    const claudePath = process.env.CLAUDE_PATH || `${process.env.HOME}/.local/bin/claude`;
 
     const prompt = [
       `You are agent \`${this.agentId}\`.`,

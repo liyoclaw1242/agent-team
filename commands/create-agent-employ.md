@@ -6,7 +6,7 @@ argument-hint: [role] [repo]
 
 # Create Agent Employment
 
-Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe liyoclaw1242/whitelabel-admin`)
+Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe owner/my-repo`)
 
 Parse `$ARGUMENTS` by splitting on whitespace:
 - First token → role (be, fe, ops, arch, design, qa, debug)
