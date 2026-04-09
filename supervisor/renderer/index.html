@@ -169,13 +169,16 @@ document.getElementById('role-picker-grid').addEventListener('click', async (e) 
   try {
     const result = await api.createAgent(role, repo);
     if (result.ok) {
+      showToast(`${role.toUpperCase()} agent created for ${repo.split('/')[1]}`, 'success');
       setTimeout(async () => {
         await refreshAgents();
         selectAgent(result.agent_id);
       }, 300);
+    } else {
+      showToast(result.error || 'Failed to create agent', 'error');
     }
   } catch (err) {
-    console.error('createAgent error:', err);
+    showToast('Failed to create agent: ' + (err.message || err), 'error');
   }
 });
 
@@ -1007,6 +1010,39 @@ setInterval(() => {
   // Update properties uptime live
   if (activeAgentId) renderProperties();
 }, 1000);
+
+// ---------------------------------------------------------------------------
+// Toast notifications
+// ---------------------------------------------------------------------------
+
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  const colors = { success: '#4ade80', error: '#f87171', info: '#60a5fa' };
+  const bg = { success: 'rgba(74,222,128,0.12)', error: 'rgba(248,113,113,0.12)', info: 'rgba(96,165,250,0.12)' };
+  toast.style.cssText = `
+    padding:10px 16px; border-radius:8px; font-size:12px; max-width:360px;
+    color:${colors[type] || colors.info}; background:${bg[type] || bg.info};
+    border:1px solid ${colors[type] || colors.info}33;
+    backdrop-filter:blur(10px); pointer-events:auto;
+    animation:toast-in 0.3s ease;
+  `;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
 
 </script>
 

@@ -9,6 +9,20 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
   ipcMain.handle("get-health", () => supervisor.getHealth());
   ipcMain.handle("get-agent-logs", (_e, id: string) => supervisor.getAgentLogs(id));
   ipcMain.handle("create-agent", (_e, role: string, repoSlug: string) => {
+    const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+    if (!role || !validRoles.includes(role)) {
+      return { ok: false, error: `Invalid role. Must be one of: ${validRoles.join(", ")}` };
+    }
+    if (!repoSlug || !/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(repoSlug)) {
+      return { ok: false, error: "Invalid repo format. Must be owner/repo" };
+    }
+    // Check duplicate
+    const existing = supervisor.getAllAgents().find(
+      a => a.role === role && a.repo === repoSlug && !["dead", "error"].includes(a.status)
+    );
+    if (existing) {
+      return { ok: false, error: `${role.toUpperCase()} already running on ${repoSlug.split("/")[1]}` };
+    }
     return { ok: true, agent_id: supervisor.createAgent(role, repoSlug) };
   });
   ipcMain.handle("stop-agent", async (_e, id: string) => {
