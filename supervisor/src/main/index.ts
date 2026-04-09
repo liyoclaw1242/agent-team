@@ -159,7 +159,7 @@ function startAPIServer(sup: Supervisor): void {
     const url = req.url || "/";
 
     // GET /api/agents — simple list
-    if (url === "/api/agents") {
+    if (url === "/api/agents" && req.method === "GET") {
       const agents = sup.getAllAgents().map(a => ({
         id: a.agent_id,
         role: a.role,
@@ -174,7 +174,7 @@ function startAPIServer(sup: Supervisor): void {
 
     // GET /api/agents/:id — detailed
     const match = url.match(/^\/api\/agents\/(.+)$/);
-    if (match) {
+    if (match && req.method === "GET") {
       const agent = sup.getAgent(decodeURIComponent(match[1]));
       if (!agent) {
         res.writeHead(404);
@@ -197,6 +197,50 @@ function startAPIServer(sup: Supervisor): void {
         agents_total: agents.length,
         cost_usd: Math.round(cost * 100) / 100,
       }));
+      return;
+    }
+
+    // POST /api/agents — create agent { role, repo }
+    if (url === "/api/agents" && req.method === "POST") {
+      let body = "";
+      req.on("data", (chunk: Buffer) => { body += chunk; });
+      req.on("end", () => {
+        try {
+          const { role, repo } = JSON.parse(body);
+          const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+          if (!role || !validRoles.includes(role)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: `invalid role, must be one of: ${validRoles.join(", ")}` }));
+            return;
+          }
+          if (!repo) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "repo required (e.g. owner/repo)" }));
+            return;
+          }
+          const agentId = sup.createAgent(role, repo);
+          res.writeHead(201);
+          res.end(JSON.stringify({ ok: true, agent_id: agentId }));
+        } catch {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: "invalid JSON body" }));
+        }
+      });
+      return;
+    }
+
+    // DELETE /api/agents/:id — stop agent
+    const delMatch = url.match(/^\/api\/agents\/(.+)$/);
+    if (delMatch && req.method === "DELETE") {
+      sup.stopAgent(decodeURIComponent(delMatch[1])).then((err) => {
+        if (err) {
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: err }));
+        } else {
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true }));
+        }
+      });
       return;
     }
 
