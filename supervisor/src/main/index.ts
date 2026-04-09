@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, Notification } from "electron";
 import * as path from "path";
+import * as http from "http";
 import { Supervisor } from "./supervisor";
 import { Tracker } from "./tracker";
 import { setupIPC } from "./ipc";
@@ -145,6 +146,76 @@ function setupNotifications(sv: Supervisor): void {
 }
 
 // ---------------------------------------------------------------------------
+// HTTP API (lightweight status endpoint)
+// ---------------------------------------------------------------------------
+
+function startAPIServer(sup: Supervisor): void {
+  const PORT = 3200;
+
+  const server = http.createServer((req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    const url = req.url || "/";
+
+    // GET /api/agents — simple list
+    if (url === "/api/agents") {
+      const agents = sup.getAllAgents().map(a => ({
+        id: a.agent_id,
+        role: a.role,
+        repo: a.repo,
+        status: a.status,
+        cycle: a.cycle,
+      }));
+      res.writeHead(200);
+      res.end(JSON.stringify(agents));
+      return;
+    }
+
+    // GET /api/agents/:id — detailed
+    const match = url.match(/^\/api\/agents\/(.+)$/);
+    if (match) {
+      const agent = sup.getAgent(decodeURIComponent(match[1]));
+      if (!agent) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify(agent));
+      return;
+    }
+
+    // GET /api/health — overview
+    if (url === "/api/health") {
+      const agents = sup.getAllAgents();
+      const alive = agents.filter(a => !["dead", "restarting"].includes(a.status)).length;
+      const cost = agents.reduce((s, a) => s + (a.cost_usd || 0), 0);
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        agents_alive: alive,
+        agents_total: agents.length,
+        cost_usd: Math.round(cost * 100) / 100,
+      }));
+      return;
+    }
+
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: "not found" }));
+  });
+
+  server.listen(PORT, "127.0.0.1", () => {
+    console.log(`[API] HTTP server listening on http://127.0.0.1:${PORT}`);
+  });
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.log(`[API] Port ${PORT} in use, skipping HTTP server`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
 
@@ -161,6 +232,7 @@ app.whenReady().then(() => {
   createTray();
   setupIPC(supervisor, tracker);
   setupNotifications(supervisor);
+  startAPIServer(supervisor);
 
   // Refresh tray periodically
   setInterval(() => updateTrayMenu(), 15_000);
