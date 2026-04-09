@@ -236,11 +236,24 @@ function startAPIServer(sup: Supervisor): void {
             return;
           }
 
-          // Check repo exists on GitHub
-          const { execSync } = require("child_process");
-          try {
-            execSync(`gh repo view ${repo} --json name`, { timeout: 10000, stdio: "pipe" });
-          } catch {
+          // Check repo exists on GitHub (use HTTPS, no gh CLI dependency)
+          const repoCheck = await new Promise<boolean>((resolve) => {
+            const token = tracker?.getState().github_token;
+            const opts: any = {
+              hostname: "api.github.com",
+              path: `/repos/${repo}`,
+              headers: { "User-Agent": "agent-team-supervisor", "Accept": "application/vnd.github+json" },
+              timeout: 10000,
+            };
+            if (token) opts.headers["Authorization"] = `Bearer ${token}`;
+            const r = require("https").get(opts, (resp: any) => {
+              resp.resume();
+              resolve(resp.statusCode === 200);
+            });
+            r.on("error", () => resolve(false));
+            r.on("timeout", () => { r.destroy(); resolve(false); });
+          });
+          if (!repoCheck) {
             res.writeHead(404);
             res.end(JSON.stringify({ error: `repo ${repo} not found or not accessible` }));
             return;
