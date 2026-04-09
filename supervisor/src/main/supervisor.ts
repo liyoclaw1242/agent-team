@@ -26,10 +26,13 @@ export interface LogEntry {
   text: string;
 }
 
+export type AgentRuntime = "claude" | "gemini";
+
 export interface AgentState {
   agent_id: string;
   role: string;
   repo: string;
+  runtime: AgentRuntime;
   status: AgentStatus;
   cycle: number;
   detail: string;
@@ -47,6 +50,7 @@ export interface AgentAPI {
   agent_id: string;
   role: string;
   repo: string;
+  runtime: AgentRuntime;
   status: AgentStatus;
   cycle: number;
   detail: string;
@@ -77,6 +81,7 @@ class ManagedAgent {
     public role: string,
     public agentId: string,
     public repoSlug: string,
+    public runtime: AgentRuntime,
     onUpdate: () => void,
     onLog: (agentId: string, entry: LogEntry) => void,
     private onPtyData: (agentId: string, data: string) => void,
@@ -87,6 +92,7 @@ class ManagedAgent {
       agent_id: agentId,
       role,
       repo: repoSlug,
+      runtime,
       status: "starting",
       cycle: 0,
       detail: "Launching...",
@@ -115,7 +121,15 @@ class ManagedAgent {
   async start(): Promise<void> {
     console.log(`[AGENT] start() called for ${this.agentId}`);
 
-    const claudePath = process.env.CLAUDE_PATH || `${process.env.HOME}/.local/bin/claude`;
+    // Runtime selection
+    const runtimePaths: Record<AgentRuntime, string> = {
+      claude: process.env.CLAUDE_PATH || `${process.env.HOME}/.local/bin/claude`,
+      gemini: process.env.GEMINI_PATH || "/opt/homebrew/bin/gemini",
+    };
+    const cliPath = runtimePaths[this.runtime];
+    const cliArgs = this.runtime === "gemini"
+      ? ["--verbose", "--dangerously-skip-permissions", "--approval-mode", "yolo"]
+      : ["--verbose", "--dangerously-skip-permissions"];
 
     const prompt = [
       `You are agent \`${this.agentId}\`.`,
@@ -125,17 +139,15 @@ class ManagedAgent {
       `When asked to confirm (Ready to start? y/n), answer: y`,
     ].join("\n");
 
-    this.pushLog("system", `Session starting for ${this.role.toUpperCase()} agent...`);
+    this.pushLog("system", `Session starting for ${this.role.toUpperCase()} agent (${this.runtime})...`);
     this.pushLog("system", `Agent ID: ${this.agentId}`);
     this.pushLog("system", `Repo: ${this.repoSlug}`);
+    this.pushLog("system", `Runtime: ${this.runtime} → ${cliPath}`);
     this.pushLog("system", "─".repeat(60));
     this.onUpdate();
 
     return new Promise<void>((resolve) => {
-      const proc = pty.spawn(claudePath, [
-        "--verbose",
-        "--dangerously-skip-permissions",
-      ], {
+      const proc = pty.spawn(cliPath, cliArgs, {
         name: "xterm-256color",
         cols: 120,
         rows: 40,
@@ -419,7 +431,7 @@ export class Supervisor extends EventEmitter {
   // Lifecycle
   // -----------------------------------------------------------------------
 
-  createAgent(role: string, repoSlug: string): string {
+  createAgent(role: string, repoSlug: string, runtime: AgentRuntime = "claude"): string {
     const ts = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 15);
     const agentId = `${role}-${ts.slice(0, 8)}-${ts.slice(8)}`;
 
@@ -427,6 +439,7 @@ export class Supervisor extends EventEmitter {
       role,
       agentId,
       repoSlug,
+      runtime,
       () => this.emit("agent:update", agentId),
       (id, entry) => this.emit("agent:log", id, entry),
       (id, data) => this.emit("agent:pty-data", id, data),
@@ -497,6 +510,7 @@ export class Supervisor extends EventEmitter {
 
     const role = old.role;
     const repoSlug = old.repoSlug;
+    const runtime = old.runtime;
     const restartCount = old.state.restart_count + 1;
 
     if (restartCount > this.maxRestarts) {
@@ -512,8 +526,8 @@ export class Supervisor extends EventEmitter {
     this.agents.delete(agentId);
     this.emit("agent:update", agentId);
 
-    // Create new agent
-    const newId = this.createAgent(role, repoSlug);
+    // Create new agent with same runtime
+    const newId = this.createAgent(role, repoSlug, runtime);
     const newManaged = this.agents.get(newId);
     if (newManaged) {
       newManaged.state.restart_count = restartCount;
@@ -588,6 +602,7 @@ export class Supervisor extends EventEmitter {
       agent_id: m.state.agent_id,
       role: m.state.role,
       repo: m.state.repo,
+      runtime: m.state.runtime,
       status: m.state.status,
       cycle: m.state.cycle,
       detail: m.state.detail,
@@ -609,6 +624,7 @@ export class Supervisor extends EventEmitter {
       agent_id: managed.state.agent_id,
       role: managed.state.role,
       repo: managed.state.repo,
+      runtime: managed.state.runtime,
       status: managed.state.status,
       cycle: managed.state.cycle,
       detail: managed.state.detail,

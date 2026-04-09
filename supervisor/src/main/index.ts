@@ -164,6 +164,7 @@ function startAPIServer(sup: Supervisor): void {
         id: a.agent_id,
         role: a.role,
         repo: a.repo,
+        runtime: a.runtime,
         status: a.status,
         cycle: a.cycle,
       }));
@@ -206,8 +207,10 @@ function startAPIServer(sup: Supervisor): void {
       req.on("data", (chunk: Buffer) => { body += chunk; });
       req.on("end", async () => {
         try {
-          const { role, repo } = JSON.parse(body);
+          const { role, repo, runtime } = JSON.parse(body);
           const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+          const validRuntimes = ["claude", "gemini"];
+          const rt = (runtime && validRuntimes.includes(runtime)) ? runtime : "claude";
 
           // Validate role
           if (!role || !validRoles.includes(role)) {
@@ -259,7 +262,7 @@ function startAPIServer(sup: Supervisor): void {
             return;
           }
 
-          const agentId = sup.createAgent(role, repo);
+          const agentId = sup.createAgent(role, repo, rt);
           res.writeHead(201);
           res.end(JSON.stringify({ ok: true, agent_id: agentId }));
         } catch {

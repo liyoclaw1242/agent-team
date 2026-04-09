@@ -8,8 +8,10 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
   ipcMain.handle("get-agent", (_e, id: string) => supervisor.getAgent(id));
   ipcMain.handle("get-health", () => supervisor.getHealth());
   ipcMain.handle("get-agent-logs", (_e, id: string) => supervisor.getAgentLogs(id));
-  ipcMain.handle("create-agent", (_e, role: string, repoSlug: string) => {
+  ipcMain.handle("create-agent", (_e, role: string, repoSlug: string, runtime?: string) => {
     const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+    const validRuntimes = ["claude", "gemini"];
+    const rt = (runtime && validRuntimes.includes(runtime)) ? runtime as "claude" | "gemini" : "claude";
     if (!role || !validRoles.includes(role)) {
       return { ok: false, error: `Invalid role. Must be one of: ${validRoles.join(", ")}` };
     }
@@ -23,7 +25,7 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
     if (existing) {
       return { ok: false, error: `${role.toUpperCase()} already running on ${repoSlug.split("/")[1]}` };
     }
-    return { ok: true, agent_id: supervisor.createAgent(role, repoSlug) };
+    return { ok: true, agent_id: supervisor.createAgent(role, repoSlug, rt) };
   });
   ipcMain.handle("stop-agent", async (_e, id: string) => {
     const err = await supervisor.stopAgent(id);

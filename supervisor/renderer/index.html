@@ -119,6 +119,10 @@
 <!-- Role picker popup -->
 <div class="role-picker" id="role-picker" style="display:none">
   <div class="role-picker-title">Create Agent</div>
+  <div class="role-picker-runtime">
+    <button class="runtime-btn active" data-runtime="claude">Claude</button>
+    <button class="runtime-btn" data-runtime="gemini">Gemini</button>
+  </div>
   <div class="role-picker-grid" id="role-picker-grid"></div>
 </div>
 
@@ -141,9 +145,13 @@ const terminals = {};
 // Role picker
 // ---------------------------------------------------------------------------
 let pickerRepo = null;
+let pickerRuntime = 'claude';
 
 function showRolePicker(repoSlug, anchorEl) {
   pickerRepo = repoSlug;
+  pickerRuntime = 'claude';
+  // Reset runtime buttons
+  document.querySelectorAll('.runtime-btn').forEach(b => b.classList.toggle('active', b.dataset.runtime === 'claude'));
   const picker = document.getElementById('role-picker');
   const grid = document.getElementById('role-picker-grid');
   grid.innerHTML = ROLES.map(r =>
@@ -160,14 +168,23 @@ function hideRolePicker() {
   pickerRepo = null;
 }
 
+// Runtime toggle in role picker
+document.querySelector('.role-picker-runtime')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-runtime]');
+  if (!btn) return;
+  pickerRuntime = btn.dataset.runtime;
+  document.querySelectorAll('.runtime-btn').forEach(b => b.classList.toggle('active', b.dataset.runtime === pickerRuntime));
+});
+
 document.getElementById('role-picker-grid').addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-role]');
   if (!btn || !pickerRepo) return;
   const role = btn.dataset.role;
   const repo = pickerRepo;
+  const runtime = pickerRuntime;
   hideRolePicker();
   try {
-    const result = await api.createAgent(role, repo);
+    const result = await api.createAgent(role, repo, runtime);
     if (result.ok) {
       showToast(`${role.toUpperCase()} agent created for ${repo.split('/')[1]}`, 'success');
       setTimeout(async () => {

@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld("bridge", {
   getAgent: (id: string) => ipcRenderer.invoke("get-agent", id),
   getHealth: () => ipcRenderer.invoke("get-health"),
   getAgentLogs: (id: string) => ipcRenderer.invoke("get-agent-logs", id),
-  createAgent: (role: string, repo: string) => ipcRenderer.invoke("create-agent", role, repo),
+  createAgent: (role: string, repo: string, runtime?: string) => ipcRenderer.invoke("create-agent", role, repo, runtime),
   stopAgent: (id: string) => ipcRenderer.invoke("stop-agent", id),
   restartAgent: (id: string) => ipcRenderer.invoke("restart-agent", id),
   writeAgentInput: (id: string, data: string) => ipcRenderer.send("write-agent-input", id, data),

@@ -909,6 +909,32 @@ body {
   padding: 0 2px;
 }
 
+.role-picker-runtime {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.runtime-btn {
+  flex: 1;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.runtime-btn:hover { color: #aaa; }
+.runtime-btn.active { background: #333; color: #e0e0e0; }
+
 .role-picker-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
