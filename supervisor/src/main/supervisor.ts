@@ -196,8 +196,15 @@ class ManagedAgent {
           : rawBuffer.includes("\u276F");
         if (!promptSent && elapsed > 5000 && promptReady) {
           promptSent = true;
-          console.log(`[AGENT:${this.agentId}] Sending initial prompt (${elapsed}ms after spawn)`);
-          proc.write(prompt + "\r");
+          console.log(`[AGENT:${this.agentId}] Sending initial prompt (${elapsed}ms after spawn, runtime=${this.runtime})`);
+          if (this.runtime === "gemini") {
+            // Gemini TUI: write prompt as single line, then Enter to submit
+            const singleLine = prompt.replace(/\n/g, " ");
+            proc.write(singleLine);
+            setTimeout(() => proc.write("\r"), 500);
+          } else {
+            proc.write(prompt + "\r");
+          }
         }
 
         // Infer status from cleaned text
