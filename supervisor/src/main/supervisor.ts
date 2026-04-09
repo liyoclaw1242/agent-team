@@ -482,6 +482,7 @@ export class Supervisor extends EventEmitter {
     if (!old) return;
 
     const role = old.role;
+    const repoSlug = old.repoSlug;
     const restartCount = old.state.restart_count + 1;
 
     if (restartCount > this.maxRestarts) {
@@ -490,21 +491,30 @@ export class Supervisor extends EventEmitter {
       return;
     }
 
+    // Kill old agent and remove from map
     old.stop();
+    old.state.status = "dead";
+    old.state.detail = "Restarting...";
+    this.agents.delete(agentId);
+    this.emit("agent:update", agentId);
 
-    const newId = this.createAgent(role, old.repoSlug);
+    // Create new agent
+    const newId = this.createAgent(role, repoSlug);
     const newManaged = this.agents.get(newId);
     if (newManaged) {
       newManaged.state.restart_count = restartCount;
+      newManaged.state.status = "restarting";
     }
 
+    console.log(`[supervisor] Restarted: ${agentId} → ${newId} (attempt ${restartCount}/${this.maxRestarts})`);
     this.emit("agent:restarted", newId, agentId);
   }
 
   async restartAgent(agentId: string): Promise<string | null> {
     const managed = this.agents.get(agentId);
     if (!managed) return `Agent ${agentId} not found`;
-    managed.state.restart_count = 0; // Reset for manual
+    managed.state.restart_count = 0; // Reset for manual restart
+    console.log(`[supervisor] Manual restart requested for ${agentId}`);
     this.doRestart(agentId);
     return null;
   }
