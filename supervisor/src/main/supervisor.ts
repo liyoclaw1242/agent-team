@@ -188,10 +188,13 @@ class ManagedAgent {
           .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, "")
           .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 
-        // Detect Claude's input prompt and send the initial command.
-        // Wait at least 8s from spawn to ensure trust dialog is fully past.
+        // Detect input prompt and send the initial command.
+        // Claude: ❯ (U+276F), Gemini: "Type your message"
         const elapsed = Date.now() - this.state.created_at;
-        if (!promptSent && elapsed > 8000 && rawBuffer.includes("\u276F")) {
+        const promptReady = this.runtime === "gemini"
+          ? rawBuffer.includes("Type your message") || rawBuffer.includes("? for shortcuts")
+          : rawBuffer.includes("\u276F");
+        if (!promptSent && elapsed > 5000 && promptReady) {
           promptSent = true;
           console.log(`[AGENT:${this.agentId}] Sending initial prompt (${elapsed}ms after spawn)`);
           proc.write(prompt + "\r");
