@@ -162,8 +162,6 @@ class ManagedAgent {
       }
 
       proc.onData((data: string) => {
-        this.state.last_activity = Date.now();
-
         // Forward raw PTY data to renderer for xterm.js
         this.onPtyData(this.agentId, data);
 
@@ -189,9 +187,18 @@ class ManagedAgent {
 
         // Infer status from cleaned text
         const lines = clean.split(/\r?\n/);
+        let hasContent = false;
         for (const line of lines) {
           const trimmed = line.trim();
-          if (trimmed) this.inferStatus(trimmed);
+          if (trimmed) {
+            hasContent = true;
+            this.inferStatus(trimmed);
+          }
+        }
+
+        // Only update last_activity when there's actual content (not just ANSI noise)
+        if (hasContent) {
+          this.state.last_activity = Date.now();
         }
 
         this.onUpdate();
