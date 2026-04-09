@@ -324,7 +324,11 @@ class ManagedAgent {
       this.state.current_task = null;
     }
 
-    if (text.includes("Sleeping") || text.includes("sleeping") || text.includes("next poll in")) {
+    if (text.includes("API Error") || text.includes("Internal server error") || text.includes("api_error")) {
+      this.state.status = "error";
+      this.state.detail = "API error — will auto-restart";
+      this.state.error = text.slice(0, 200);
+    } else if (text.includes("Sleeping") || text.includes("sleeping") || text.includes("next poll in")) {
       this.state.status = "sleeping";
       this.state.detail = "Sleeping until next cycle";
     } else if (text.includes("No tasks available") || text.includes("No repos registered")) {
@@ -383,11 +387,11 @@ export class Supervisor extends EventEmitter {
 
   private staleTimeouts: Record<string, number> = {
     starting: 5 * 60_000,
-    polling: 45 * 60_000,    // agents sleep 30min between polls
-    working: 120 * 60_000,
-    sleeping: 45 * 60_000,
-    rate_limited: 120 * 60_000,
-    error: 30 * 60_000,
+    polling: 40 * 60_000,    // agents sleep 30min between polls + 10min buffer
+    working: 60 * 60_000,    // working on a task (reduced from 120 to catch stuck agents sooner)
+    sleeping: 40 * 60_000,
+    rate_limited: 60 * 60_000,
+    error: 10 * 60_000,      // API errors should recover fast or restart
   };
 
   private maxRestarts = 5;
