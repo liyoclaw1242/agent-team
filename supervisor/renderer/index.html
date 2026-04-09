@@ -346,6 +346,15 @@ function renderProperties() {
   const dot = statusDot(agent.status);
   const uptime = agent.created_at ? formatUptime(Date.now() - agent.created_at) : '-';
 
+  // Health check countdown
+  const lastActivityAgo = agent.last_activity_seconds_ago || 0;
+  const staleTimeout = agent.stale_timeout_seconds || 2400;
+  const remaining = Math.max(0, staleTimeout - lastActivityAgo);
+  const healthPct = staleTimeout > 0 ? Math.min(100, (remaining / staleTimeout) * 100) : 100;
+  let healthBarClass = '';
+  if (healthPct < 20) healthBarClass = 'danger';
+  else if (healthPct < 50) healthBarClass = 'warning';
+
   // Cost bar
   const costUsd = agent.cost_usd || 0;
   const maxBudget = 10;
@@ -387,7 +396,21 @@ function renderProperties() {
       </div>
       <div class="props-row">
         <span class="props-label">Restarts</span>
-        <span class="props-value">${agent.restarts || 0}</span>
+        <span class="props-value">${agent.restart_count || 0}</span>
+      </div>
+    </div>
+    <div class="props-section">
+      <div class="props-section-title">Health Check</div>
+      <div class="props-row">
+        <span class="props-label">Last Activity</span>
+        <span class="props-value">${formatUptime(lastActivityAgo * 1000)} ago</span>
+      </div>
+      <div class="props-row">
+        <span class="props-label">Restart In</span>
+        <span class="props-value" style="color:${healthPct < 20 ? '#f87171' : healthPct < 50 ? '#facc15' : '#4ade80'}">${remaining > 0 ? formatUptime(remaining * 1000) : 'IMMINENT'}</span>
+      </div>
+      <div class="cost-bar-track">
+        <div class="cost-bar-fill ${healthBarClass}" style="width:${healthPct}%"></div>
       </div>
     </div>
     <div class="props-section">

@@ -55,6 +55,7 @@ export interface AgentAPI {
   cost_usd: number;
   restart_count: number;
   last_activity_seconds_ago: number;
+  stale_timeout_seconds: number;
   session_id: string | null;
   created_at: number;
 }
@@ -588,6 +589,7 @@ export class Supervisor extends EventEmitter {
       cost_usd: Math.round(m.state.cost_usd * 10000) / 10000,
       restart_count: m.state.restart_count,
       last_activity_seconds_ago: Math.round((now - m.state.last_activity) / 1000),
+      stale_timeout_seconds: Math.round((this.staleTimeouts[m.state.status] ?? 60 * 60_000) / 1000),
       session_id: m.state.session_id,
       created_at: m.state.created_at,
     }));
@@ -608,6 +610,7 @@ export class Supervisor extends EventEmitter {
       cost_usd: Math.round(managed.state.cost_usd * 10000) / 10000,
       restart_count: managed.state.restart_count,
       last_activity_seconds_ago: Math.round((Date.now() - managed.state.last_activity) / 1000),
+      stale_timeout_seconds: Math.round((this.staleTimeouts[managed.state.status] ?? 60 * 60_000) / 1000),
       session_id: managed.state.session_id,
       created_at: managed.state.created_at,
     };
