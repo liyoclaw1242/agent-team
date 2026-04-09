@@ -342,7 +342,7 @@ class ManagedAgent {
       this.state.status = "error";
       this.state.detail = "API error — will auto-restart";
       this.state.error = text.slice(0, 200);
-    } else if (text.includes("Sleeping") || text.includes("sleeping") || text.includes("next poll in")) {
+    } else if (text.includes("Sleeping") || text.includes("sleeping") || text.includes("next poll in") || text.includes("Waiting for Cycle")) {
       this.state.status = "sleeping";
       this.state.detail = "Sleeping until next cycle";
     } else if (text.includes("No tasks available") || text.includes("No repos registered")) {
@@ -352,7 +352,7 @@ class ManagedAgent {
       this.state.status = "rate_limited";
       this.state.detail = "API rate limited";
       this.state.error = "rate_limited";
-    } else if (text.includes("Cycle #")) {
+    } else if (text.includes("Cycle #") && !text.includes("Waiting")) {
       this.state.status = "polling";
       this.state.detail = text.split("\n")[0].slice(0, 120);
     }
