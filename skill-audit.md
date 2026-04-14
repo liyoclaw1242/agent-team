@@ -672,6 +672,91 @@ ARCH creates issues with `agent:{role}` + `status:ready`. This is correct — on
 3. ✅ #47 — pre-triage won't auto-merge frontend PRs without Design review
 4. ✅ #52/#61 — ARCH polling fixed (status:review)
 
+---
+
+# Round 6: Post-refactor Integrity Check
+
+Verifying all fixes are internally consistent after Design refactor and status:review changes.
+
+---
+
+## Iteration 38: Design stale references cleanup
+
+### Findings
+
+67. **FIXED — Design SKILL.md Actions table had deliver.sh and setup-branch.sh.** Removed — Design no longer writes code.
+68. **FIXED — Design review-heuristics.md referenced "Mode B".** Changed to "Mode C".
+69. **FIXED — Design check-all.sh had "implement" mode.** Changed to "spec" mode with spec-appropriate checklist. Removed code quality checks (no code to check).
+
+---
+
+## Iteration 39: status:ready vs status:review final consistency
+
+### Findings
+
+70. **PASS — ARCH creates issues with `status:ready` for FE/BE/OPS** — correct, these agents poll for `status:ready`.
+71. **PASS — Route to ARCH sets `status:review`** — correct, ARCH polls for `status:review`.
+72. **PASS — poll.sh, pre-triage.sh, claims.sh all handle `status:review`** — fixed in Round 4.
+
+---
+
+## Iteration 40: Design Mode A → ARCH → FE handoff
+
+**Scenario**: ARCH dispatches to Design. Design produces spec. ARCH routes to FE.
+
+### Findings
+
+73. **ISSUE — Design spec may not contain enough detail for FE.** Design posts a comment on the issue, but FE needs to find it among potentially many comments. No structured format guarantee.
+    - **Severity**: Low — the spec template in design.md is structured enough. FE reads all comments.
+
+74. **ISSUE — If Design identifies backend data needs, ARCH must create a separate BE task.** Design spec has "Notes for FE" section that flags this. But ARCH's Mode D triage doesn't explicitly check for Design data requirements.
+    - **Severity**: Low — ARCH reads all comments and would naturally see this.
+
+---
+
+## Iteration 41: pre-triage frontend detection accuracy
+
+**Scenario**: pre-triage.sh detects frontend PRs by branch name (`agent/fe*`) or title (`FE:` / `frontend:`).
+
+### Findings
+
+75. **ISSUE — Design Mode A PRs no longer exist.** pre-triage.sh checks for `design:` in title to detect frontend PRs. But Design no longer creates PRs. This check is now dead code — harmless but misleading.
+    - **Severity**: None — dead code path, never triggers.
+
+---
+
+## Iteration 42: End-to-end — Design spec → FE implement → QA verify
+
+**Scenario**: Full flow after Design refactor.
+
+1. ARCH creates Design task → Design produces Pencil sketch + spec comment → routes to ARCH
+2. ARCH reads Design spec → creates FE task with spec reference → routes to FE
+3. FE reads Design spec comment → implements → self-test → delivers PR
+4. ARCH routes to QA → QA verifies against preview URL
+5. ARCH routes to Design for visual review (Mode C)
+6. Design screenshots → compares with original sketch → APPROVED
+7. ARCH merges
+
+### Findings
+
+76. **PASS — Flow is clean.** Design produces artifacts (sketch + spec), FE implements, QA verifies functionality, Design verifies visuals. No code ownership overlap.
+
+77. **PASS — Design Mode C still works independently.** Visual review doesn't require code access, just screenshots. No conflict with the refactor.
+
+---
+
+## Round 6 Summary
+
+| # | Severity | Issue | Status |
+|---|----------|-------|--------|
+| 67-69 | Fixed | Design stale references | ✅ |
+| 73 | Low | Design spec format in comments | Acceptable |
+| 74 | Low | ARCH checking Design data requirements | Natural flow |
+| 75 | None | Dead code in pre-triage frontend check | Harmless |
+| 76-77 | PASS | E2E flow validated | ✅ |
+
+**No new Critical/High/Medium issues found. All fixes are internally consistent.**
+
 ### All Medium Fixes Applied
 
 5. ✅ #3/#12 — route.sh --force for re-verification

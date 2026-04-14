@@ -123,8 +123,6 @@ During context phase, scan the issue/spec for keywords. If any match, read the c
 |--------|---------|
 | `pencil` CLI | Create/modify/export .pen design files |
 | `actions/capture-screenshots.sh` | Playwright screenshot capture at 3 breakpoints |
-| `actions/setup-branch.sh` | Create agent work branch |
-| `actions/deliver.sh` | Commit + push + PR |
 | `actions/write-journal.sh` | Write experience log entry |
 
 ## Experience System

@@ -1,6 +1,6 @@
 # Case: Visual Review Heuristics
 
-Learned patterns for Mode B (visual review). This file grows from review experience — each review teaches what to look for next.
+Learned patterns for Mode C (visual review). This file grows from review experience — each review teaches what to look for next.
 
 ---
 

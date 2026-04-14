@@ -5,10 +5,10 @@
 # and self-confirm before delivery.
 #
 # Usage: check-all.sh [mode]
-#   mode: "implement" (default) | "review"
+#   mode: "spec" (default) | "review"
 set -e
 
-MODE="${1:-implement}"
+MODE="${1:-spec}"
 
 echo "═══ Design Validation Gate ═══"
 echo ""
@@ -51,18 +51,19 @@ cat << 'CHECKLIST'
 - [ ] Visually reviewed each screenshot
 CHECKLIST
 
-if [ "$MODE" = "implement" ]; then
-cat << 'IMPLEMENT_CHECKLIST'
+if [ "$MODE" = "spec" ]; then
+cat << 'SPEC_CHECKLIST'
 
-── Implementation-Specific ──
-- [ ] Matches design sketch / Pencil output (if Mode A)
-- [ ] Spacing follows 4px grid (4/8/12/16/24/32/48)
-- [ ] Typography hierarchy is clear (display > h1 > h2 > body > caption)
-- [ ] Interactive elements have hover/focus/active states
-- [ ] Transitions under 300ms
-- [ ] No dead code or unused imports
-- [ ] design-decisions.md updated (if applicable)
-IMPLEMENT_CHECKLIST
+── Design Spec-Specific ──
+- [ ] Layout structure clearly described
+- [ ] Typography hierarchy specified (heading levels, sizes, weights)
+- [ ] Color tokens specified (not raw hex values)
+- [ ] All component states described (loading, error, empty, interactive)
+- [ ] Responsive behavior described for 3 breakpoints
+- [ ] Accessibility requirements noted (keyboard flow, ARIA)
+- [ ] Backend data needs flagged (if design requires new API fields)
+- [ ] Sketch exported and attached
+SPEC_CHECKLIST
 fi
 
 if [ "$MODE" = "review" ]; then
@@ -79,13 +80,7 @@ REVIEW_CHECKLIST
 fi
 
 echo ""
-echo "── Code Quality (rules/code-quality.md) ──"
-echo "- [ ] No console.log in production code"
-echo "- [ ] No TODO without issue number"
-echo "- [ ] Follows existing code style"
-echo ""
 echo "── Git (rules/git.md) ──"
-echo "- [ ] Branch follows agent/{ID}/issue-{N} pattern"
-echo "- [ ] Commit message follows {prefix}: {description} (closes #{N})"
+echo "- [ ] .pen file committed to design/ directory (if Mode A)"
 echo ""
 echo "═══ Review every item. Fix failures. Then deliver. ═══"
