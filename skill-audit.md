@@ -537,3 +537,90 @@ Deep-dive on scripts, error paths, and concurrent operation scenarios.
 | 48 | Medium | deliver.sh `git add -A` race (known, deferred) |
 | 49 | Low | ARCH Mode 0 pushes directly to main |
 | 50 | Medium | Design Mode A has no Scope Guard for `src/` writes |
+
+---
+
+# Round 4: Shared Scripts & Infrastructure Consistency
+
+Auditing the shared scripts (poll.sh, claims.sh, route.sh, deliver.sh) and cross-role action scripts for consistency.
+
+---
+
+## Iteration 31: poll.sh — ARCH-only housekeeping
+
+**Scenario**: All 7 roles use `poll.sh` to find tasks. Only ARCH triggers housekeeping.
+
+### Findings
+
+51. **PASS — poll.sh correctly gates housekeeping to ARCH only.** The `if [ "$ROLE" = "arch" ]` block runs pre-triage, scan-unblock, and scan-complete before returning results. Other roles get a simple `gh issue list`.
+
+52. **ISSUE — poll.sh uses `status:ready` but ARCH now gets `status:review`.** After our route.sh fix (#30), routing to ARCH sets `status:review` instead of `status:ready`. But poll.sh queries `--label "status:ready"`. ARCH won't see issues routed to it.
+    - **Severity**: Critical — ARCH polling is broken by our own fix.
+    - **Fix**: poll.sh for ARCH should query `status:review` (or both `status:ready` + `status:review`).
+
+---
+
+## Iteration 32: claims.sh race detection
+
+**Scenario**: Two agents try to claim the same issue simultaneously.
+
+### Findings
+
+53. **PASS — Race detection via comment timestamp ordering is clever.** `sleep 2` then check if another "Claimed by" comment appeared after ours. Simple but effective for the scale.
+
+54. **ISSUE — claims.sh `sleep 2` is fragile.** If GitHub API is slow (>2s to post the other agent's comment), the race goes undetected. But acceptable for current scale.
+    - **Severity**: Low
+
+---
+
+## Iteration 33: deliver.sh consistency across roles
+
+**Scenario**: BE, FE, OPS, Design all have deliver.sh. Are they consistent?
+
+### Findings
+
+55. **PASS — BE and FE deliver.sh are nearly identical.** Only difference is the self-test error message. Both gate on self-test file, post as PR comment, route via route.sh.
+
+56. **ISSUE — OPS deliver.sh has no self-test gate.** OPS doesn't require self-test record. This is intentional (OPS tasks are infra, not features), but it means QA Phase 0 self-test check would fail for OPS PRs. QA Phase 0 already says "applies to FE and BE PRs, not OPS" — correct.
+    - **Severity**: None — already handled.
+
+57. **ISSUE — DEBUG has no deliver.sh.** DEBUG doesn't code — it diagnoses and dispatches. No PR, no deliver. But DEBUG has no `setup-branch.sh` either, so it can't attach reproduction scripts.
+    - **Severity**: Low (same as #36)
+
+58. **ISSUE — QA has no deliver.sh.** QA's Codify phase writes E2E tests and needs to commit + PR. But QA has no deliver.sh. QA would need to manually run git commands.
+    - **Severity**: Medium — QA Codify phase should have a deliver mechanism.
+    - **Fix**: Either give QA a deliver.sh or document the git flow in the Codify phase.
+
+---
+
+## Iteration 34: verify-labels.sh completeness
+
+**Scenario**: After any label change, verify-labels.sh checks for exactly 1 agent + 1 status label.
+
+### Findings
+
+59. **PASS — verify-labels.sh is thorough.** Checks exactly 1 `agent:` and exactly 1 `status:` label. Closed issues are exempt.
+
+60. **ISSUE — `status:review` not in verify-labels.sh.** verify-labels.sh checks for `status:` labels but doesn't validate which values are valid. It could accept `status:banana`. Not a real risk since labels are created by scripts, not humans.
+    - **Severity**: None
+
+---
+
+## Iteration 35: pre-triage.sh + route.sh `status:review` mismatch
+
+**Scenario**: pre-triage.sh fetches issues with `agent:arch` + `status:ready`. But route.sh now sets `status:review` when routing to ARCH.
+
+### Findings
+
+61. **CRITICAL — Same as #52.** pre-triage.sh line 16 queries `--label "status:ready"`. After our route.sh fix, ARCH issues get `status:review`. pre-triage.sh won't find them either.
+    - **Fix**: Update pre-triage.sh to query `status:review` for ARCH issues.
+
+---
+
+## Round 4 Summary
+
+| # | Severity | Issue |
+|---|----------|-------|
+| 52/61 | Critical | poll.sh + pre-triage.sh query `status:ready` but ARCH now gets `status:review` |
+| 54 | Low | claims.sh `sleep 2` race window |
+| 58 | Medium | QA has no deliver.sh for Codify commits |

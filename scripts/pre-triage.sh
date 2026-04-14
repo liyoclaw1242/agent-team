@@ -13,7 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "=== Pre-triage: ${REPO_SLUG} ==="
 
 # Fetch all issues routed to ARCH
-ISSUES=$(gh issue list --repo "$REPO_SLUG" --label "agent:arch" --label "status:ready" --json number,title --jq '.[].number' 2>/dev/null || true)
+# ARCH issues arrive with status:review (set by route.sh when routing to arch)
+ISSUES=$(gh issue list --repo "$REPO_SLUG" --label "agent:arch" --label "status:review" --json number,title --jq '.[].number' 2>/dev/null || true)
 
 if [ -z "$ISSUES" ]; then
   echo "No issues for ARCH. Nothing to triage."

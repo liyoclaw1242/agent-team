@@ -30,7 +30,15 @@ if [ "$ROLE" = "arch" ]; then
 fi
 
 # ── Poll for tasks ──
-gh issue list --repo "$REPO_SLUG" \
-  --label "agent:${ROLE}" --label "status:ready" \
-  --json number,title \
-  --jq '.[]'
+if [ "$ROLE" = "arch" ]; then
+  # ARCH receives issues with status:review (routed back from other agents)
+  gh issue list --repo "$REPO_SLUG" \
+    --label "agent:arch" --label "status:review" \
+    --json number,title \
+    --jq '.[]'
+else
+  gh issue list --repo "$REPO_SLUG" \
+    --label "agent:${ROLE}" --label "status:ready" \
+    --json number,title \
+    --jq '.[]'
+fi

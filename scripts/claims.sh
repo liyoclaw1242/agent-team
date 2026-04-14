@@ -9,16 +9,16 @@ REPO_SLUG="${1:?REPO_SLUG required (e.g. owner/repo)}"
 ISSUE_N="${2:?ISSUE_NUMBER required}"
 AGENT_ID="${3:?AGENT_ID required}"
 
-# 1. Pre-check: is the issue still status:ready?
+# 1. Pre-check: is the issue claimable? (status:ready for agents, status:review for ARCH)
 LABELS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | join(",")')
-if [[ "$LABELS" != *"status:ready"* ]]; then
-  echo "SKIP: #${ISSUE_N} is not status:ready (labels: ${LABELS})"
+if [[ "$LABELS" != *"status:ready"* ]] && [[ "$LABELS" != *"status:review"* ]]; then
+  echo "SKIP: #${ISSUE_N} is not claimable (labels: ${LABELS})"
   exit 1
 fi
 
-# 2. Claim: swap status:ready → status:in-progress
+# 2. Claim: swap status:ready/review → status:in-progress
 gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-  --remove-label "status:ready" --add-label "status:in-progress" 2>/dev/null
+  --remove-label "status:ready" --remove-label "status:review" --add-label "status:in-progress" 2>/dev/null
 
 # 3. Post claim comment with agent ID
 gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
