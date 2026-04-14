@@ -132,16 +132,10 @@ case "$TARGET" in
     for LABEL in $(echo "$LABELS" | tr ',' '\n' | grep '^agent:'); do
       gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$LABEL" 2>/dev/null || true
     done
-    # Set appropriate status: arch gets "review" (triage), others get "ready" (claimable)
-    if [ "$TARGET" = "arch" ]; then
-      STATUS_LABEL="status:review"
-    else
-      STATUS_LABEL="status:ready"
-    fi
     gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-      --remove-label "status:in-progress" --remove-label "status:ready" --remove-label "status:review" \
-      --add-label "agent:${TARGET}" --add-label "${STATUS_LABEL}" 2>/dev/null
-    echo "ROUTED: #${ISSUE_N} → agent:${TARGET} (${STATUS_LABEL})"
+      --remove-label "status:in-progress" \
+      --add-label "agent:${TARGET}" --add-label "status:ready" 2>/dev/null
+    echo "ROUTED: #${ISSUE_N} → agent:${TARGET}"
     ;;
 
   *)

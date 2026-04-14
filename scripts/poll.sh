@@ -30,22 +30,7 @@ if [ "$ROLE" = "arch" ]; then
 fi
 
 # ── Poll for tasks ──
-if [ "$ROLE" = "arch" ]; then
-  # ARCH has two task sources:
-  #   1. New tasks (created by users/ARCH) → status:ready
-  #   2. Routed back from other agents → status:review
-  # Query both and merge results
-  READY=$(gh issue list --repo "$REPO_SLUG" \
-    --label "agent:arch" --label "status:ready" \
-    --json number,title --jq '.[]' 2>/dev/null || true)
-  REVIEW=$(gh issue list --repo "$REPO_SLUG" \
-    --label "agent:arch" --label "status:review" \
-    --json number,title --jq '.[]' 2>/dev/null || true)
-  echo "$READY"
-  echo "$REVIEW"
-else
-  gh issue list --repo "$REPO_SLUG" \
-    --label "agent:${ROLE}" --label "status:ready" \
-    --json number,title \
-    --jq '.[]'
-fi
+gh issue list --repo "$REPO_SLUG" \
+  --label "agent:${ROLE}" --label "status:ready" \
+  --json number,title \
+  --jq '.[]'

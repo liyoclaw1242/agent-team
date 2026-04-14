@@ -139,7 +139,7 @@ Now proceed to the requested mode (A, B, or C).
 
 ### Phase 1: Intake
 
-The request is a GitHub issue with `agent:arch` + `status:review`. You already picked it up during polling.
+The request is a GitHub issue with `agent:arch` + `status:ready`. You already picked it up during polling.
 
 1. Read the issue title + body carefully
 2. Claim it: `bash scripts/claims.sh "{REPO_SLUG}" {N} "{AGENT_ID}"`
