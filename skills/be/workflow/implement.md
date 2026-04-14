@@ -75,16 +75,16 @@ Max 3 rounds: validate → fix → re-validate.
    - [ ] No regressions in existing tests
    - [ ] DB migrations run cleanly (up + down)
    - [ ] No secrets or .env committed
-3. Commit: `{commit_prefix} {title} (closes #{N})`
-4. Push + open PR. **PR body must include a self-test declaration**:
+3. **Write self-test record** to `/tmp/self-test-issue-{N}.md`:
    ```markdown
-   ## Self-Test
-   - [x] Happy path verified
-   - [x] Error paths verified (404, 422, 401)
+   # Self-Test: {Issue Title}
+   - [x] Happy path works end-to-end
+   - [x] Error paths return correct status codes (404, 422, 401)
    - [x] All tests pass (`go test ./...` or `pnpm test`)
    - [x] DB migration up/down clean
    - [x] No secrets in code
    ```
+4. Run `actions/deliver.sh` — commit, push, open PR, post self-test as PR comment, route to ARCH.
 5. Update API status + release claim.
 
 ## Phase 6: Journal

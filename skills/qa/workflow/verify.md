@@ -46,12 +46,12 @@ If self-test record found, note what was already verified. Focus your execution 
    gh pr checkout {PR_NUMBER} --repo {REPO_SLUG}
    ```
 
-2. **Get preview URL**:
+2. **Get preview URL** (platform-agnostic):
    ```bash
-   # Get the preview deployment URL from the PR
+   # Extract deployment URL from PR comments (Vercel, Fly.io, Netlify, etc.)
    gh pr view {PR_NUMBER} --repo {REPO_SLUG} --json comments \
-     --jq '[.comments[].body] | map(select(test("vercel\\.app"))) | last' \
-     | grep -oE 'https://[a-zA-Z0-9._-]+\.vercel\.app'
+     --jq '[.comments[].body] | map(select(test("https://.*\\.(vercel\\.app|fly\\.dev|netlify\\.app|onrender\\.com)"))) | last' \
+     | grep -oE 'https://[a-zA-Z0-9._-]+\.(vercel\.app|fly\.dev|netlify\.app|onrender\.com)'
    ```
    If no preview URL available → report **BLOCKED**.
 

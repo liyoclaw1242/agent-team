@@ -1,10 +1,11 @@
 #!/bin/bash
 # Route an issue to a target role. Enforces routing rules before changing labels.
 #
-# Usage: route.sh <REPO_SLUG> <ISSUE_NUMBER> <TARGET_ROLE> [AGENT_ID]
+# Usage: route.sh <REPO_SLUG> <ISSUE_NUMBER> <TARGET_ROLE> [AGENT_ID] [--force]
 #   TARGET_ROLE: fe, be, ops, qa, design, debug, arch, merge, done
 #   "merge" = merge the PR + close issue + mark done
 #   "done"  = close issue + mark done (no PR)
+#   --force = skip verdict re-route guards (ARCH only)
 #
 # Exit 0 = routed, 1 = blocked by validation
 set -euo pipefail
@@ -13,6 +14,11 @@ REPO_SLUG="${1:?REPO_SLUG required}"
 ISSUE_N="${2:?ISSUE_NUMBER required}"
 TARGET="${3:?TARGET_ROLE required (fe/be/ops/qa/design/debug/arch/merge/done)}"
 AGENT_ID="${4:-unknown}"
+FORCE=false
+# Check for --force in any position
+for arg in "$@"; do
+  [ "$arg" = "--force" ] && FORCE=true
+done
 
 # ── Gather current state ──
 LABELS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | join(",")')
@@ -55,23 +61,33 @@ print(int((now - ts).total_seconds()))
   fi
 fi
 
-# Rule 1: Don't route to QA if QA already gave a verdict
+# Rule 1: Don't route to QA if QA already gave a verdict (unless --force)
 if [ "$TARGET" = "qa" ]; then
   if [ -n "$QA_PASS" ] || [ -n "$QA_FAIL" ]; then
-    echo "BLOCKED: QA already gave a verdict on #${ISSUE_N}. Cannot re-route to QA."
-    echo "  QA_PASS='${QA_PASS:0:80}'"
-    echo "  QA_FAIL='${QA_FAIL:0:80}'"
-    echo "  → If QA passed, use: route.sh $REPO_SLUG $ISSUE_N merge"
-    echo "  → If QA failed, route to implementer: route.sh $REPO_SLUG $ISSUE_N fe"
-    exit 1
+    if [ "$FORCE" = true ]; then
+      echo "WARN: QA already gave a verdict on #${ISSUE_N}. --force override active."
+    else
+      echo "BLOCKED: QA already gave a verdict on #${ISSUE_N}. Cannot re-route to QA."
+      echo "  QA_PASS='${QA_PASS:0:80}'"
+      echo "  QA_FAIL='${QA_FAIL:0:80}'"
+      echo "  → If QA passed, use: route.sh $REPO_SLUG $ISSUE_N merge"
+      echo "  → If QA failed, route to implementer: route.sh $REPO_SLUG $ISSUE_N fe"
+      echo "  → To re-verify after fix: route.sh $REPO_SLUG $ISSUE_N qa AGENT_ID --force"
+      exit 1
+    fi
   fi
 fi
 
-# Rule 2: Don't route to design if design already gave a verdict
+# Rule 2: Don't route to design if design already gave a verdict (unless --force)
 if [ "$TARGET" = "design" ]; then
   if [ -n "$DESIGN_APPROVED" ] || [ -n "$DESIGN_NEEDS_CHANGES" ]; then
-    echo "BLOCKED: Design already gave a verdict on #${ISSUE_N}. Cannot re-route to Design."
-    exit 1
+    if [ "$FORCE" = true ]; then
+      echo "WARN: Design already gave a verdict on #${ISSUE_N}. --force override active."
+    else
+      echo "BLOCKED: Design already gave a verdict on #${ISSUE_N}. Cannot re-route to Design."
+      echo "  → To re-review after fix: route.sh $REPO_SLUG $ISSUE_N design AGENT_ID --force"
+      exit 1
+    fi
   fi
 fi
 
@@ -116,11 +132,16 @@ case "$TARGET" in
     for LABEL in $(echo "$LABELS" | tr ',' '\n' | grep '^agent:'); do
       gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$LABEL" 2>/dev/null || true
     done
-    # Remove in-progress if present, ensure ready
+    # Set appropriate status: arch gets "review" (triage), others get "ready" (claimable)
+    if [ "$TARGET" = "arch" ]; then
+      STATUS_LABEL="status:review"
+    else
+      STATUS_LABEL="status:ready"
+    fi
     gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-      --remove-label "status:in-progress" \
-      --add-label "agent:${TARGET}" --add-label "status:ready" 2>/dev/null
-    echo "ROUTED: #${ISSUE_N} → agent:${TARGET}"
+      --remove-label "status:in-progress" --remove-label "status:ready" --remove-label "status:review" \
+      --add-label "agent:${TARGET}" --add-label "${STATUS_LABEL}" 2>/dev/null
+    echo "ROUTED: #${ISSUE_N} → agent:${TARGET} (${STATUS_LABEL})"
     ;;
 
   *)

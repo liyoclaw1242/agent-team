@@ -45,6 +45,15 @@ Always check observability signals before reading code:
 3. **Traces** (TraceQL) — what's the full request path?
 4. **Code** — only after you have evidence
 
+### Fallback (no observability stack)
+
+If the project doesn't have Grafana/Prometheus/Loki/Tempo:
+1. **Application logs** — `docker logs`, `fly logs`, server stdout
+2. **Browser DevTools** — console errors, network tab (via Chrome MCP)
+3. **Git bisect** — `git bisect start` to find the breaking commit
+4. **Local reproduction** — run the app locally and reproduce the bug
+5. **Code** — read the relevant code path with the error context
+
 ### Root Cause Test
 
 Can you explain it in one paragraph without "might be" or "probably"? If not, keep investigating.

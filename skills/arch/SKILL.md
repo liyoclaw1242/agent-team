@@ -81,6 +81,34 @@ preflight.sh → READY?
 | Acceptance criteria | Every task has checkable criteria |
 | QA coverage | Testable deliverables get a QA task |
 | Order | Data model → API → UI → QA |
+| Testing field | Every issue must include `testing:` (see below) |
+
+### Testing Field
+
+Every issue spec must include a `testing:` field to tell FE/BE what level of testing is expected:
+
+| Value | Meaning | Used by |
+|-------|---------|---------|
+| `unit-required` | Must write unit tests (hooks, shared components, utils) | FE |
+| `self-test-only` | Browser/API self-test only, no unit tests | FE (default if omitted) |
+| `tdd` | TDD mandatory (always true for BE, but explicit is better) | BE |
+
+**BE always uses TDD regardless** — the field is informational for BE. For FE, this field determines whether unit tests are written.
+
+### Verdict Priority (Mode D Triage)
+
+When Design and QA both review the same PR and give conflicting verdicts:
+
+| Conflict | Resolution |
+|----------|-----------|
+| Design NEEDS_CHANGES + QA PASS | Route to FE for visual fix. Design verdict wins for visual issues. |
+| Design APPROVED + QA FAIL | Route to implementer for functional fix. QA verdict wins for functional issues. |
+| Both FAIL | Route to implementer. Address QA issues first (functional), then Design (visual). |
+
+When routing for re-verification after fixes, use `--force`:
+```bash
+bash scripts/route.sh "{REPO_SLUG}" {N} qa "{AGENT_ID}" --force
+```
 
 ## Output Artifacts (Mode B)
 
