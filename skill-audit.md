@@ -232,3 +232,203 @@ Systematic review of all 7 agent skills for conflicts, inconsistencies, and edge
 1. **Standardize self-test location** — both FE and BE post self-test as PR comment, QA checks comments. (Fixes #4, #15, #24)
 2. **Add `--force` to route.sh for ARCH** — allow ARCH to override QA/Design re-route guards for re-verification cycles. (Fixes #3, #12)
 3. **Platform-agnostic preview URL discovery** — QA should detect any deployment URL, not just `vercel.app`. (Fixes #27)
+
+### Fixed in `b1dece2`
+
+- #4/#15/#24 — BE self-test → PR comment ✅
+- #27 — QA preview URL platform-agnostic ✅
+- #3/#12 — route.sh `--force` ✅
+- #30 — route to ARCH uses `status:review` ✅
+- #6/#29 — ARCH `testing` field + verdict priority ✅
+- #14 — DEBUG fallback methods ✅
+
+### Remaining Low Severity (deferred)
+
+- #8 — BE TDD vs ARCH testing field: BE always does TDD regardless of spec. Harmless inconsistency.
+- #10 — `playwright.config.ts` shared by OPS/QA: rare conflict, documented ownership is sufficient.
+- #20 — FE `check-all.sh` in monorepo with Go: monorepo dir isolation prevents issues.
+- #26 — OPS `preflight.sh` checks Vercel even for non-Vercel projects: warnings only, not failures.
+
+---
+
+# Round 2: End-to-End Scenario Simulations
+
+Testing complete lifecycle flows to find deeper integration issues.
+
+---
+
+## Iteration 16: Full lifecycle — New Feature (ARCH → BE → FE → QA → ARCH merge)
+
+**Scenario**: User requests "Add user management API + page". ARCH decomposes into BE task (API) + FE task (page) + QA task (test plan).
+
+### Simulation
+
+1. ARCH creates 3 issues: `agent:be` (API), `agent:fe` (page, depends on BE), `agent:qa` (test plan)
+2. BE picks up, implements with TDD, writes self-test to `/tmp/self-test-issue-{N}.md`, runs `deliver.sh`
+3. `deliver.sh` commits, pushes, creates PR, posts self-test as PR comment, routes to ARCH
+4. ARCH receives (with `status:review`), routes to QA
+5. QA Phase 0 checks self-test comment → found → proceeds
+6. QA Phase 1 gets preview URL → Fly.io (`fly.dev`) → matched by new regex → proceeds
+7. QA verifies, PASS → routes to ARCH
+8. ARCH merges
+
+### Findings
+
+33. **ISSUE — FE task blocked until BE merges.** ARCH decomposition says `Order: Data Model → API → UI → QA`, but how does FE know when BE is done? There's no automatic unblocking mechanism when BE's PR is merged.
+    - **Severity**: Medium
+    - **Status**: Partially covered — ARCH has `scan-unblock.sh` in housekeeping. Need to verify it handles this case.
+
+34. **ISSUE — QA test plan created in parallel but may reference endpoints that don't exist yet.** QA shift-left means test plan is written before BE finishes. If BE changes the API shape during TDD, the test plan is stale.
+    - **Severity**: Low — QA should re-read the spec before executing. Plan workflow Phase 1 says "Read the spec" which should include any updated API contract.
+
+---
+
+## Iteration 17: Bug Report Flow (user → ARCH → DEBUG → BE → QA)
+
+**Scenario**: User reports "API returns 500 on user creation". ARCH routes to DEBUG.
+
+### Simulation
+
+1. ARCH creates issue `agent:debug`, `status:ready`
+2. DEBUG picks up, tries observability stack → project has none
+3. DEBUG uses fallback: application logs, local reproduction, git bisect
+4. DEBUG finds root cause: missing null check in DB query
+5. DEBUG writes report, suggests `be` as fix owner, routes to ARCH
+6. ARCH routes to BE
+7. BE fixes with TDD (write failing test for null case → fix → green), delivers
+8. ARCH routes to QA (no prior verdict, `--force` not needed)
+9. QA verifies fix
+
+### Findings
+
+35. **PASS — DEBUG → ARCH → BE flow works cleanly.** DEBUG diagnoses, ARCH dispatches, BE fixes. No conflicts.
+
+36. **ISSUE — DEBUG doesn't create a branch or PR.** DEBUG's workflow is `investigate.md` (Reproduce → Observe → Trace → Diagnose → Report → Dispatch → Journal). But the report is just a comment on the issue. If DEBUG needs to add a reproduction script or test file, where does it go?
+    - **Severity**: Low — DEBUG dispatches to implementers, doesn't code. But a `reproduce.sh` would be useful.
+
+---
+
+## Iteration 18: Design Review Rejection Loop (FE → ARCH → Design → FE → Design)
+
+**Scenario**: FE delivers a dashboard page. ARCH routes to Design for visual review. Design says NEEDS_CHANGES.
+
+### Simulation
+
+1. FE delivers PR, routes to ARCH
+2. ARCH routes to Design (Mode C: Visual Review)
+3. Design screenshots, finds issues (e.g., bad spacing, wrong color), posts NEEDS_CHANGES verdict
+4. Design routes to ARCH
+5. ARCH routes back to FE to fix visual issues
+6. FE fixes, delivers updated PR
+7. ARCH wants to re-route to Design → `route.sh` blocks (Design already gave verdict)
+8. ARCH uses `--force` → re-routes to Design
+9. Design re-reviews → APPROVED
+
+### Findings
+
+37. **PASS — `--force` flag fixes the re-route loop.** Without the fix from this audit, step 8 would have been permanently blocked.
+
+38. **ISSUE — When should ARCH route to Design vs QA first?** Currently no documented order. If ARCH routes to QA first and QA passes, then Design finds visual issues, the functional work was wasted effort (QA might need to re-verify after visual fixes).
+    - **Severity**: Medium
+    - **Recommendation**: Document in ARCH: route to Design BEFORE QA for tasks with visual components. Already partially addressed in verdict priority table, but the routing ORDER should be explicit.
+
+---
+
+## Iteration 19: Parallel Agents — Worktree Hazard
+
+**Scenario**: BE agent and FE agent both working on the same repo simultaneously.
+
+### Simulation
+
+1. ARCH dispatches BE issue #10 and FE issue #11 in parallel
+2. BE creates branch `agent/be-1/issue-10`, FE creates `agent/fe-1/issue-11`
+3. Both agents run `git add -A` in `deliver.sh`
+4. If they share the same working tree → one agent commits the other's WIP
+
+### Findings
+
+39. **KNOWN ISSUE — Shared worktree hazard.** Already documented in memory (`feedback_shared_worktree_hazard.md`). `deliver.sh` uses `git add -A` which is dangerous.
+    - **Status**: Known. `deliver.sh` should use `git add` with explicit file lists, or agents should work in isolated worktrees. Memory says "always `git status` before `deliver.sh`/`git add -A`".
+    - **Recommendation**: Update `deliver.sh` to run `git status` check before `git add -A` and warn if untracked files exist that aren't part of the current issue.
+
+---
+
+## Iteration 20: OPS Preflight in CI Context
+
+**Scenario**: OPS agent sets up CI pipeline. CI runner doesn't have local CLI auth.
+
+### Simulation
+
+1. ARCH creates issue: "Set up GitHub Actions CI pipeline"
+2. OPS picks up, runs `preflight.sh`
+3. Preflight checks `vercel whoami`, `fly auth whoami`, `turso auth whoami`
+4. All pass locally, but CI runner won't have these CLIs or auth
+
+### Findings
+
+40. **ISSUE — OPS preflight is local-only.** It verifies the developer machine, not the CI environment. CI uses tokens/secrets, not CLI auth.
+    - **Severity**: Low — preflight is for the agent's local capability check, not CI. CI config uses `VERCEL_TOKEN`, `FLY_API_TOKEN` etc. in GitHub Actions secrets.
+    - **Recommendation**: Add a note in preflight.sh output that CI auth is separate (via platform secrets, not CLI login).
+
+---
+
+## Iteration 21: QA Codify → OPS CI Integration
+
+**Scenario**: QA codifies E2E tests after PASS. OPS needs to make sure CI runs them.
+
+### Simulation
+
+1. QA verifies, PASS, enters Codify phase
+2. QA writes `e2e/user-management.spec.ts`
+3. QA commits on QA branch, routes to ARCH
+4. ARCH merges QA's E2E tests
+5. Next PR → CI should run `pnpm exec playwright test`
+6. But OPS hasn't set up the E2E CI step yet
+
+### Findings
+
+41. **ISSUE — QA Codify creates E2E tests but depends on OPS CI setup.** QA's "When NOT to Codify" section says "No E2E infrastructure → create follow-up issue for ARCH". But there's no guarantee ARCH will prioritize the OPS task before the next PR.
+    - **Severity**: Medium
+    - **Recommendation**: First time QA codifies E2E tests for a repo, QA should check if `playwright.config.ts` and `.github/workflows/e2e.yml` exist. If not, create a blocking follow-up issue for OPS before committing the tests.
+
+---
+
+## Iteration 22: Multi-repo Scenario
+
+**Scenario**: Agent team operates across two repos (e.g., `whitelabel-admin` frontend + separate Go backend repo).
+
+### Findings
+
+42. **ISSUE — `route.sh` and all skills assume single-repo.** `REPO_SLUG` is passed per-call, which is correct. But agent claim/release scripts, journal logs, and preflight checks don't account for multi-repo workflows.
+    - **Severity**: Low — current setup is monorepo. Multi-repo would need `deliver.sh` to handle cross-repo PRs.
+
+---
+
+## Iteration 23: ARCH scan-unblock.sh dependency chain
+
+**Scenario**: Issue #11 (FE) depends on #10 (BE). BE finishes. Does FE auto-unblock?
+
+### Findings
+
+43. **NEED TO VERIFY — Does `scan-unblock.sh` exist and work?** ARCH SKILL.md references it in housekeeping but we haven't read it.
+
+---
+
+## Round 2 Summary
+
+| # | Severity | Issue |
+|---|----------|-------|
+| 33 | Medium | FE blocked on BE — dependency unblocking needs verification |
+| 34 | Low | QA test plan may go stale during parallel dev |
+| 36 | Low | DEBUG has no mechanism to attach reproduction artifacts |
+| 38 | Medium | ARCH should route Design BEFORE QA for visual tasks |
+| 39 | Known | Shared worktree `git add -A` hazard |
+| 40 | Low | OPS preflight is local-only, doesn't cover CI |
+| 41 | Medium | QA Codify depends on OPS E2E CI setup |
+| 42 | Low | Single-repo assumption in scripts |
+| 43 | Verified ✅ | `scan-unblock.sh` works — uses `<!-- deps: N,N -->` in issue body |
+
+### Fixed in Round 2
+
+- #33 — ARCH decomposition now documents `<!-- deps: -->` format for `scan-unblock.sh` ✅
+- #38 — ARCH order updated: Design review BEFORE QA for visual tasks ✅

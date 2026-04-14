@@ -77,10 +77,11 @@ preflight.sh → READY?
 |-----------|-----------|
 | Task count per request | 1-6 (if > 6, the request is too big) |
 | Files per task | ≤ 10 (if > 10, split further) |
-| Dependencies | Explicit, no circular deps |
+| Dependencies | Explicit, no circular deps. Use `<!-- deps: 5,6 -->` in issue body for `scan-unblock.sh` |
 | Acceptance criteria | Every task has checkable criteria |
 | QA coverage | Testable deliverables get a QA task |
-| Order | Data model → API → UI → QA |
+| Order | Data model → API → UI → **Design review** → QA → merge |
+| Review routing | Route to **Design before QA** for tasks with visual components |
 | Testing field | Every issue must include `testing:` (see below) |
 
 ### Testing Field
