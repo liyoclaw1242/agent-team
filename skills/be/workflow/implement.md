@@ -51,11 +51,15 @@ Move on to next task. Don't wait.
 
 **Gate**: Spec is feasible. If not, feed back and move on.
 
-## Phase 3: Implement
+## Phase 3: Implement (TDD)
 
 1. Create branch: `agent/{AGENT_ID}/issue-{N}`
-2. Code following existing patterns.
-3. Write tests alongside code, not after.
+2. For each behavior unit, follow **Red → Green → Refactor**:
+   - **Red**: Write a single failing test that defines the expected behavior. Run it. Confirm it fails.
+   - **Green**: Write the minimum code to make the test pass. Run it. Confirm it passes.
+   - **Refactor**: Clean up implementation. Run tests. Confirm they still pass.
+3. Repeat step 2 for each behavior: happy path → error paths → edge cases.
+4. Do NOT batch — one cycle per behavior, not "write all tests then implement."
 
 ## Phase 4: Validate
 

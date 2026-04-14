@@ -19,6 +19,18 @@ Follow `workflow/implement.md` — Understand → Plan → Implement → Validat
 | Code Quality | `rules/code-quality.md` |
 | Git Hygiene | `rules/git.md` |
 
+## Preflight Check
+
+Before any deploy or infra task, run `validate/preflight.sh [project_dir]`. It verifies:
+
+- CLI tools installed (`gh`, `vercel`, `fly`, `turso`, `docker`)
+- Auth status for each platform
+- Project linkage (`.vercel/project.json`, `fly.toml`, git remote)
+- Environment variables present
+- Docker daemon running
+
+**Failures block the task. Warnings are logged but non-blocking.**
+
 ## Role-Specific Patterns
 
 ### Docker

@@ -1,5 +1,5 @@
 #!/bin/bash
-# BE validation pipeline — runs all rule checks in sequence
+# OPS validation pipeline — preflight + infra-specific checks
 # Exit code: 0 = all pass, 1 = failures found
 set -e
 
@@ -7,38 +7,48 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 FAILURES=0
 
-echo "═══ BE Validation Pipeline ═══"
+echo "═══ OPS Validation Pipeline ═══"
 
-# 1. Testing
-echo "── Testing ──"
-if [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
-  pnpm test 2>&1 || npm test 2>&1 || { echo "FAIL: Tests failed"; FAILURES=$((FAILURES+1)); }
-else
-  echo "SKIP: No test script found"
-fi
+# 0. Preflight
+echo "── Preflight ──"
+bash "$SCRIPT_DIR/preflight.sh" "$PWD" || FAILURES=$((FAILURES+1))
 
-# 2. Lint
-echo "── Code Quality ──"
-if [ -f "package.json" ] && grep -q '"lint"' package.json 2>/dev/null; then
-  pnpm lint 2>&1 || npm run lint 2>&1 || { echo "FAIL: Lint failed"; FAILURES=$((FAILURES+1)); }
-else
-  echo "SKIP: No lint script found"
-fi
-
-# 3. Security checks
+# 1. Security — no secrets in tracked files
 echo "── Security ──"
-SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
+SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" --include="*.go" --include="*.toml" --include="*.yaml" --include="*.yml" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." | grep -v ".env" || true)
 if [ -n "$SECRETS" ]; then
-  echo "FAIL: Potential secrets found:"
+  echo "FAIL: Potential secrets in tracked files:"
   echo "$SECRETS"
   FAILURES=$((FAILURES+1))
 fi
 
-SQL_INJECT=$(grep -rn 'query.*`.*\${' --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
-if [ -n "$SQL_INJECT" ]; then
-  echo "FAIL: Potential SQL injection:"
-  echo "$SQL_INJECT"
-  FAILURES=$((FAILURES+1))
+# Check .gitignore covers sensitive files
+for sensitive in ".env" ".env.local" ".env.production"; do
+  if [ -f ".gitignore" ]; then
+    grep -qF "$sensitive" .gitignore 2>/dev/null || {
+      echo "WARN: $sensitive not in .gitignore"
+    }
+  fi
+done
+
+# 2. Docker — validate Dockerfile if present
+echo "── Docker ──"
+for dockerfile in $(find . -name "Dockerfile" -not -path "*/node_modules/*" 2>/dev/null); do
+  echo "  Checking $dockerfile"
+  # Non-root user check
+  grep -q "USER\|useradd\|adduser" "$dockerfile" 2>/dev/null || echo "  WARN: $dockerfile — no non-root USER directive"
+  # Multi-stage check
+  grep -cq "^FROM" "$dockerfile" 2>/dev/null && {
+    STAGES=$(grep -c "^FROM" "$dockerfile")
+    [ "$STAGES" -lt 2 ] && echo "  WARN: $dockerfile — single-stage build, consider multi-stage"
+  }
+done
+
+# 3. Fly.io — validate fly.toml if present
+echo "── Fly.io ──"
+if [ -f "fly.toml" ]; then
+  grep -q "\[http_service\]\|internal_port" fly.toml 2>/dev/null || echo "WARN: fly.toml — no http_service configured"
+  grep -q "\[checks\]\|health" fly.toml 2>/dev/null || echo "WARN: fly.toml — no health check configured"
 fi
 
 # 4. Git hygiene
@@ -49,14 +59,6 @@ echo "$BRANCH" | grep -qE "^agent/" || echo "WARN: Branch doesn't follow agent/ 
 git log origin/main..HEAD --format="%s" 2>/dev/null | while read msg; do
   echo "$msg" | grep -qE "^(feat|fix|docs|design|test|chore):" || echo "FAIL: Bad commit message: $msg"
 done
-
-# 5. Performance (N+1 detection)
-echo "── Performance ──"
-N1=$(git diff origin/main 2>/dev/null | grep "^+" | grep -E "\.map\(.*=>.*find|\.forEach\(.*=>.*find" || true)
-if [ -n "$N1" ]; then
-  echo "WARN: Potential N+1 query pattern:"
-  echo "$N1"
-fi
 
 echo "═══ Results: $FAILURES failure(s) ═══"
 exit $FAILURES

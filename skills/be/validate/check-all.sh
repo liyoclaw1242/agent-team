@@ -11,10 +11,14 @@ echo "═══ BE Validation Pipeline ═══"
 
 # 1. Testing
 echo "── Testing ──"
-if [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
+if [ -f "go.mod" ]; then
+  echo "  Go project detected"
+  go test ./... -cover 2>&1 || { echo "FAIL: Go tests failed"; FAILURES=$((FAILURES+1)); }
+elif [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
+  echo "  Node.js project detected"
   pnpm test 2>&1 || npm test 2>&1 || { echo "FAIL: Tests failed"; FAILURES=$((FAILURES+1)); }
 else
-  echo "SKIP: No test script found"
+  echo "SKIP: No test runner found"
 fi
 
 # 2. Lint
@@ -27,7 +31,7 @@ fi
 
 # 3. Security checks
 echo "── Security ──"
-SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." || true)
+SECRETS=$(grep -rn "sk-\|ghp_\|AKIA\|password\s*=\s*['\"]" --include="*.ts" --include="*.js" --include="*.go" . 2>/dev/null | grep -v node_modules | grep -v .venv | grep -v ".test." | grep -v "_test.go" || true)
 if [ -n "$SECRETS" ]; then
   echo "FAIL: Potential secrets found:"
   echo "$SECRETS"

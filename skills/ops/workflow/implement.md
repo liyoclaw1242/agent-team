@@ -15,11 +15,14 @@ Each phase has a gate. Do not skip ahead.
 
 ## Phase 2: Plan
 
-1. List files to change and why.
-2. Determine test strategy — what exists, what's needed.
-3. Check for blockers (missing deps, unclear spec).
-4. Ambiguous spec → conservative interpretation + comment.
-5. **Spec feasibility check** — does the spec conflict with:
+1. **Run preflight check**: `bash validate/preflight.sh [project_dir]`
+   - All failures must be resolved before proceeding.
+   - Warnings are acceptable but should be noted in the plan.
+2. List files to change and why.
+3. Determine test strategy — what exists, what's needed.
+4. Check for blockers (missing deps, unclear spec).
+5. Ambiguous spec → conservative interpretation + comment.
+6. **Spec feasibility check** — does the spec conflict with:
    - Existing CI/CD pipeline structure or deployment config?
    - Security rules? (e.g. spec exposes secrets, uses root containers)
    - Infrastructure constraints? (e.g. spec assumes resources that don't exist)

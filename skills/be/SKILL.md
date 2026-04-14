@@ -13,7 +13,7 @@ Follow `workflow/implement.md` — a phase-gated process:
 
 1. **Understand** → read spec, check QA feedback, read related code
 2. **Plan** → list changes, determine test strategy, check blockers
-3. **Implement** → branch, code, write tests alongside
+3. **Implement (TDD)** → branch, then repeat Red→Green→Refactor per behavior
 4. **Validate** → run every rule in `rules/`, execute validation scripts in `scripts/`
 5. **Deliver** → test suite, commit, push, PR, update API
 6. **Journal** → write log entry in `log/`
@@ -24,7 +24,7 @@ Enforced via `rules/` — each has validation commands:
 
 | Rule | File | What it checks |
 |------|------|----------------|
-| Testing | `rules/testing.md` | Test coverage, test quality |
+| Testing (TDD) | `rules/testing.md` | Red→Green→Refactor cycle, coverage ≥80% |
 | Security | `rules/security.md` | OWASP, secrets, injection |
 | Code Quality | `rules/code-quality.md` | Lint, dead code, naming |
 | API Design | `rules/api.md` | REST conventions, error shape |
