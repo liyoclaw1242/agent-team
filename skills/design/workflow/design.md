@@ -1,17 +1,18 @@
 # Design Workflow
 
-Three modes:
-- **Mode A: Design-First** — sketch in Pencil canvas → review → implement in code
-- **Mode B: Code-Direct** — implement directly in code (minor changes, design already decided)
+Two modes:
+- **Mode A: Design Spec** — sketch in Pencil canvas → produce design spec for FE
 - **Mode C: Visual Review** — black-box validation of other agents' PRs
+
+**Design does NOT write application code.** Design produces visual decisions and specs. FE implements.
 
 See `SKILL.md` → Mode Routing for how to choose.
 
 ---
 
-## Mode A: Design-First (new pages, layouts, major UI changes)
+## Mode A: Design Spec (new pages, layouts, major UI changes)
 
-Canvas sketch → Visual review → Code implementation
+Canvas sketch → Design spec → Hand off to FE
 
 ### Phase 1: Context
 
@@ -35,7 +36,7 @@ Canvas sketch → Visual review → Code implementation
 
 ### Phase 3: Sketch in Pencil
 
-Create a design proposal on canvas before writing any code:
+Create a design proposal on canvas:
 
 ```bash
 # Create initial design
@@ -58,80 +59,62 @@ pencil --in {feature-name}.pen --out {feature-name}.pen \
 pencil --in {feature-name}.pen --export /tmp/sketch-v2.png --export-scale 2
 ```
 
-Max 3 iterations. When satisfied, move to code.
+Max 3 iterations. When satisfied, produce the spec.
 
 **Gate**: Does the sketch look like something you'd approve in a visual review? If not, iterate.
 
-### Phase 4: Implement in Code
+### Phase 4: Produce Design Spec
 
-Now translate the approved sketch into React/Tailwind:
-
-1. Create branch: `actions/setup-branch.sh`
-2. Implement following the sketch as your visual target
-3. Apply patterns from `cases/visual-vocabulary.md` (ring borders, spacing scale, etc.)
-4. Handle all component states (loading, error, empty)
-
-### Phase 5: Capture + Compare
-
-1. Start dev server: `pnpm dev &`
-2. Screenshot the implemented result:
-   ```bash
-   bash actions/capture-screenshots.sh http://localhost:3000 /tmp/implemented /route
-   ```
-3. **Compare sketch vs implementation** — read both PNGs:
-   - Does the implementation match the sketch?
-   - Any details lost in translation?
-
-### Phase 6: Validate
-
-Run the design checklist gate:
+Write a design spec as a comment on the issue for FE to implement:
 
 ```bash
-bash validate/check-all.sh implement
+gh issue comment {ISSUE_N} --repo {REPO_SLUG} \
+  --body "## Design Spec by \`{AGENT_ID}\`
+
+### Layout
+{describe the layout structure, grid, spacing}
+
+### Typography
+{heading levels, font sizes, weights}
+
+### Colors
+{which design tokens to use, contrast requirements}
+
+### Component States
+{loading, error, empty, interactive states — describe each visually}
+
+### Responsive
+{how it should adapt at 320px, 768px, 1280px}
+
+### Accessibility
+{keyboard flow, ARIA requirements, focus management}
+
+### Sketch
+{attach exported PNG or describe where to find the .pen file}
+
+### Notes for FE
+{anything that might need a new API field or backend change — flag for ARCH}"
 ```
 
-Review every item. Fix failures against:
-- `rules/ai-design-audit.md`
-- `rules/accessibility.md`
-- `rules/responsive.md`
+**If the design requires new data or API changes** (e.g., showing a field that doesn't exist yet), note this in "Notes for FE" so ARCH can create a BE task.
 
-Max 2 fix-and-revalidate rounds.
-
-**Gate**: All checklist items confirmed.
-
-### Phase 7: Polish
-
-Fix remaining issues from validation. Recapture screenshots to confirm.
-
-### Phase 8: Record
+### Phase 5: Record
 
 - Update `design-decisions.md` in the repo
-- Commit the `.pen` file alongside the code (optional — for design history)
+- Commit the `.pen` file to `design/` directory (for design history)
 
-### Phase 9: Deliver
+### Phase 6: Route to ARCH
 
-1. Run `actions/deliver.sh` — commit + push + open PR + route to ARCH (deliver.sh handles routing)
+```bash
+bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
+```
 
-### Phase 10: Journal + Distill
+ARCH reads the design spec and routes to FE for implementation.
+
+### Phase 7: Journal + Distill
 
 1. Write journal entry to `log/` via `actions/write-journal.sh`
 2. Distill reusable patterns to `cases/visual-vocabulary.md`
-3. Distill review insights to `cases/review-heuristics.md`
-
----
-
-## Mode B: Code-Direct (minor changes, tweaks, polish)
-
-For tasks where the design is already decided (bug fixes, spacing adjustments, color changes).
-
-Skip Pencil. Go straight to code:
-
-1. **Context** — same as Mode A Phase 1
-2. **Implement** — same as Mode A Phase 4 (create branch, code, handle states)
-3. **Capture** — screenshot at 3 breakpoints
-4. **Validate** — run `bash validate/check-all.sh implement`, review all items
-5. **Deliver** — same as Mode A Phase 9
-6. **Journal** — same as Mode A Phase 10
 
 ---
 
