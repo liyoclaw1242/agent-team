@@ -432,3 +432,108 @@ Testing complete lifecycle flows to find deeper integration issues.
 
 - #33 — ARCH decomposition now documents `<!-- deps: -->` format for `scan-unblock.sh` ✅
 - #38 — ARCH order updated: Design review BEFORE QA for visual tasks ✅
+
+---
+
+# Round 3: Stress Tests & Edge Cases
+
+Deep-dive on scripts, error paths, and concurrent operation scenarios.
+
+---
+
+## Iteration 24: QA review.md vs verify.md — dual workflow confusion
+
+**Scenario**: QA has TWO workflows — `review.md` (code review + functional test) and `verify.md` (test plan execution). When does QA use which?
+
+### Findings
+
+44. **ISSUE — QA has two entry points with overlapping scope.** `review.md` Mode B does functional testing against preview URL. `verify.md` Phase 2-5 also does functional testing against preview URL. If ARCH routes to QA, which workflow does QA follow?
+    - **Severity**: Medium
+    - **Analysis**: `review.md` is for code review + quick functional smoke. `verify.md` is for full test plan execution. But `review.md` Mode A Phase 5 can merge PRs directly (`gh pr merge`), which conflicts with ARCH being the "sole merge authority."
+    - **Fix**: 
+      1. Remove `gh pr merge` from `review.md` — QA should never merge, always route back to ARCH.
+      2. Document when to use which: `review.md` for code review tasks, `verify.md` for QA verification tasks with test plans.
+
+---
+
+## Iteration 25: QA review.md merge authority violation
+
+**Scenario**: QA review.md Mode A Phase 5 says "APPROVED → merge" with `gh pr merge`.
+
+### Findings
+
+45. **ISSUE — QA review.md bypasses ARCH merge authority.** ARCH SKILL.md explicitly states "Only ARCH merges PRs (`gh pr merge`)". But `review.md` line 88-89 has QA merging directly. And `route.sh` enforces that all agents route back to ARCH.
+    - **Severity**: High — violates the central authority model.
+    - **Fix**: Replace direct merge in review.md with route-to-ARCH.
+
+---
+
+## Iteration 26: QA review.md preview URL still Vercel-only
+
+**Scenario**: QA review.md Mode B Phase 1 gets preview URL.
+
+### Findings
+
+46. **ISSUE — review.md uses Vercel-only URL pattern.** Line 113 greps for `vercel\.app`. Same issue as #27 but in a different file.
+    - **Severity**: Medium
+    - **Fix**: Apply same platform-agnostic regex as verify.md.
+
+---
+
+## Iteration 27: ARCH Mode D pre-triage auto-merge safety
+
+**Scenario**: `pre-triage.sh` auto-merges QA PASS PRs without ARCH reviewing.
+
+### Findings
+
+47. **NEED TO VERIFY — Does `pre-triage.sh` auto-merge?** ARCH workflow says "QA PASS → merge and PR delivered → route to QA are already handled by pre-triage.sh." If pre-triage auto-merges, it could merge without Design review for visual PRs.
+    - **Severity**: Potentially High
+    - **Status**: Need to read `pre-triage.sh`
+
+---
+
+## Iteration 28: deliver.sh git add -A race condition
+
+**Scenario**: All roles use shared `deliver.sh` (or role-specific copies) with `git add -A`.
+
+### Findings
+
+48. **ISSUE — BE and FE deliver.sh both use `git add -A`.** This is the same #39 shared worktree hazard but now confirmed across both roles. The scripts are identical in this regard.
+    - **Severity**: Medium (known, deferred)
+    - **Status**: Documented in memory, not fixing now.
+
+---
+
+## Iteration 29: ARCH Mode 0 Bootstrap pushes directly to main
+
+**Scenario**: ARCH bootstraps `arch.md` and pushes to main without PR.
+
+### Findings
+
+49. **ISSUE — Mode 0 commits directly to main.** `git push origin main` in architect.md Step 8. All other agents use branches + PRs. ARCH bypasses its own review process.
+    - **Severity**: Low — `arch.md` is a documentation file, not code. Direct push is intentional for bootstrapping. But could conflict if main has branch protection rules.
+    - **Recommendation**: Note that this requires main branch push access. If branch protection is enabled, ARCH should create a PR instead.
+
+---
+
+## Iteration 30: Design Mode A creates code — potential file conflict with FE
+
+**Scenario**: Design Mode A implements React/Tailwind code for a new page. FE is also assigned to build pages.
+
+### Findings
+
+50. **ISSUE — Design Mode A and FE both write to `src/` or `apps/*/src/`.** OPS Scope Guard says OPS should NOT modify `src/`. But Design has no equivalent Scope Guard — it can write anywhere FE writes.
+    - **Severity**: Medium (same as #18)
+    - **Fix**: Add Scope Guard to Design SKILL.md: Design Mode A should only create files in its branch, and ARCH should never dispatch both Design Mode A and FE to the same component.
+
+## Round 3 Summary
+
+| # | Severity | Issue |
+|---|----------|-------|
+| 44 | Medium | QA has two overlapping workflows (review.md vs verify.md) |
+| 45 | High | QA review.md merges PRs directly, violating ARCH sole merge authority |
+| 46 | Medium | QA review.md preview URL still Vercel-only |
+| 47 | Unknown | pre-triage.sh may auto-merge without Design review |
+| 48 | Medium | deliver.sh `git add -A` race (known, deferred) |
+| 49 | Low | ARCH Mode 0 pushes directly to main |
+| 50 | Medium | Design Mode A has no Scope Guard for `src/` writes |

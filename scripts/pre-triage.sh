@@ -49,11 +49,22 @@ for N in $ISSUES; do
     PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
   fi
 
-  # ── Case 1: QA PASS + PR open → merge ──
+  # ── Case 1: QA PASS + PR open → merge (if Design review not needed or done) ──
   if [ -n "$QA_PASS" ] && [ -n "$PR_NUMBER" ] && [ "$PR_STATE" = "OPEN" ]; then
-    # Check if Design review is also needed (skip if already approved or non-frontend)
+    # Check if Design rejected
     if [ -n "$DESIGN_NEEDS_CHANGES" ]; then
-      # Design rejected — needs ARCH judgment on routing
+      REMAINING="$REMAINING $N"
+      continue
+    fi
+
+    # Check if this is a frontend PR that still needs Design review
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    IS_FRONTEND=false
+    echo "$PR_BRANCH" | grep -qiE "^agent/fe" && IS_FRONTEND=true
+    echo "$TITLE" | grep -qiE "^(fe|frontend|design):" && IS_FRONTEND=true
+
+    if [ "$IS_FRONTEND" = true ] && [ -z "$DESIGN_APPROVED" ]; then
+      echo "#${N}: QA PASS but frontend PR #${PR_NUMBER} needs Design review → leaving for ARCH"
       REMAINING="$REMAINING $N"
       continue
     fi

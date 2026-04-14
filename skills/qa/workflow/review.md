@@ -81,21 +81,21 @@ For each unreviewed PR:
 
 ### Phase 5: Verdict
 
-**APPROVED** (code level) → proceed to Mode B if it's a frontend PR. Otherwise merge:
+**APPROVED** — route back to ARCH for merge decision:
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
-  --body "## QA Review by \`{AGENT_ID}\`\n\nCode review passed.\n\n**Verdict: APPROVED**"
-gh pr merge {PR_NUMBER} --repo {REPO_SLUG} --squash --delete-branch
+  --body "## QA Review by \`{AGENT_ID}\`\n\nCode review passed.\n\n**Verdict: Code APPROVED**"
+bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
 ```
 
-**APPROVED but needs visual review** (frontend PRs):
+QA does NOT merge. ARCH decides whether to merge directly or route to Design for visual review first.
+
+**NEEDS CHANGES** → post feedback, route back to ARCH:
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
-  --body "## QA Review by \`{AGENT_ID}\`\n\nCode review passed. Frontend PR — needs Design visual review before merge.\n\n**Code: APPROVED** | **Visual: PENDING**"
+  --body "## QA Review by \`{AGENT_ID}\`\n\nCode review found issues.\n\n{details}\n\n**Verdict: NEEDS CHANGES**"
+bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
 ```
-Do NOT merge yet. The Design agent will do visual review.
-
-**NEEDS CHANGES** → close PR, post feedback, reset issue to `ready`.
 
 ---
 
@@ -107,10 +107,10 @@ For frontend PRs, after code review passes:
 
 Self-test record was already checked in Mode A Phase 2. Use the findings from there to focus your functional testing on gaps.
 
-Get the preview URL from the PR deployment:
+Get the preview URL from the PR deployment (platform-agnostic):
 ```bash
 gh pr view {PR_NUMBER} --repo {REPO_SLUG} --json comments,body \
-  --jq '[.comments[].body, .body] | map(select(test("https://.*\\.vercel\\.app"))) | first'
+  --jq '[.comments[].body, .body] | map(select(test("https://.*\\.(vercel\\.app|fly\\.dev|netlify\\.app|onrender\\.com)"))) | first'
 ```
 
 QA does NOT build or run the app locally. All testing targets the preview environment.
