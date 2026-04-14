@@ -137,9 +137,25 @@ Max 3 rounds: validate → fix → re-validate.
 
 ## Phase 6: Deliver
 
-1. Run full test suite
-2. Commit + push + PR via `actions/deliver.sh`
-3. Update API status + release claim
+1. Run full test suite.
+2. **Self-test** — before opening PR, verify your own work:
+   - [ ] Happy path renders correctly
+   - [ ] All UI states handled (loading, error, empty)
+   - [ ] Responsive at 320px, 768px, 1280px
+   - [ ] Keyboard navigation works
+   - [ ] No console errors / warnings
+   - [ ] No regressions in existing tests
+3. Commit + push + PR via `actions/deliver.sh`. **PR body must include a self-test declaration**:
+   ```markdown
+   ## Self-Test
+   - [x] Happy path verified
+   - [x] All states handled (loading, error, empty)
+   - [x] Responsive check (320/768/1280)
+   - [x] Keyboard accessible
+   - [x] No console errors
+   - [x] All tests pass
+   ```
+4. Update API status + release claim
 
 ---
 

@@ -4,6 +4,34 @@ You have a test plan. Now execute it step by step and produce a verify report.
 
 ---
 
+## Phase 0: Check Self-Test Declaration
+
+Before setting up the environment, check if FE/BE completed their self-test:
+
+```bash
+gh pr view {PR_NUMBER} --repo {REPO_SLUG} --json body -q '.body'
+```
+
+Look for a `## Self-Test` section with checked items. If missing or incomplete:
+
+```bash
+gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
+  --body "## QA Pre-check by \`{AGENT_ID}\`
+
+**BLOCKED**: PR is missing the self-test declaration.
+
+Please add a \`## Self-Test\` section to the PR body with checked items confirming you verified your own work before QA review.
+
+Returning to ARCH."
+bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
+```
+
+Do NOT proceed with verification if self-test is missing. Move on to next task.
+
+**Gate**: PR body contains a `## Self-Test` section with all items checked.
+
+---
+
 ## Phase 1: Setup Environment
 
 1. **Checkout the branch**:

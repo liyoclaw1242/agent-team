@@ -69,9 +69,23 @@ Max 3 rounds: validate → fix → re-validate.
 ## Phase 5: Deliver
 
 1. Run full test suite.
-2. Commit: `{commit_prefix} {title} (closes #{N})`
-3. Push + open PR.
-4. Update API status + release claim.
+2. **Self-test** — before opening PR, verify your own work:
+   - [ ] Happy path works end-to-end
+   - [ ] Error paths return correct status codes and error shape
+   - [ ] No regressions in existing tests
+   - [ ] DB migrations run cleanly (up + down)
+   - [ ] No secrets or .env committed
+3. Commit: `{commit_prefix} {title} (closes #{N})`
+4. Push + open PR. **PR body must include a self-test declaration**:
+   ```markdown
+   ## Self-Test
+   - [x] Happy path verified
+   - [x] Error paths verified (404, 422, 401)
+   - [x] All tests pass (`go test ./...` or `pnpm test`)
+   - [x] DB migration up/down clean
+   - [x] No secrets in code
+   ```
+5. Update API status + release claim.
 
 ## Phase 6: Journal
 
