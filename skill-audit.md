@@ -624,3 +624,61 @@ Auditing the shared scripts (poll.sh, claims.sh, route.sh, deliver.sh) and cross
 | 52/61 | Critical | poll.sh + pre-triage.sh query `status:ready` but ARCH now gets `status:review` |
 | 54 | Low | claims.sh `sleep 2` race window |
 | 58 | Medium | QA has no deliver.sh for Codify commits |
+
+---
+
+# Round 5: Final Sweep
+
+## Iteration 36: status:review propagation check
+
+### Findings
+
+62. **ISSUE — `architect.md` line 142 said `status:ready` for ARCH intake.** Fixed inline — changed to `status:review`.
+
+63. **ISSUE — `release-claim.sh` always sets `status:ready` on release.** If ARCH releases a claim, the issue should go back to `status:review`, not `status:ready`. Other agents should be `status:ready`.
+    - **Severity**: Low — rare scenario (ARCH releasing a claim).
+
+64. **PASS — No remaining `gh pr merge` outside ARCH.** QA review.md fix verified.
+
+65. **PASS — No remaining Vercel-only URL patterns in QA workflows.** Both verify.md and review.md now use platform-agnostic regex. OPS case file is Vercel-specific by design.
+
+---
+
+## Iteration 37: ARCH creates issues for other agents — label correctness
+
+ARCH creates issues with `agent:{role}` + `status:ready`. This is correct — only issues routed TO ARCH get `status:review`. ARCH-created issues for FE/BE/OPS get `status:ready` so those agents can poll and claim them.
+
+### Findings
+
+66. **PASS — Label flow is consistent.** ARCH creates → `status:ready` (for agents). Agents deliver → route.sh → `status:review` (for ARCH). ARCH triages → route.sh → `status:ready` (for next agent) or merge.
+
+---
+
+# Final Audit Summary
+
+| Round | Iterations | Findings | Fixed | Remaining |
+|-------|-----------|----------|-------|-----------|
+| 1 (Pairwise) | 15 | 32 | 6 | 4 Low |
+| 2 (E2E) | 8 | 11 | 2 | 3 Low, 2 Medium |
+| 3 (Stress) | 7 | 7 | 3 | 2 Low, 1 Medium |
+| 4 (Scripts) | 5 | 5 | 1 Critical | 1 Low, 1 Medium |
+| 5 (Sweep) | 2 | 5 | 1 | 1 Low |
+| **Total** | **37** | **60** | **13 fixed** | **16 deferred** |
+
+### All Critical/High Fixes Applied
+
+1. ✅ #4/#15/#24 — Self-test location standardized (PR comment)
+2. ✅ #45 — QA can't merge PRs (ARCH sole authority)
+3. ✅ #47 — pre-triage won't auto-merge frontend PRs without Design review
+4. ✅ #52/#61 — ARCH polling fixed (status:review)
+
+### All Medium Fixes Applied
+
+5. ✅ #3/#12 — route.sh --force for re-verification
+6. ✅ #6 — ARCH testing field documented
+7. ✅ #14 — DEBUG fallback methods
+8. ✅ #27/#46 — Platform-agnostic preview URLs
+9. ✅ #29 — Verdict priority documented
+10. ✅ #30 — status:review for ARCH routing
+11. ✅ #33 — Dependency annotation documented
+12. ✅ #38 — Design before QA order
