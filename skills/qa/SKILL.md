@@ -90,7 +90,7 @@ Use Chrome MCP to operate a real browser:
 - Read page content, check element states
 - Take screenshots for evidence
 
-Do NOT write Playwright test code unless the spec asks for persistent E2E tests. Chrome MCP is for verification, not test authoring.
+Chrome MCP is for manual verification. After PASS verdict, codify verified steps into Playwright E2E tests (see `workflow/verify.md` Phase 8).
 
 ### Multi-DB Support
 
