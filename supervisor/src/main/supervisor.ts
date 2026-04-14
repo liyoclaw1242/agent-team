@@ -207,7 +207,10 @@ class ManagedAgent {
               setTimeout(() => proc.write("\r"), 500);
             }, 300);
           } else {
-            proc.write(prompt + "\r");
+            // Claude: flatten to single line + send Enter separately
+            const singleLine = prompt.replace(/\n/g, " ");
+            proc.write(singleLine);
+            setTimeout(() => proc.write("\r"), 500);
           }
         }
 
