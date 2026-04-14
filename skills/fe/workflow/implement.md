@@ -1,6 +1,6 @@
 # Frontend Implementation Workflow
 
-Phases: Onboard Context → Locate Impact → Plan → Implement → Validate → Deliver → Journal
+Phases: Onboard Context → Locate Impact → Plan → Implement → Self-Test → Validate → Deliver → Journal
 
 Each phase has a gate. Do not skip ahead.
 
@@ -45,9 +45,9 @@ grep -rn "ComponentName" --include="*.tsx" --include="*.ts" src/
 ## Phase 3: Plan
 
 1. **List changes** — for each file: what changes and why.
-2. **Determine test strategy**:
-   - What states need testing? (default, loading, error, empty, interactive)
-   - Are there integration tests that need updating?
+2. **Determine test strategy** — check the issue spec's `testing` field:
+   - `unit-required` → plan unit tests for hooks/components (see `rules/testing.md` Mode 2)
+   - `self-test-only` or not specified → plan browser self-test steps only
 3. **Check for blockers** — missing API endpoints, unclear design spec, dependency on other tasks.
 4. **Conservative scope** — if the spec says "add a button", add a button. Don't redesign the page.
 5. **Spec feasibility check** — does the spec conflict with:
@@ -101,9 +101,10 @@ Then move on to your next task. Don't wait for ARCH — they'll update the spec 
    - CSS modules? Don't introduce styled-components.
    - Existing `Button` component? Use it, don't make a new one.
 
-3. **Write tests alongside code** — not after:
+3. **Write unit tests alongside code** — only if spec says `testing: unit-required`:
    - Testing Library: `getByRole` > `getByLabelText` > `getByText` > `getByTestId`
    - Test behavior, not implementation details
+   - See `rules/testing.md` Mode 2 for what needs unit tests
 
 4. **Handle all states**:
    - Default (happy path render)
@@ -120,49 +121,66 @@ Then move on to your next task. Don't wait for ARCH — they'll update the spec 
 
 ---
 
-## Phase 5: Validate
+## Phase 5: Self-Test
 
-Run `validate/check-all.sh`.
+> "Build it like production, test it like a user."
 
-Additionally verify:
-- [ ] Works at 320px, 768px, 1280px?
-- [ ] Tab through all interactive elements?
-- [ ] Loading state appears promptly?
+This phase is mandatory for every task. You are the first QA — catch your own bugs before anyone else sees them.
+
+### 5a. Production Build
+
+```bash
+pnpm build
+```
+
+If build fails, go back to Phase 4 and fix. Do not proceed with a broken build.
+
+### 5b. Start & Test via Browser MCP
+
+```bash
+pnpm start &
+```
+
+Using Browser MCP, walk through each Acceptance Criteria item from the issue spec:
+
+1. **Navigate** to the affected route
+2. **Operate** — click, type, scroll, as described in the AC
+3. **Observe** — does the UI respond correctly?
+4. **Check DevTools** — console errors? network failures? JS exceptions?
+5. **Screenshot** — capture evidence at each key step
+
+### 5c. Write Self-Test Record
+
+Write results to `/tmp/self-test-issue-{N}.md`. See `rules/testing.md` for the file format.
+
+**If any step fails**: go back to Phase 4, fix, rebuild, re-test. Max 3 rounds.
+
+**Gate**: All AC items pass. Self-test file exists at `/tmp/self-test-issue-{N}.md`.
+
+---
+
+## Phase 6: Validate
+
+Run `validate/check-all.sh` for static checks (TypeScript, lint, a11y scan, security scan, git hygiene).
 
 Max 3 rounds: validate → fix → re-validate.
 
-**Gate**: All checks pass.
+**Gate**: All checks pass AND self-test passed in Phase 5.
 
 ---
 
-## Phase 6: Deliver
+## Phase 7: Deliver
 
-1. Run full test suite.
-2. **Self-test** — before opening PR, verify your own work:
-   - [ ] Happy path renders correctly
-   - [ ] All UI states handled (loading, error, empty)
-   - [ ] Responsive at 320px, 768px, 1280px
-   - [ ] Keyboard navigation works
-   - [ ] No console errors / warnings
-   - [ ] No regressions in existing tests
-3. Commit + push + PR via `actions/deliver.sh`. **PR body must include a self-test declaration**:
-   ```markdown
-   ## Self-Test
-   - [x] Happy path verified
-   - [x] All states handled (loading, error, empty)
-   - [x] Responsive check (320/768/1280)
-   - [x] Keyboard accessible
-   - [x] No console errors
-   - [x] All tests pass
-   ```
-4. Update API status + release claim
+1. Run `actions/deliver.sh` — commit + push + open PR + route to ARCH
+   - `deliver.sh` will verify self-test file exists before proceeding
+   - Self-test record is automatically posted as a PR comment
 
 ---
 
-## Phase 7: Journal
+## Phase 8: Journal
 
 Write entry to `log/` via `actions/write-journal.sh`. Focus on:
 - Component patterns discovered
 - Design tokens and naming conventions
-- Test patterns that worked
+- Self-test findings (what broke during testing, what was tricky to verify)
 - Repo-specific gotchas

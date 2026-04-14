@@ -87,7 +87,7 @@ src/
 
 Follow `workflow/implement.md` — frontend-specific phase-gated process:
 
-Onboard Context → Locate Impact → Plan → Implement → Validate → Deliver → Journal
+Onboard Context → Locate Impact → Plan → Implement → Self-Test → Validate → Deliver → Journal
 
 ## Rules
 
@@ -95,7 +95,7 @@ Onboard Context → Locate Impact → Plan → Implement → Validate → Delive
 
 | Rule | File | What it checks |
 |------|------|----------------|
-| Testing | `rules/testing.md` | Component tests, role-based queries |
+| Testing | `rules/testing.md` | Self-test (all tasks) + unit tests (hook/component libraries only, when ARCH specifies `testing: unit-required`) |
 | Security | `rules/security.md` | XSS, input sanitization |
 | Code Quality | `rules/code-quality.md` | Lint, naming, dead code |
 | Accessibility | `rules/accessibility.md` | WCAG AA, semantic HTML, keyboard nav |
@@ -143,11 +143,18 @@ Example: if an accessible pattern causes significant layout shift (CLS), choose 
 
 ### Testing Approach
 
+**Primary: Browser Self-Test (every task)**
+- `pnpm build` → `pnpm start` → Browser MCP interactive testing
+- Walk through each Acceptance Criteria from the issue spec
+- Screenshot evidence at each step, check DevTools for errors
+- Write results to `/tmp/self-test-issue-{N}.md` — `deliver.sh` gates on this file
+
+**Secondary: Unit Tests (only when ARCH specifies `testing: unit-required`)**
+- For shared hooks, component libraries, pure utils only
 - Vitest + @testing-library/react
 - Query priority: `getByRole` > `getByLabelText` > `getByText` > `getByTestId`
-- Test behavior not implementation — "user clicks submit, sees success" not "setState was called"
-- No snapshot tests as primary assertions
-- Each state gets its own test
+- Test behavior not implementation
+- Business page components do NOT need unit tests
 
 ### Responsive
 

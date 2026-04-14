@@ -34,12 +34,17 @@ Not every task requires all four. Choose dimensions based on the spec.
 
 ## Workflow
 
-Two phases, two documents:
+Three phases, three outputs:
 
 | Phase | File | Output |
 |-------|------|--------|
-| **Plan** | `workflow/plan.md` | Test Plan (md/txt) — verification checklist |
+| **Plan** | `workflow/plan.md` | Test Plan (md) — verification checklist |
 | **Verify** | `workflow/verify.md` | Verify Report — pass/fail results |
+| **Codify** | `workflow/verify.md` Phase 8 | Playwright E2E + API tests — automated regression |
+
+Plan is the design, Verify is the manual execution, Codify turns verified steps into persistent test code that CI runs on future PRs.
+
+Additionally, QA reviews PRs via `workflow/review.md` — code review + functional test against preview environment.
 
 ## Rules
 

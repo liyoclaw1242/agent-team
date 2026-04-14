@@ -4,23 +4,25 @@ You have a test plan. Now execute it step by step and produce a verify report.
 
 ---
 
-## Phase 0: Check Self-Test Declaration
+## Phase 0: Check Self-Test Record
 
 Before setting up the environment, check if FE/BE completed their self-test:
 
 ```bash
-gh pr view {PR_NUMBER} --repo {REPO_SLUG} --json body -q '.body'
+gh pr view {PR_NUMBER} --repo {REPO_SLUG} --comments --json comments \
+  --jq '.comments[] | select(.body | test("^# Self-Test")) | .body'
 ```
 
-Look for a `## Self-Test` section with checked items. If missing or incomplete:
+**If no self-test record found** (applies to FE and BE PRs, not OPS):
 
 ```bash
 gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
   --body "## QA Pre-check by \`{AGENT_ID}\`
 
-**BLOCKED**: PR is missing the self-test declaration.
+**BLOCKED**: PR is missing the self-test record.
 
-Please add a \`## Self-Test\` section to the PR body with checked items confirming you verified your own work before QA review.
+Implementer must complete self-testing before QA verification.
+Expected: a PR comment starting with \`# Self-Test:\` including AC verification steps and results.
 
 Returning to ARCH."
 bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
@@ -28,30 +30,34 @@ bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
 
 Do NOT proceed with verification if self-test is missing. Move on to next task.
 
-**Gate**: PR body contains a `## Self-Test` section with all items checked.
+If self-test record found, note what was already verified. Focus your execution on:
+- Steps the self-test did NOT cover
+- Steps where the self-test result looks suspicious
+- Edge cases and error paths beyond the AC
+
+**Gate**: Self-test record exists on the PR.
 
 ---
 
 ## Phase 1: Setup Environment
 
-1. **Checkout the branch**:
+1. **Checkout the branch** (for reading test plan and code):
    ```bash
    gh pr checkout {PR_NUMBER} --repo {REPO_SLUG}
    ```
 
-2. **Install + build**:
+2. **Get preview URL**:
    ```bash
-   # Detect package manager from lockfile
-   pnpm install && pnpm build   # or npm/yarn equivalent
+   # Get the preview deployment URL from the PR
+   gh pr view {PR_NUMBER} --repo {REPO_SLUG} --json comments \
+     --jq '[.comments[].body] | map(select(test("vercel\\.app"))) | last' \
+     | grep -oE 'https://[a-zA-Z0-9._-]+\.vercel\.app'
    ```
-   If build fails → **FAIL** immediately. Report build error.
+   If no preview URL available → report **BLOCKED**.
 
-3. **Start services**:
-   - Dev server (if UI dimension applies)
-   - Database (verify connection with a simple query)
-   - Any dependent services mentioned in prerequisites
+   QA does NOT build or run the app locally. All verification targets the preview environment.
 
-4. **Read the test plan**:
+3. **Read the test plan**:
    ```bash
    cat test-plans/{ISSUE_N}-{slug}.md
    ```
@@ -85,7 +91,7 @@ For each `U{N}` step in the test plan:
 
 For each `A{N}` step in the test plan:
 
-1. Run the exact curl command from the plan
+1. Run the exact curl command from the plan (targeting preview URL)
 2. Check:
    - HTTP status code matches expected
    - Response body contains expected fields/values
@@ -242,7 +248,141 @@ bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
 
 > **Why**: ARCH is the sole merge authority and dispatcher. QA provides the verdict and evidence; ARCH decides the action (merge, route to Design for visual review, reject back to FE/BE, or escalate to DEBUG).
 
-## Phase 8: Journal
+## Phase 8: Codify (PASS verdict only)
+
+When all steps pass, convert the verified test plan into persistent, executable tests. This is how manual verification becomes automated regression protection.
+
+### Principles
+
+1. **Black-box only** — QA tests against a deployed URL, not local services. UI and API are the same from the outside.
+2. **Preview environment** — all tests target the PR's preview URL (e.g., Vercel Preview), never `localhost`
+3. **QA only touches `e2e/` and `test-plans/`** — never modify app source code (`src/`, `apps/`, `packages/`)
+4. **One feature, one file** — UI interactions + API calls for the same feature live together
+
+### Test Environment
+
+Tests run against the PR's preview deployment. The base URL comes from environment:
+
+```typescript
+// playwright.config.ts (already set up by OPS/ARCH)
+export default defineConfig({
+  use: {
+    baseURL: process.env.PREVIEW_URL || 'http://localhost:3000',
+  },
+});
+```
+
+QA does NOT start local servers. If preview URL is not available, report BLOCKED to ARCH.
+
+### File Structure (monorepo)
+
+```
+repo-root/
+  apps/
+    web/          ← FE code (QA does NOT touch)
+    api/          ← BE code (QA does NOT touch)
+  e2e/            ← QA's territory
+    {feature}.spec.ts     ← UI + API tests for one feature
+    playwright.config.ts  ← shared config
+  test-plans/     ← QA's territory
+    {N}-{slug}.md
+```
+
+### What to Codify
+
+| Plan Step Type | Codify? | Goes into |
+|---------------|---------|-----------|
+| `U{N}` (UI) | Yes | `e2e/{feature}.spec.ts` |
+| `A{N}` (API) | Yes | same file — `request` fixture in Playwright |
+| `E{N}` (Edge) | Yes | same file |
+| `D{N}` (DB) | No — verification-only, schema covered by migrations | — |
+| `L{N}` (Load) | No — periodic, not per-PR | — |
+
+### Example: One Feature, One File
+
+```typescript
+// e2e/user-management.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('User Management', () => {
+
+  // === UI Tests (from U steps) ===
+
+  // U1: Page loads with user list
+  test('dashboard shows user list', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+  });
+
+  // U2: Create user via modal
+  test('create user modal flow', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Create' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.getByLabel('Name').fill('Test User');
+    await page.getByRole('button', { name: 'Submit' }).click();
+
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.getByText('Test User')).toBeVisible();
+  });
+
+  // E1: Empty form validation
+  test('shows validation error on empty submit', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.getByText('Name is required')).toBeVisible();
+  });
+
+  // === API Tests (from A steps) ===
+
+  // A1: Create user endpoint
+  test('POST /api/users creates user', async ({ request }) => {
+    const res = await request.post('/api/users', {
+      data: { name: 'Test User', email: 'test@example.com' }
+    });
+    expect(res.status()).toBe(201);
+    const body = await res.json();
+    expect(body).toHaveProperty('id');
+    expect(body.name).toBe('Test User');
+  });
+
+  // A2: Reject invalid payload
+  test('POST /api/users rejects missing name', async ({ request }) => {
+    const res = await request.post('/api/users', {
+      data: { email: 'test@example.com' }
+    });
+    expect(res.status()).toBe(400);
+  });
+});
+```
+
+### Rules
+
+1. **Only codify verified steps** — if you didn't manually verify it passed, don't automate it
+2. **Test names reference the plan step** (U1, A2, E1) — traceability back to test plan
+3. **Follow the project's existing test setup** — if they use Cypress instead of Playwright, use Cypress
+4. **Commit tests on the QA branch** before delivering back to ARCH
+5. **Never import app internals** — no `import { db } from '../../apps/api/src/db'`, tests are pure black-box
+
+### Scope Guard
+
+QA may only create or modify files in:
+- `e2e/**`
+- `test-plans/**`
+
+If you need changes outside these directories (e.g., `playwright.config.ts` at root, CI config), create a follow-up issue for ARCH/OPS instead.
+
+### When NOT to Codify
+
+- **No E2E infrastructure** — no `playwright.config.ts`, no `e2e/` directory
+  → Create follow-up issue for ARCH: "Set up E2E test infrastructure"
+- **One-off feature** — admin script, migration helper, won't be iterated
+- **ARCH spec says `testing: self-test-only`**
+
+## Phase 9: Journal
 
 Write to `log/` via `actions/write-journal.sh`:
 - What verification approaches worked
