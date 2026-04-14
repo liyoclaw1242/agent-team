@@ -375,6 +375,31 @@ QA may only create or modify files in:
 
 If you need changes outside these directories (e.g., `playwright.config.ts` at root, CI config), create a follow-up issue for ARCH/OPS instead.
 
+### Deliver Codified Tests
+
+After writing the E2E tests, commit and push on the existing PR branch:
+
+```bash
+# Stage only e2e/ and test-plans/ (QA Scope Guard)
+git add e2e/ test-plans/
+git commit -m "test: codify E2E tests from test plan #{ISSUE_N}"
+git push origin HEAD
+```
+
+Then post a comment on the PR and route back to ARCH:
+
+```bash
+gh pr comment {PR_NUMBER} --repo {REPO_SLUG} \
+  --body "## QA Codify by \`{AGENT_ID}\`
+
+Added E2E tests from verified test plan:
+- \`e2e/{feature}.spec.ts\` ({count} tests)
+
+Ready for merge."
+
+bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
+```
+
 ### When NOT to Codify
 
 - **No E2E infrastructure** — no `playwright.config.ts`, no `e2e/` directory
