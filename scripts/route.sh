@@ -1,152 +1,158 @@
-#!/bin/bash
-# Route an issue to a target role. Enforces routing rules before changing labels.
+#!/usr/bin/env bash
+# route.sh — the only legal way to change an issue's agent:* or status:* labels.
 #
-# Usage: route.sh <REPO_SLUG> <ISSUE_NUMBER> <TARGET_ROLE> [AGENT_ID] [--force]
-#   TARGET_ROLE: fe, be, ops, qa, design, debug, arch, merge, done
-#   "merge" = merge the PR + close issue + mark done
-#   "done"  = close issue + mark done (no PR)
-#   --force = skip verdict re-route guards (ARCH only)
+# Validates source→target transitions against LABEL_RULES.md before applying.
+# Writes a structured comment recording the transition for audit trail.
 #
-# Exit 0 = routed, 1 = blocked by validation
+# Usage:
+#   route.sh <issue-number> <target-agent>
+#       [--repo OWNER/REPO]      (default: $REPO env var)
+#       [--agent-id ID]          (default: $AGENT_ID env var, fallback "unknown")
+#       [--reason "TEXT"]        (default: empty; recommended)
+#       [--status STATUS]        (default: ready; only used when target requires non-ready)
+#
+# Examples:
+#   route.sh 142 fe --reason "decomposed by arch-shape"
+#   route.sh 99  arch-feedback --reason "spec conflict, see comment #c-456"
+#
+# Exit codes:
+#   0  routed
+#   1  argument or env error
+#   2  illegal transition per LABEL_RULES.md
+#   3  GitHub API error
+#   4  precondition violated (e.g., issue already at target)
+
 set -euo pipefail
 
-REPO_SLUG="${1:?REPO_SLUG required}"
-ISSUE_N="${2:?ISSUE_NUMBER required}"
-TARGET="${3:?TARGET_ROLE required (fe/be/ops/qa/design/debug/arch/merge/done)}"
-AGENT_ID="${4:-unknown}"
-FORCE=false
-# Check for --force in any position
-for arg in "$@"; do
-  [ "$arg" = "--force" ] && FORCE=true
+# ─── Argument parsing ───────────────────────────────────────────────────────
+
+ISSUE_N="${1:-}"; shift || true
+TARGET="${1:-}"; shift || true
+
+REPO="${REPO:-}"
+AGENT_ID="${AGENT_ID:-unknown}"
+REASON=""
+NEW_STATUS="ready"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)     REPO="$2"; shift 2 ;;
+    --agent-id) AGENT_ID="$2"; shift 2 ;;
+    --reason)   REASON="$2"; shift 2 ;;
+    --status)   NEW_STATUS="$2"; shift 2 ;;
+    *) echo "unknown flag: $1" >&2; exit 1 ;;
+  esac
 done
 
-# ── Gather current state ──
-LABELS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | join(",")')
-
-# Find associated PR
-PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${ISSUE_N}" --json number --jq '.[0].number // empty' 2>/dev/null || true)
-
-# Collect comments from BOTH issue AND PR (QA often posts verdict on PR)
-ISSUE_COMMENTS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
-PR_COMMENTS="[]"
-if [ -n "$PR_NUMBER" ]; then
-  PR_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
-fi
-COMMENTS=$(echo "$ISSUE_COMMENTS $PR_COMMENTS" | jq -s 'add')
-
-# Extract last verdict (if any)
-QA_PASS=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass|PASS.*verdict"; "i"))] | last // empty')
-QA_FAIL=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
-DESIGN_APPROVED=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
-DESIGN_NEEDS_CHANGES=$(echo "$COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
-
-# ── Validation rules ──
-
-# Rule 0: Block if pre-triage already handled this issue recently
-# EXCEPTION: routing TO arch (reporting back) is always allowed — only block outward dispatch
-if [ "$TARGET" != "arch" ] && [ "$TARGET" != "merge" ] && [ "$TARGET" != "done" ]; then
-  PRETRIAGE_COMMENT_TS=$(echo "$COMMENTS" | jq -r '[.[] | select(.body | test("pre-triage"; "i")) | .createdAt] | last // empty')
-  if [ -n "$PRETRIAGE_COMMENT_TS" ]; then
-    AGE=$(python3 -c "
-from datetime import datetime, timezone
-ts = datetime.fromisoformat('${PRETRIAGE_COMMENT_TS}'.replace('Z','+00:00'))
-now = datetime.now(timezone.utc)
-print(int((now - ts).total_seconds()))
-" 2>/dev/null || echo "9999")
-    if [ "$AGE" -lt 600 ] && [ "$AGE" -ge 0 ]; then
-      echo "BLOCKED: #${ISSUE_N} was handled by pre-triage ${AGE}s ago. Cannot re-dispatch."
-      echo "  Wait 10 minutes or resolve manually."
-      exit 1
-    fi
-  fi
-fi
-
-# Rule 1: Don't route to QA if QA already gave a verdict (unless --force)
-if [ "$TARGET" = "qa" ]; then
-  if [ -n "$QA_PASS" ] || [ -n "$QA_FAIL" ]; then
-    if [ "$FORCE" = true ]; then
-      echo "WARN: QA already gave a verdict on #${ISSUE_N}. --force override active."
-    else
-      echo "BLOCKED: QA already gave a verdict on #${ISSUE_N}. Cannot re-route to QA."
-      echo "  QA_PASS='${QA_PASS:0:80}'"
-      echo "  QA_FAIL='${QA_FAIL:0:80}'"
-      echo "  → If QA passed, use: route.sh $REPO_SLUG $ISSUE_N merge"
-      echo "  → If QA failed, route to implementer: route.sh $REPO_SLUG $ISSUE_N fe"
-      echo "  → To re-verify after fix: route.sh $REPO_SLUG $ISSUE_N qa AGENT_ID --force"
-      exit 1
-    fi
-  fi
-fi
-
-# Rule 2: Don't route to design if design already gave a verdict (unless --force)
-if [ "$TARGET" = "design" ]; then
-  if [ -n "$DESIGN_APPROVED" ] || [ -n "$DESIGN_NEEDS_CHANGES" ]; then
-    if [ "$FORCE" = true ]; then
-      echo "WARN: Design already gave a verdict on #${ISSUE_N}. --force override active."
-    else
-      echo "BLOCKED: Design already gave a verdict on #${ISSUE_N}. Cannot re-route to Design."
-      echo "  → To re-review after fix: route.sh $REPO_SLUG $ISSUE_N design AGENT_ID --force"
-      exit 1
-    fi
-  fi
-fi
-
-# Rule 3: If QA passed and no design concern, suggest merge instead of routing
-if [ "$TARGET" != "merge" ] && [ "$TARGET" != "done" ] && [ "$TARGET" != "design" ]; then
-  if [ -n "$QA_PASS" ] && [ -z "$DESIGN_NEEDS_CHANGES" ]; then
-    echo "WARN: QA already PASSED on #${ISSUE_N}. Consider merging instead."
-    echo "  → route.sh $REPO_SLUG $ISSUE_N merge"
-  fi
-fi
-
-# ── Execute routing ──
-
-case "$TARGET" in
-  merge)
-    if [ -z "$PR_NUMBER" ]; then
-      echo "BLOCKED: No PR found for #${ISSUE_N}. Cannot merge."
-      exit 1
-    fi
-    echo "Merging PR #${PR_NUMBER} for issue #${ISSUE_N}..."
-    gh pr merge "$PR_NUMBER" --repo "$REPO_SLUG" --squash --delete-branch
-    gh issue close "$ISSUE_N" --repo "$REPO_SLUG"
-    # Remove all agent/status labels, add done
-    for LABEL in $(echo "$LABELS" | tr ',' '\n' | grep -E '^(agent:|status:)'); do
-      gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$LABEL" 2>/dev/null || true
-    done
-    gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --add-label "status:done"
-    echo "MERGED: PR #${PR_NUMBER}, issue #${ISSUE_N} closed."
-    ;;
-
-  done)
-    gh issue close "$ISSUE_N" --repo "$REPO_SLUG"
-    for LABEL in $(echo "$LABELS" | tr ',' '\n' | grep -E '^(agent:|status:)'); do
-      gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$LABEL" 2>/dev/null || true
-    done
-    gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --add-label "status:done"
-    echo "DONE: issue #${ISSUE_N} closed."
-    ;;
-
-  fe|be|ops|qa|design|debug|arch)
-    # Remove all existing agent: labels
-    for LABEL in $(echo "$LABELS" | tr ',' '\n' | grep '^agent:'); do
-      gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" --remove-label "$LABEL" 2>/dev/null || true
-    done
-    gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-      --remove-label "status:in-progress" \
-      --add-label "agent:${TARGET}" --add-label "status:ready" 2>/dev/null
-    echo "ROUTED: #${ISSUE_N} → agent:${TARGET}"
-    ;;
-
-  *)
-    echo "ERROR: Unknown target '${TARGET}'. Use: fe/be/ops/qa/design/debug/arch/merge/done"
-    exit 1
-    ;;
-esac
-
-# ── Post-routing verification ──
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "${SCRIPT_DIR}/verify-labels.sh" "$REPO_SLUG" "$ISSUE_N" || {
-  echo "LABEL VERIFICATION FAILED after routing #${ISSUE_N} → ${TARGET}"
+[[ -z "$ISSUE_N" || -z "$TARGET" ]] && {
+  echo "usage: route.sh <issue-number> <target-agent> [--reason TEXT] [--repo OWNER/REPO]" >&2
   exit 1
 }
+[[ "$ISSUE_N" =~ ^[0-9]+$ ]] || { echo "issue-number must be numeric" >&2; exit 1; }
+[[ -z "$REPO" ]] && { echo "REPO not set; pass --repo or export REPO" >&2; exit 1; }
+
+# Valid targets — every agent label without the "agent:" prefix.
+case "$TARGET" in
+  fe|be|ops|qa|design|debug|arch|arch-shape|arch-audit|arch-feedback|arch-judgment) ;;
+  *) echo "invalid target agent: $TARGET" >&2; exit 1 ;;
+esac
+
+case "$NEW_STATUS" in
+  ready|in-progress|blocked|done) ;;
+  *) echo "invalid status: $NEW_STATUS" >&2; exit 1 ;;
+esac
+
+# ─── Read current state ─────────────────────────────────────────────────────
+
+current_labels=$(gh issue view "$ISSUE_N" --repo "$REPO" --json labels \
+  --jq '[.labels[].name] | join(" ")') || { echo "cannot read issue #$ISSUE_N" >&2; exit 3; }
+
+current_agent=$(echo "$current_labels" | grep -oE 'agent:[a-z-]+' | head -n1 || true)
+current_status=$(echo "$current_labels" | grep -oE 'status:[a-z-]+' | head -n1 || true)
+
+# Idempotency: if already at target with target status, no-op success.
+if [[ "$current_agent" == "agent:$TARGET" && "$current_status" == "status:$NEW_STATUS" ]]; then
+  echo "no-op: #$ISSUE_N already at agent:$TARGET status:$NEW_STATUS" >&2
+  exit 0
+fi
+
+# ─── Transition validation ──────────────────────────────────────────────────
+#
+# Legal transitions:
+#   - agent:* may change to any other agent:* (routing is the dispatcher's job)
+#   - status:ready ↔ status:in-progress (claim/release)
+#   - status:* → status:blocked (when deps appear)
+#   - status:blocked → status:ready (when deps clear)
+#   - status:* → status:done (closing)
+#
+# Illegal:
+#   - status:done → anything (terminal)
+#   - jumping from agent:fe to agent:be without going through arch (must Mode C
+#     properly: fe writes feedback, returns to arch, arch decides). This is
+#     enforced by checking the caller's agent_id matches the current agent OR
+#     is an arch-family agent.
+
+if [[ "$current_status" == "status:done" ]]; then
+  echo "illegal transition: #$ISSUE_N is status:done (terminal)" >&2
+  exit 2
+fi
+
+# Caller-permission check: only the current agent or an arch-family agent
+# can route from agent:X.
+if [[ -n "$current_agent" ]]; then
+  current_agent_short="${current_agent#agent:}"
+  if [[ "$current_agent_short" != "$AGENT_ID" \
+     && "$AGENT_ID" != "dispatcher" \
+     && ! "$AGENT_ID" =~ ^arch ]]; then
+    echo "illegal: caller agent_id=$AGENT_ID cannot move issue from $current_agent" >&2
+    echo "  only the current agent or an arch-family agent may route." >&2
+    exit 2
+  fi
+fi
+
+# ─── Apply the transition ───────────────────────────────────────────────────
+
+# Build add/remove label lists.
+add_labels="agent:$TARGET,status:$NEW_STATUS"
+remove_labels=""
+
+# Drop the old agent and status labels.
+for lbl in $current_labels; do
+  case "$lbl" in
+    agent:*|status:*)
+      # Don't add to remove if it's already what we want
+      if [[ "$lbl" != "agent:$TARGET" && "$lbl" != "status:$NEW_STATUS" ]]; then
+        remove_labels="${remove_labels:+$remove_labels,}$lbl"
+      fi
+      ;;
+  esac
+done
+
+# Atomic-as-possible: GitHub API allows comma-separated add/remove in one call.
+gh_args=( --add-label "$add_labels" )
+[[ -n "$remove_labels" ]] && gh_args+=( --remove-label "$remove_labels" )
+
+if ! gh issue edit "$ISSUE_N" --repo "$REPO" "${gh_args[@]}" >/dev/null; then
+  echo "gh issue edit failed for #$ISSUE_N" >&2
+  exit 3
+fi
+
+# ─── Audit trail comment ────────────────────────────────────────────────────
+
+ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+comment=$(cat <<EOF
+🔀 **Routed** by \`$AGENT_ID\` at $ts
+
+\`\`\`
+${current_agent:-<none>} → agent:$TARGET
+${current_status:-<none>} → status:$NEW_STATUS
+\`\`\`
+
+${REASON:+**Reason:** $REASON}
+EOF
+)
+
+gh issue comment "$ISSUE_N" --repo "$REPO" --body "$comment" >/dev/null \
+  || echo "warning: routed but failed to write audit comment for #$ISSUE_N" >&2
+
+echo "routed #$ISSUE_N → agent:$TARGET status:$NEW_STATUS"

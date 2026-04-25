@@ -1,0 +1,48 @@
+%% Service chain for Cargo Shipping (DDD example).
+%% This is the "皇冠上的寶石" artefact — every external integration and inter-service
+%% call shows up here.
+
+sequenceDiagram
+    autonumber
+    participant Cust as Customer
+    participant FE as Booking UI
+    participant BS as Booking Service
+    participant RS as Routing Service
+    participant HS as Handling Service
+    participant TS as Tracking Service
+    participant Bus as Event Bus
+    participant Email as Email Provider
+
+    Cust->>FE: Submit booking (origin, destination, deadline)
+    FE->>BS: POST /cargos
+    BS->>BS: Generate TrackingId
+    BS->>FE: 201 + TrackingId
+    BS->>Bus: CargoBookedEvent
+    Bus->>TS: CargoBookedEvent
+    TS->>TS: Create empty tracking view
+
+    Cust->>FE: Request route options
+    FE->>BS: GET /cargos/{id}/routes
+    BS->>RS: fetchRoutesForSpecification(spec)
+    RS->>BS: List<Itinerary>
+    BS->>FE: 200 + itinerary candidates
+
+    Cust->>FE: Choose itinerary
+    FE->>BS: PUT /cargos/{id}/itinerary
+    BS->>BS: Persist + transition to ROUTED
+    BS->>Bus: CargoAssignedToRouteEvent
+    Bus->>TS: CargoAssignedToRouteEvent
+    Bus->>Email: send_booking_confirmation()
+
+    Note over HS: Operations register events as cargo travels
+
+    HS->>HS: registerHandlingEvent(LOAD at SHANGHAI)
+    HS->>Bus: HandlingEventRegistered
+    Bus->>TS: HandlingEventRegistered
+    TS->>TS: Update view, recompute misdirection
+    Bus->>BS: HandlingEventRegistered (for invariants)
+
+    Cust->>FE: Track cargo
+    FE->>TS: GET /tracking/{id}
+    TS->>FE: CargoTrackingView
+    FE->>Cust: Render tracking page

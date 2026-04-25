@@ -1,49 +1,80 @@
-#!/bin/bash
-# Claim a GitHub issue for an agent. Prevents double-claim via label swap + comment verification.
+#!/usr/bin/env bash
+# claims.sh — atomically claim an issue for an agent.
 #
-# Usage: claims.sh <REPO_SLUG> <ISSUE_NUMBER> <AGENT_ID>
-# Exit 0 = claimed, 1 = already claimed or race detected
+# Sets status:in-progress, posts a structured claim comment with the agent's
+# id and timestamp. If the issue is not status:ready, exits 3 (conflict).
+#
+# Usage:
+#   claims.sh <issue-number>
+#       --agent-id ID
+#       [--repo OWNER/REPO]
+#       [--note "TEXT"]
+#
+# Exit codes:
+#   0 claimed
+#   1 argument error
+#   2 GitHub error
+#   3 already claimed / not ready
+
 set -euo pipefail
 
-REPO_SLUG="${1:?REPO_SLUG required (e.g. owner/repo)}"
-ISSUE_N="${2:?ISSUE_NUMBER required}"
-AGENT_ID="${3:?AGENT_ID required}"
+ISSUE_N="${1:-}"; shift || true
+[[ -z "$ISSUE_N" ]] && { echo "usage: claims.sh <issue-number> --agent-id ID" >&2; exit 1; }
+[[ "$ISSUE_N" =~ ^[0-9]+$ ]] || { echo "issue-number must be numeric" >&2; exit 1; }
 
-# 1. Pre-check: is the issue still status:ready?
-LABELS=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | join(",")')
-if [[ "$LABELS" != *"status:ready"* ]]; then
-  echo "SKIP: #${ISSUE_N} is not status:ready (labels: ${LABELS})"
-  exit 1
+REPO="${REPO:-}"
+AGENT_ID=""
+NOTE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)     REPO="$2"; shift 2 ;;
+    --agent-id) AGENT_ID="$2"; shift 2 ;;
+    --note)     NOTE="$2"; shift 2 ;;
+    *) echo "unknown flag: $1" >&2; exit 1 ;;
+  esac
+done
+
+[[ -z "$REPO" ]] && { echo "REPO not set" >&2; exit 1; }
+[[ -z "$AGENT_ID" ]] && { echo "--agent-id required" >&2; exit 1; }
+
+# ─── Read current state ─────────────────────────────────────────────────────
+
+labels=$(gh issue view "$ISSUE_N" --repo "$REPO" --json labels \
+  --jq '[.labels[].name] | join(" ")') || { echo "cannot read issue #$ISSUE_N" >&2; exit 2; }
+
+if ! echo " $labels " | grep -q ' status:ready '; then
+  current_status=$(echo "$labels" | grep -oE 'status:[a-z-]+' | head -n1 || echo "<none>")
+  echo "cannot claim #$ISSUE_N: status is $current_status, expected status:ready" >&2
+  exit 3
 fi
 
-# 2. Claim: swap status:ready → status:in-progress
-gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-  --remove-label "status:ready" --add-label "status:in-progress" 2>/dev/null
+# ─── Atomic flip: ready → in-progress ───────────────────────────────────────
+#
+# GitHub does not give us true CAS, but `gh issue edit` is essentially
+# linearisable from the API perspective. The race window is between read
+# and write; for stronger isolation see dispatcher's TOCTOU re-read pattern.
 
-# 3. Post claim comment with agent ID
-gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
-  --body "Claimed by \`${AGENT_ID}\`" 2>/dev/null
-
-# 4. Race detection: check if another agent also claimed after us
-sleep 2
-COMMENTS_JSON=$(gh issue view "$ISSUE_N" --repo "$REPO_SLUG" --json comments --jq '.comments')
-
-MY_IDX=$(echo "$COMMENTS_JSON" | jq --arg me "$AGENT_ID" \
-  '[to_entries[] | select(.value.body | contains($me)) | .key] | last // -1')
-LAST_OTHER_IDX=$(echo "$COMMENTS_JSON" | jq --arg me "$AGENT_ID" \
-  '[to_entries[] | select(.value.body | startswith("Claimed by")) | select(.value.body | contains($me) | not) | .key] | last // -1')
-
-if [ "$LAST_OTHER_IDX" -gt "$MY_IDX" ]; then
-  echo "RACE: #${ISSUE_N} claimed by another agent after us — backing off"
-  gh issue edit "$ISSUE_N" --repo "$REPO_SLUG" \
-    --remove-label "status:in-progress" --add-label "status:ready" 2>/dev/null
-  gh issue comment "$ISSUE_N" --repo "$REPO_SLUG" \
-    --body "Released by \`${AGENT_ID}\` (race detected)" 2>/dev/null
-  exit 1
+if ! gh issue edit "$ISSUE_N" --repo "$REPO" \
+       --add-label "status:in-progress" \
+       --remove-label "status:ready" >/dev/null; then
+  echo "gh edit failed; another agent may have claimed first" >&2
+  exit 3
 fi
 
-# 5. Verify labels
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "${SCRIPT_DIR}/verify-labels.sh" "$REPO_SLUG" "$ISSUE_N" || echo "WARN: Label verification failed for #${ISSUE_N}"
+# ─── Claim comment ──────────────────────────────────────────────────────────
 
-echo "CLAIMED: #${ISSUE_N} by ${AGENT_ID}"
+ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+comment=$(cat <<EOF
+🔒 **Claimed** by \`$AGENT_ID\` at $ts
+
+${NOTE:+**Note:** $NOTE}
+
+This issue is now status:in-progress. Other agents should not work on it concurrently.
+EOF
+)
+
+gh issue comment "$ISSUE_N" --repo "$REPO" --body "$comment" >/dev/null \
+  || echo "warning: claimed but failed to comment on #$ISSUE_N" >&2
+
+echo "claimed #$ISSUE_N for $AGENT_ID"

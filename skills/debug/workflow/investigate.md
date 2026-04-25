@@ -1,209 +1,124 @@
-# Investigation Workflow
+# Workflow — Investigate
 
-Reproduce → Observe → Trace → Diagnose → Report → Dispatch → Journal
+Single-pass investigation per pickup. If the timebox exhausts before root cause is confirmed, escalate; don't loop here indefinitely.
 
-Each phase has a gate. Do not skip ahead.
+## Phase 1 — Read intake
 
----
+Required:
+1. The bug issue body (from `bug-report.yml` template) or alert payload
+2. All comments — sometimes the originator added context after filing
+3. Any prior investigation comments — if this issue has been picked up before by a previous debug agent, their notes are valuable
 
-## Phase 1: Reproduce
+For `source:alert`:
+4. The `<!-- alert-id: ... -->` marker — fetch the alert details from the observability platform (Datadog / Sentry / Grafana, depending on the project)
+5. Linked traces, dashboards, or runbooks
 
-> "A bug you can't reproduce is a bug you can't diagnose."
+## Phase 2 — Reproduce
 
-1. **Read the bug report** — extract: symptoms, affected endpoint/page, timestamp, user impact.
-2. **Set up env** — check out the relevant branch, install deps, start services.
-3. **Attempt reproduction** — follow the exact steps from the report.
-4. **Record what happens** — copy error messages, HTTP status codes, console output verbatim.
+For `source:human` bugs with reproduction steps:
 
-If reproduction fails:
-- Check if the bug is environment-specific (staging vs prod, specific browser, specific data)
-- Check if a deploy happened between report time and now (`git log --after=...`)
-- If still unreproducible after 3 attempts, note this in the report and proceed to Phase 2 with the original timestamp
+1. Try the steps in the lowest environment that exhibits the bug (local → staging → prod, prefer earlier)
+2. Confirm "actual" matches what was reported
+3. If you can't reproduce: skip to `cases/cannot-reproduce.md`
 
-**Gate**: You have either reproduced the bug OR documented why you cannot with the original evidence.
+For `source:alert`:
 
----
+1. Find the trace / event the alert fired on
+2. Identify the failing code path from the stack trace or instrumented spans
+3. Check whether the failure is ongoing (if not, treat as historical investigation; if yes, urgency is high)
 
-## Phase 2: Observe
+For both:
+- If you can reproduce, capture the reproduction recipe in your notes — it'll go into the fix issue's AC ("the test reproducing this should now pass").
 
-> "Before reading code, read the signals."
+## Phase 3 — Form hypothesis
 
-Use the observability stack to gather evidence. Work from high-level to specific.
+Read enough context to form ONE hypothesis. Common starting points:
 
-### 2a. Metrics — PromQL (Is there a pattern?)
+- **Stack trace** — where in the code does the failure surface?
+- **Recent changes** — `git log --since "1 week ago" --oneline -- <suspect file>` often points right at it
+- **Diff between expected and actual** — what would the code have to do for "actual" to be observed?
 
-```bash
-# Error rate spike around the reported time
-actions/query-metrics.sh 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))' '2h'
+Write your hypothesis in one sentence. If you can't, you don't have one yet — gather more evidence.
 
-# Latency P99 for the affected service
-actions/query-metrics.sh 'histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name="SERVICE"}[5m])) by (le))' '2h'
-```
+## Phase 4 — Test the hypothesis
 
-Look for: sudden spikes, trend changes, correlation with deploys.
+Run experiments to confirm or refute:
 
-### 2b. Logs — LogQL (What error messages?)
+- Local repro with logging added at suspect points
+- Targeted code reading: does the suspect path have the behaviour your hypothesis describes?
+- Differential analysis: does the bug surface only under conditions consistent with your hypothesis?
 
-```bash
-# Errors from the affected service in the time window
-actions/query-logs.sh '{service_name="SERVICE"} |= "error" | json' '1h'
+If the hypothesis is **confirmed**: proceed to Phase 5.
+If **refuted**: form a new hypothesis and repeat. Each repeat consumes timebox steps.
+If you can't form a new hypothesis: see `rules/timebox.md`.
 
-# Stack traces
-actions/query-logs.sh '{service_name="SERVICE"} |= "Exception" or |= "Error" | json | line_format "{{.trace_id}} {{.message}}"' '1h'
-```
+## Phase 5 — Write root-cause report
 
-Extract any `trace_id` from the logs — you'll need it in the next step.
-
-### 2c. Traces — TraceQL (What's the request path?)
-
-```bash
-# Find error traces for the service
-actions/query-traces.sh '{ resource.service.name = "SERVICE" && status = error }' '1h'
-
-# Slow requests
-actions/query-traces.sh '{ resource.service.name = "SERVICE" && duration > 1s }' '1h'
-
-# If you have a trace ID from logs
-actions/query-traces.sh --id <TRACE_ID>
-```
-
-In Grafana (http://localhost:3002):
-1. Go to **Explore → Tempo**
-2. Paste the trace ID or run a TraceQL query
-3. Examine the waterfall — which span is slow or errored?
-4. Click a span → check attributes (`db.statement`, `http.route`, `error.message`)
-5. Click **Logs for this span** to jump to Loki with trace correlation
-
-### 2d. Frontend — Faro (If browser-side)
-
-If the bug involves the frontend:
-1. Go to **Explore → Loki**
-2. Query: `{service_name="faro"} | json | kind = "error"`
-3. Look for: JS errors, failed fetches, web vitals degradation
-4. Extract `trace_id` from Faro logs to correlate with backend traces
-
-**Gate**: You have concrete observability evidence — timestamps, trace IDs, error messages, metric trends. Not just "the user said it was slow."
-
----
-
-## Phase 3: Trace
-
-> "Follow the code path with evidence in hand."
-
-Now read code, guided by what you found in Phase 2.
-
-1. **Identify the entry point** — from trace data, find the HTTP route or event handler.
-2. **Follow the span tree** — each span maps to a function call, DB query, or external request.
-3. **Check git blame** — who changed the relevant code and when?
-   ```bash
-   git log --oneline --after="2 weeks ago" -- <file>
-   git blame -L <start>,<end> <file>
-   ```
-4. **Find related issues** — search for similar symptoms in issue tracker.
-5. **Check recent deploys** — does the bug timeline correlate with a specific commit?
-   ```bash
-   git log --oneline --since="<bug_reported_time>" --until="<now>"
-   ```
-
-**Gate**: You can point to specific lines of code that are involved.
-
----
-
-## Phase 4: Diagnose
-
-> "Root cause is not where the error appears. It's why the error exists."
-
-Apply the root cause test:
-
-**Can you explain it in one paragraph without "might be" or "probably"?**
-
-If not, go back to Phase 2 or 3.
-
-### Root cause categories
-
-| Category | Example | Evidence needed |
-|----------|---------|-----------------|
-| Logic error | Off-by-one, wrong condition | Code + failing test case |
-| Race condition | Concurrent writes, stale cache | Trace showing timing overlap |
-| Data issue | Null field, schema mismatch | DB query + trace showing bad data |
-| Integration | API contract change, timeout | Trace showing failed external call |
-| Resource | OOM, connection pool exhausted | Metrics showing resource trend |
-| Configuration | Wrong env var, missing flag | Config diff between working/broken |
-| Regression | Previous fix reverted/broken | Git bisect result |
-
-### Distinguish symptom from cause
-
-- Symptom: "500 error on /api/orders"
-- Intermediate: "NULL pointer in orderService.getTotal()"
-- Root cause: "Migration 042 added `discount_amount` column as NOT NULL without default, existing rows have NULL via a pre-migration insert race"
-
-Go deeper until you hit the **first wrong thing** in the causal chain.
-
-**Gate**: One paragraph, no hedging, with trace ID and file:line references.
-
----
-
-## Phase 5: Report
-
-Post diagnosis on the issue. Use this structure:
+The structured report is what gets posted as a comment on the bug issue. Format:
 
 ```markdown
-## Root Cause Analysis — #{ISSUE_N}
+## Root cause report (debug)
 
-**Trace ID**: `<trace_id>`
-**Affected service**: `<service_name>`
-**Severity**: critical | high | medium | low
+### Reproduction
+{Steps that reliably trigger the bug. For alerts, the trace ID or event reference.}
 
-### Root Cause
-
-<one paragraph, no hedging>
+### Hypothesis confirmed
+{One sentence describing the cause. No "might", no "probably" — confirmed cause.}
 
 ### Evidence
+- {Specific log lines / trace data / git blame pointing at the cause}
+- {File:line references}
+- ...
 
-1. **Trace**: `<TraceQL query>` shows <what>
-2. **Logs**: `<LogQL query>` shows <what>
-3. **Metrics**: `<PromQL query>` shows <what>
-4. **Code**: `<file>:<line>` — <what's wrong>
-5. **Git**: `<commit_sha>` introduced on <date>
+### Why this happens
+{Mechanism: what does the code actually do that causes the observed failure?
+Be specific enough that a fixer reads this and knows what's wrong.}
 
-### Impact
+### Suggested owning role
+{fe / be / ops — whoever owns the failing code}
 
-- <who is affected, how many, since when>
+### Suggested approach (high-level only)
+{Sketch of what fixing means. NOT prescriptive — just enough that the
+fix-issue's spec can be written. The implementer picks the approach.}
 
-### Recommended Fix
-
-- <specific change with file paths and line numbers>
-- <estimated complexity: trivial | small | medium | large>
-
-### Suggested Role
-
-`fe` | `be` | `ops` — because <reason>
+### Severity confirmation
+{Per the bug-report template severity. Adjust if investigation reveals
+the bug is more / less severe than initially classified.}
 ```
 
-**Gate**: Report is posted on the issue.
+This format is consumed by `actions/file-fix.sh` to populate the fix issue's body.
 
----
-
-## Phase 6: Route Back to ARCH
-
-DEBUG diagnoses. **ARCH dispatches.** You do NOT create fix bounties or assign roles.
-
-Post your diagnosis on the issue (Phase 5), then hand back to ARCH:
+## Phase 6 — File the fix issue
 
 ```bash
-bash scripts/route.sh "{REPO_SLUG}" {ISSUE_N} arch "{AGENT_ID}"
+bash actions/file-fix.sh \
+  --bug-issue $BUG_N \
+  --owning-role be \
+  --severity 2 \
+  --report-file /tmp/root-cause-report.md
 ```
 
-Your Phase 5 report already includes `### Suggested Role` and `### Recommended Fix` — ARCH uses this to create the fix issue with the correct `agent:*` label.
+The action:
+- Creates a new issue with `source:arch` (because debug is an arch-family specialist), `agent:{role}`, `status:ready`
+- Adds `<!-- bug-of: #BUG_N -->` to the new fix issue
+- Adds `<!-- fix: #FIX_N -->` to the original bug issue
+- Posts the root-cause comment on the bug issue
+- Routes the bug issue to `status:blocked` with `<!-- deps: #FIX_N -->` so it auto-closes when the fix lands
 
-**Gate**: Diagnosis posted, issue routed back to ARCH.
+## Phase 7 — Self-test
 
----
+Before exiting:
+- [ ] Bug issue has a root-cause report comment
+- [ ] Fix issue exists with `bug-of` marker
+- [ ] Bug issue has `fix` marker pointing to the new fix issue
+- [ ] Bug issue is `status:blocked` with deps on the fix
+- [ ] Severity in fix issue matches the report (which may differ from original tag if investigation revealed different severity)
 
-## Phase 7: Journal
+If any check fails: don't exit. Either fix the inconsistency or, if you can't, escalate to arch-judgment with a handoff.
 
-Write entry via `actions/write-journal.sh`. Focus on:
-- Which observability signals were most useful
-- Dead ends and false leads (save others the time)
-- Patterns — is this a recurring type of bug?
-- Query templates that worked well (save to `cases/`)
+## Anti-patterns
+
+- **Patching by guessing** — Iron Law violation. If you don't know the cause, don't suggest a fix.
+- **Closing the bug yourself** — the bug stays open until the fix lands. `scan-complete-requests.sh` handles closure.
+- **Writing the fix in the report** — implementation details belong to the implementer. Suggested approach is high-level only.
+- **Indefinitely looping** — see `rules/timebox.md`. Escalate when stuck.

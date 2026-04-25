@@ -1,144 +1,169 @@
-#!/bin/bash
-# Pre-triage: handle deterministic cases before ARCH Mode D judgment.
-# Run at the start of every ARCH triage cycle. Processes all agent:arch issues
-# and auto-resolves cases that don't need LLM judgment.
+#!/usr/bin/env bash
+# pre-triage.sh — deterministic handlers for post-implementation state.
 #
-# Usage: pre-triage.sh <REPO_SLUG>
-# Exit 0 = success. Prints remaining issues that need ARCH judgment.
+# The dispatcher handles intake-side routing (issues with no PR yet).
+# This script handles the "Mode D" deterministic decisions that happen after
+# implementation: read PR verdict comments, decide merge / route-to-fix /
+# escalate-to-judgment.
+#
+# Should be run on cron alongside dispatcher.sh.
+#
+# Usage:
+#   pre-triage.sh
+#       [--repo OWNER/REPO]
+#       [--dry-run]
+#
+# Exit codes:
+#   0 success
+#   1 arg error
+#   2 partial failure
+
 set -euo pipefail
 
-REPO_SLUG="${1:?REPO_SLUG required (e.g. owner/repo)}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO="${REPO:-}"
+DRY_RUN=0
 
-echo "=== Pre-triage: ${REPO_SLUG} ==="
-
-# Fetch all issues routed to ARCH
-ISSUES=$(gh issue list --repo "$REPO_SLUG" --label "agent:arch" --label "status:ready" --json number,title --jq '.[].number' 2>/dev/null || true)
-
-if [ -z "$ISSUES" ]; then
-  echo "No issues for ARCH. Nothing to triage."
-  exit 0
-fi
-
-HANDLED=0
-REMAINING=""
-
-for N in $ISSUES; do
-  TITLE=$(gh issue view "$N" --repo "$REPO_SLUG" --json title --jq '.title' 2>/dev/null)
-
-  # Find associated PR
-  PR_NUMBER=$(gh pr list --repo "$REPO_SLUG" --search "closes #${N}" --json number,state --jq '.[0].number // empty' 2>/dev/null || true)
-  PR_STATE=""
-
-  # Collect comments from BOTH issue AND PR (QA often posts verdict on PR, not issue)
-  ISSUE_COMMENTS=$(gh issue view "$N" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
-  PR_COMMENTS="[]"
-  if [ -n "$PR_NUMBER" ]; then
-    PR_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json comments --jq '.comments' 2>/dev/null || echo "[]")
-  fi
-  ALL_COMMENTS=$(echo "$ISSUE_COMMENTS $PR_COMMENTS" | jq -s 'add')
-
-  # Detect verdicts from combined issue + PR comments
-  QA_PASS=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*PASS|Code.*APPROVED|all.*pass|PASS.*verdict"; "i"))] | last // empty')
-  QA_FAIL=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*FAIL|Code.*REJECT"; "i"))] | last // empty')
-  DESIGN_APPROVED=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*APPROVED|Visual.*APPROVED"; "i"))] | last // empty')
-  DESIGN_NEEDS_CHANGES=$(echo "$ALL_COMMENTS" | jq -r '[.[].body | select(test("Verdict.*NEEDS.CHANGES|Visual.*NEEDS.CHANGES"; "i"))] | last // empty')
-
-  # PR state
-  if [ -n "$PR_NUMBER" ]; then
-    PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
-  fi
-
-  # ── Case 1: QA PASS + PR open → merge (if Design review not needed or done) ──
-  if [ -n "$QA_PASS" ] && [ -n "$PR_NUMBER" ] && [ "$PR_STATE" = "OPEN" ]; then
-    # Check if Design rejected
-    if [ -n "$DESIGN_NEEDS_CHANGES" ]; then
-      REMAINING="$REMAINING $N"
-      continue
-    fi
-
-    # Check if this is a frontend PR that still needs Design review
-    PR_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
-    IS_FRONTEND=false
-    echo "$PR_BRANCH" | grep -qiE "^agent/fe" && IS_FRONTEND=true
-    echo "$TITLE" | grep -qiE "^(fe|frontend|design):" && IS_FRONTEND=true
-
-    if [ "$IS_FRONTEND" = true ] && [ -z "$DESIGN_APPROVED" ]; then
-      echo "#${N}: QA PASS but frontend PR #${PR_NUMBER} needs Design review → leaving for ARCH"
-      REMAINING="$REMAINING $N"
-      continue
-    fi
-
-    echo "#${N}: QA PASS + PR #${PR_NUMBER} open → MERGE"
-    gh pr merge "$PR_NUMBER" --repo "$REPO_SLUG" --squash --delete-branch 2>/dev/null || {
-      echo "  WARN: merge failed for PR #${PR_NUMBER}, leaving for ARCH"
-      REMAINING="$REMAINING $N"
-      continue
-    }
-    gh issue close "$N" --repo "$REPO_SLUG" 2>/dev/null
-    for L in $(gh issue view "$N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | .[]' 2>/dev/null | grep -E '^(agent:|status:)'); do
-      gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$L" 2>/dev/null || true
-    done
-    gh issue edit "$N" --repo "$REPO_SLUG" --add-label "status:done" 2>/dev/null
-    gh issue comment "$N" --repo "$REPO_SLUG" \
-      --body "Auto-merged by pre-triage — QA PASS, PR #${PR_NUMBER} squash-merged." 2>/dev/null
-    HANDLED=$((HANDLED + 1))
-    continue
-  fi
-
-  # ── Case 2: QA PASS + PR already merged → close ──
-  if [ -n "$QA_PASS" ] && [ -n "$PR_NUMBER" ] && [ "$PR_STATE" = "MERGED" ]; then
-    echo "#${N}: QA PASS + PR #${PR_NUMBER} already merged → CLOSE"
-    gh issue close "$N" --repo "$REPO_SLUG" 2>/dev/null
-    for L in $(gh issue view "$N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | .[]' 2>/dev/null | grep -E '^(agent:|status:)'); do
-      gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$L" 2>/dev/null || true
-    done
-    gh issue edit "$N" --repo "$REPO_SLUG" --add-label "status:done" 2>/dev/null
-    HANDLED=$((HANDLED + 1))
-    continue
-  fi
-
-  # ── Case 3: Design APPROVED + QA PASS → merge ──
-  if [ -n "$DESIGN_APPROVED" ] && [ -n "$QA_PASS" ] && [ -n "$PR_NUMBER" ] && [ "$PR_STATE" = "OPEN" ]; then
-    echo "#${N}: Design APPROVED + QA PASS + PR #${PR_NUMBER} → MERGE"
-    gh pr merge "$PR_NUMBER" --repo "$REPO_SLUG" --squash --delete-branch 2>/dev/null || {
-      echo "  WARN: merge failed, leaving for ARCH"
-      REMAINING="$REMAINING $N"
-      continue
-    }
-    gh issue close "$N" --repo "$REPO_SLUG" 2>/dev/null
-    for L in $(gh issue view "$N" --repo "$REPO_SLUG" --json labels --jq '[.labels[].name] | .[]' 2>/dev/null | grep -E '^(agent:|status:)'); do
-      gh issue edit "$N" --repo "$REPO_SLUG" --remove-label "$L" 2>/dev/null || true
-    done
-    gh issue edit "$N" --repo "$REPO_SLUG" --add-label "status:done" 2>/dev/null
-    gh issue comment "$N" --repo "$REPO_SLUG" \
-      --body "Auto-merged by pre-triage — QA PASS + Design APPROVED, PR #${PR_NUMBER} squash-merged." 2>/dev/null
-    HANDLED=$((HANDLED + 1))
-    continue
-  fi
-
-  # ── Case 4: PR exists + no verdict → route to QA ──
-  if [ -n "$PR_NUMBER" ] && [ "$PR_STATE" = "OPEN" ] && [ -z "$QA_PASS" ] && [ -z "$QA_FAIL" ] && [ -z "$DESIGN_APPROVED" ] && [ -z "$DESIGN_NEEDS_CHANGES" ]; then
-    echo "#${N}: PR #${PR_NUMBER} delivered, no verdict → route to QA"
-    bash "${SCRIPT_DIR}/route.sh" "$REPO_SLUG" "$N" qa "pre-triage" 2>/dev/null || {
-      echo "  WARN: route.sh failed, leaving for ARCH"
-      REMAINING="$REMAINING $N"
-      continue
-    }
-    gh issue comment "$N" --repo "$REPO_SLUG" \
-      --body "Routed to QA by pre-triage — PR #${PR_NUMBER} needs verification." 2>/dev/null || true
-    HANDLED=$((HANDLED + 1))
-    continue
-  fi
-
-  # ── Not deterministic → leave for ARCH ──
-  REMAINING="$REMAINING $N"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)    REPO="$2"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    *) echo "unknown flag: $1" >&2; exit 1 ;;
+  esac
 done
 
-echo ""
-echo "=== Pre-triage done: ${HANDLED} auto-handled ==="
-if [ -n "$REMAINING" ]; then
-  echo "Remaining for ARCH judgment:${REMAINING}"
-else
-  echo "All issues handled. Nothing for ARCH to judge."
+[[ -z "$REPO" ]] && { echo "REPO not set" >&2; exit 1; }
+
+ROUTE_SH="${ROUTE_SH:-}"
+if [[ -z "$ROUTE_SH" ]]; then
+  if [[ -x "$HOME/.claude/scripts/route.sh" ]]; then
+    ROUTE_SH="$HOME/.claude/scripts/route.sh"
+  elif [[ -x "$(dirname "$0")/route.sh" ]]; then
+    ROUTE_SH="$(dirname "$0")/route.sh"
+  else
+    echo "route.sh not found" >&2; exit 1
+  fi
 fi
+
+# ─── Find issues with open PRs awaiting decision ────────────────────────────
+#
+# Candidates: agent:arch + status:ready issues where we can find an open PR
+# linked to them and a verdict comment present.
+
+candidates=$(gh issue list --repo "$REPO" \
+  --label "agent:arch" \
+  --label "status:ready" \
+  --state open \
+  --limit 100 \
+  --json number) || { echo "gh issue list failed" >&2; exit 2; }
+
+count_processed=0
+count_skipped=0
+count_failed=0
+
+for n in $(echo "$candidates" | jq -r '.[].number'); do
+  # Find PRs that mention this issue. We use the closing keyword convention:
+  # PRs that say "Refs: #N" or "Closes #N" in the body.
+  pr_data=$(gh pr list --repo "$REPO" --state open --search "in:body #$n" --json number,body,statusCheckRollup --limit 5 \
+    || echo "[]")
+
+  pr_count=$(echo "$pr_data" | jq 'length')
+  if [[ "$pr_count" -eq 0 ]]; then
+    count_skipped=$((count_skipped + 1))
+    continue
+  fi
+
+  # Take the first matching PR
+  pr_n=$(echo "$pr_data" | jq -r '.[0].number')
+
+  # Read PR comments for verdict from QA / Design.
+  pr_comments=$(gh pr view "$pr_n" --repo "$REPO" --json comments \
+    --jq '.comments | map(.body) | join("\n---\n")' 2>/dev/null || echo "")
+
+  qa_pass=false
+  qa_fail=false
+  qa_triage=""
+  design_approved=false
+  design_changes=false
+
+  if echo "$pr_comments" | grep -qE '^## QA Verdict.*PASS' ; then qa_pass=true; fi
+  if echo "$pr_comments" | grep -qE '^## QA Verdict.*FAIL' ; then qa_fail=true; fi
+  if echo "$pr_comments" | grep -qE '^## Design Verdict.*APPROVED' ; then design_approved=true; fi
+  if echo "$pr_comments" | grep -qE '^## Design Verdict.*NEEDS_CHANGES' ; then design_changes=true; fi
+
+  # Extract triage suggestion from QA: "triage: fe" / "triage: be" etc.
+  qa_triage=$(echo "$pr_comments" | grep -oP 'triage:\s*\K[a-z-]+' | head -n1 || true)
+
+  # ── Decision tree ─────────────────────────────────────────────────────────
+
+  if $qa_pass && ! $design_changes; then
+    # Either Design approved or design review not required for this issue.
+    echo "  #$n / PR #$pr_n: QA PASS → merge"
+    if [[ "$DRY_RUN" == "1" ]]; then
+      count_processed=$((count_processed + 1))
+      continue
+    fi
+    # Use squash merge with branch deletion.
+    if gh pr merge "$pr_n" --repo "$REPO" --squash --delete-branch >/dev/null; then
+      "$ROUTE_SH" "$n" "arch" --repo "$REPO" --agent-id "pre-triage" \
+        --status done --reason "PR merged" >/dev/null \
+        || true
+      gh issue close "$n" --repo "$REPO" >/dev/null || true
+      count_processed=$((count_processed + 1))
+    else
+      count_failed=$((count_failed + 1))
+    fi
+    continue
+  fi
+
+  if $qa_fail && [[ -n "$qa_triage" ]]; then
+    echo "  #$n: QA FAIL → route to $qa_triage"
+    if [[ "$DRY_RUN" == "1" ]]; then
+      count_processed=$((count_processed + 1))
+      continue
+    fi
+    if "$ROUTE_SH" "$n" "$qa_triage" --repo "$REPO" --agent-id "pre-triage" \
+        --reason "QA FAIL routed to $qa_triage"; then
+      count_processed=$((count_processed + 1))
+    else
+      count_failed=$((count_failed + 1))
+    fi
+    continue
+  fi
+
+  if $design_changes && ! $qa_fail; then
+    echo "  #$n: Design NEEDS_CHANGES → route to fe"
+    # Default implementer is fe for design changes; could be made smarter.
+    if [[ "$DRY_RUN" == "1" ]]; then
+      count_processed=$((count_processed + 1))
+      continue
+    fi
+    if "$ROUTE_SH" "$n" "fe" --repo "$REPO" --agent-id "pre-triage" \
+        --reason "Design NEEDS_CHANGES"; then
+      count_processed=$((count_processed + 1))
+    else
+      count_failed=$((count_failed + 1))
+    fi
+    continue
+  fi
+
+  if $qa_fail && $design_changes; then
+    echo "  #$n: QA FAIL + Design NEEDS_CHANGES → escalate to arch-judgment"
+    if [[ "$DRY_RUN" == "1" ]]; then
+      count_processed=$((count_processed + 1))
+      continue
+    fi
+    if "$ROUTE_SH" "$n" "arch-judgment" --repo "$REPO" --agent-id "pre-triage" \
+        --reason "conflicting QA and Design verdicts"; then
+      count_processed=$((count_processed + 1))
+    else
+      count_failed=$((count_failed + 1))
+    fi
+    continue
+  fi
+
+  # Fall through: PR open, no decisive verdict yet.
+  count_skipped=$((count_skipped + 1))
+done
+
+echo "done: $count_processed processed, $count_skipped skipped, $count_failed failed"
+[[ $count_failed -eq 0 ]] && exit 0 || exit 2
