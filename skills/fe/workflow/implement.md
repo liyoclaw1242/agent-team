@@ -1,186 +1,104 @@
-# Frontend Implementation Workflow
+# Workflow — Implement
 
-Phases: Onboard Context → Locate Impact → Plan → Implement → Self-Test → Validate → Deliver → Journal
+## Phase 1 — Read spec
 
-Each phase has a gate. Do not skip ahead.
+Required:
 
----
+1. The issue body in full
+2. The parent issue body (via `<!-- parent: #N -->`) — context the spec relies on
+3. Any `<!-- deps: -->` issues' AC — sibling tasks you depend on
+4. AC checklist — print or paste into your own scratchpad; you'll tick each off later
 
-## Phase 1: Onboard Context
+Conditional:
 
-> "An engineer who understands the project overview can locate the right file in seconds.
-> One who doesn't will search for hours and still modify the wrong component."
+5. The relevant `arch-ddd/bounded-contexts/{ctx}.md` if the issue mentions a domain term whose meaning you're not 100% on
+6. The Design spec issue (if `<!-- deps: #DESIGN -->` is present) — never freelance UX from your imagination if a Design task exists
 
-You should already have project context from Phase 0 (onboarding). If this is your first task, go back and read the README + project structure first.
+After reading, you should be able to state in one sentence: "I will produce X so that the user can do Y, verified by Z." If you can't, the spec is unclear — switch to `workflow/feedback.md`.
 
-Before touching any code for this task:
+## Phase 2 — Reality check
 
-1. **Re-read the project overview** — refresh your mental model of the component tree, routing, state management, and design system.
-2. **Read `design-decisions.md`** if it exists — know the established patterns.
-3. **Read last 3 journal entries** for this repo — learn what previous agents discovered.
+Before writing any code, check whether the spec matches the current codebase:
 
-**Gate**: Can you describe the component hierarchy relevant to this task? If not, read more.
+- Does the file/component the spec references actually exist in this shape?
+- Are the libraries / hooks / patterns the spec implies still the project's standard?
+- Are sibling tasks' contracts (BE endpoints, Design specs) actually delivered, or still in-flight?
 
----
+This check takes 5 minutes and saves hours. If anything is off, **stop and switch to `workflow/feedback.md`**. Do not proceed assuming "I'll figure it out as I go" — that path produces work that has to be redone after Mode C anyway.
 
-## Phase 2: Locate Impact
+## Phase 3 — Implement
 
-Based on your understanding of the project, determine:
+Walk through the AC, implementing each. General order:
 
-1. **Which components are affected?** — trace from the route/page down to the leaf components.
-2. **Which shared modules are involved?** — hooks, utils, API clients, stores.
-3. **What's the state flow?** — where does data come from, how does it transform, where does it render?
-4. **Are there design tokens/theme values involved?** — check Tailwind config, CSS variables, theme files.
-5. **What tests exist for these components?** — locate test files, understand coverage.
+1. **Static structure first** — types, component shells, route definitions
+2. **Wire data flow** — API calls, state management, prop passing
+3. **Behaviour** — event handlers, async flows, error paths
+4. **Visual fidelity** — match the Design spec exactly
+5. **Edge cases** — empty states, loading, errors, a11y
 
-**Do NOT guess file paths.** Use the project structure from onboarding. If uncertain, search:
-```bash
-grep -rn "ComponentName" --include="*.tsx" --include="*.ts" src/
+While implementing:
+
+- One commit per coherent unit (per `_shared/rules/git.md`'s commit format)
+- Each commit references the issue: `feat(billing): add cancel confirmation modal\n\nRefs: #142`
+- Run validators after each commit; don't accumulate broken state
+
+## Phase 4 — Self-test
+
+Self-test happens before opening the PR. Write the record at `/tmp/self-test-issue-{N}.md`:
+
+```markdown
+# Self-test record — issue #142
+
+## Acceptance criteria
+- [x] AC #1: cancel button shows loading state during request
+  - Verified: clicked button, observed disabled state + spinner for ~400ms
+- [x] AC #2: confirmation modal opens on click
+  - Verified: modal renders, focus moves to first interactive element
+- [x] AC #3: success closes modal and refreshes parent
+  - Verified: tested with mocked successful response
+- [x] AC #4: failure re-enables button and shows error
+  - Verified: tested with mocked 500 response
+- [x] AC #5: ESC key dismisses modal without action
+  - Verified: keyboard test in dev tools
+
+## Manual verification
+- Browsers tested: Chrome 130, Safari 17, Firefox 128
+- A11y: axe shows 0 issues on the affected surfaces
+- Reduced motion: disabling animations doesn't break the flow
+
+## Validators
+- lint: pass
+- typecheck: pass
+- test: pass (added 4 component tests, all green)
+- a11y: pass
+
+## Ready for review: yes
 ```
 
-**Gate**: Concrete list of files to read and modify. No assumptions.
+Every box ticked. Every "verified" line says concretely what you did. Empty checkboxes or "verified: yes" without elaboration is the failure mode `rules/self-test-gate.md` exists to prevent.
 
----
-
-## Phase 3: Plan
-
-1. **List changes** — for each file: what changes and why.
-2. **Determine test strategy** — check the issue spec's `testing` field:
-   - `unit-required` → plan unit tests for hooks/components (see `rules/testing.md` Mode 2)
-   - `self-test-only` or not specified → plan browser self-test steps only
-3. **Check for blockers** — missing API endpoints, unclear design spec, dependency on other tasks.
-4. **Conservative scope** — if the spec says "add a button", add a button. Don't redesign the page.
-5. **Spec feasibility check** — does the spec conflict with:
-   - The project's tech stack constraints? (e.g. Server Components can't use client-side APIs)
-   - Existing code that the spec didn't account for? (e.g. an API already exists)
-   - Your role's rules? (e.g. visual-logic-separation violated by the spec's design)
-   - A better approach you know from your codebase knowledge?
-
-### If spec has problems → feedback to ARCH
-
-Don't force an implementation that contradicts what you know. You understand the codebase deeper than ARCH does. Feed back:
+## Phase 5 — Deliver
 
 ```bash
-# 1. Comment with your technical insight
-gh issue comment {N} --repo {REPO_SLUG} \
-  --body "## Technical Feedback from \`{AGENT_ID}\`
-
-### Conflict
-{what the spec asks} conflicts with {what you know about the codebase}.
-
-### Suggestion
-{your recommended approach, with reasoning}
-
-### Affected
-{which parts of the spec need to change}"
-
-# 2. Hand back to ARCH for re-evaluation (MUST use route.sh)
-bash scripts/route.sh "{REPO_SLUG}" {N} arch "{AGENT_ID}"
+bash actions/deliver.sh \
+  --issue $ISSUE_N \
+  --self-test /tmp/self-test-issue-$ISSUE_N.md \
+  --pr-title "feat(billing): add cancellation confirmation modal" \
+  --pr-body-file /tmp/pr-body.md
 ```
 
-Then move on to your next task. Don't wait for ARCH — they'll update the spec and it will come back to you.
+The action:
+1. Verifies `/tmp/self-test-issue-{N}.md` exists and every AC checkbox is `[x]`
+2. Pushes the branch
+3. Opens the PR with `Refs: #N` in body and the self-test record summary
+4. Routes the issue to whichever role does first review
 
-6. **Auto-load Feature Cases** — scan the issue/spec text for these keywords:
-   - dark mode, theme toggle, theme switch, light/dark, color scheme → read `cases/dark-mode.md`
-   - i18n, internationalization, multi-language, locale, translation, 多語系 → read `cases/i18n-routing.md`
-   - auth, login, logout, sign in, sign up, register, protected route, session → read `cases/auth-flow.md`
-   - form, validation, input, submit, react-hook-form, zod → read `cases/form-validation.md`
+The issue typically routes to `agent:qa` if a sibling QA task exists (shift-left), otherwise to `agent:arch` which dispatches to design / qa per the parent's needs.
 
-   Multiple cases can activate simultaneously (e.g. a login page triggers both Auth Flow and Form Validation). Use the case as your implementation baseline, then adapt to the project's existing patterns.
+## Anti-patterns
 
-**Gate**: Spec is feasible with your tech stack. If not, feed back and move on.
-
----
-
-## Phase 4: Implement
-
-1. **Create branch**: run `actions/setup-branch.sh`
-
-2. **Follow existing patterns** — match the code around you:
-   - Function components? Stay with function components.
-   - CSS modules? Don't introduce styled-components.
-   - Existing `Button` component? Use it, don't make a new one.
-
-3. **Write unit tests alongside code** — only if spec says `testing: unit-required`:
-   - Testing Library: `getByRole` > `getByLabelText` > `getByText` > `getByTestId`
-   - Test behavior, not implementation details
-   - See `rules/testing.md` Mode 2 for what needs unit tests
-
-4. **Handle all states**:
-   - Default (happy path render)
-   - Loading (skeleton/spinner)
-   - Error (error message + retry action)
-   - Empty (zero-data state with guidance)
-   - Interactive (hover, focus, click, keyboard)
-
-5. **Accessibility from the start** — not bolted on after:
-   - Semantic HTML elements
-   - Keyboard navigation
-   - ARIA labels for non-obvious elements
-   - Focus management for modals/dialogs
-
----
-
-## Phase 5: Self-Test
-
-> "Build it like production, test it like a user."
-
-This phase is mandatory for every task. You are the first QA — catch your own bugs before anyone else sees them.
-
-### 5a. Production Build
-
-```bash
-pnpm build
-```
-
-If build fails, go back to Phase 4 and fix. Do not proceed with a broken build.
-
-### 5b. Start & Test via Browser MCP
-
-```bash
-pnpm start &
-```
-
-Using Browser MCP, walk through each Acceptance Criteria item from the issue spec:
-
-1. **Navigate** to the affected route
-2. **Operate** — click, type, scroll, as described in the AC
-3. **Observe** — does the UI respond correctly?
-4. **Check DevTools** — console errors? network failures? JS exceptions?
-5. **Screenshot** — capture evidence at each key step
-
-### 5c. Write Self-Test Record
-
-Write results to `/tmp/self-test-issue-{N}.md`. See `rules/testing.md` for the file format.
-
-**If any step fails**: go back to Phase 4, fix, rebuild, re-test. Max 3 rounds.
-
-**Gate**: All AC items pass. Self-test file exists at `/tmp/self-test-issue-{N}.md`.
-
----
-
-## Phase 6: Validate
-
-Run `validate/check-all.sh` for static checks (TypeScript, lint, a11y scan, security scan, git hygiene).
-
-Max 3 rounds: validate → fix → re-validate.
-
-**Gate**: All checks pass AND self-test passed in Phase 5.
-
----
-
-## Phase 7: Deliver
-
-1. Run `actions/deliver.sh` — commit + push + open PR + route to ARCH
-   - `deliver.sh` will verify self-test file exists before proceeding
-   - Self-test record is automatically posted as a PR comment
-
----
-
-## Phase 8: Journal
-
-Write entry to `log/` via `actions/write-journal.sh`. Focus on:
-- Component patterns discovered
-- Design tokens and naming conventions
-- Self-test findings (what broke during testing, what was tricky to verify)
-- Repo-specific gotchas
+- **Implementing first, reading spec later** — spec drift becomes invisible. Read first, implement second.
+- **Skipping reality check** — saves 5 minutes, costs 5 hours.
+- **Stuffing the self-test** — `[x]` without verification evidence is dishonest. The gate is for you, not the bureaucracy.
+- **"While I'm here, let me refactor X"** — file a separate issue. Scope creep is how PRs become unreviewable.
+- **Treating `agent:fe` as "do anything"** — your scope is the AC. Anything outside is a separate intake.

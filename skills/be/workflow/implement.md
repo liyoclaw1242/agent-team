@@ -1,92 +1,156 @@
-# Implementation Workflow
+# Workflow — Implement (TDD)
 
-Phases: Understand → Plan → Implement → Validate → Deliver → Journal
+BE workflow is shaped around TDD. The phases enforce the discipline structurally — you can't skip ahead because the deliver gate looks for the test commits.
 
-Each phase has a gate. Do not skip ahead.
+## Phase 1 — Read spec
 
-## Phase 1: Understand
+Required:
+1. The issue body in full
+2. The parent issue body (via `<!-- parent: #N -->`)
+3. Any `<!-- deps: -->` issues' AC
+4. The relevant `arch-ddd/bounded-contexts/{ctx}.md` — BE work always happens within a context
+5. `arch-ddd/service-chain.mermaid` — verify any cross-service interaction the spec implies is documented; if not, that's drift to flag
+6. AC checklist
 
-1. Read the issue spec (title + body + acceptance criteria). Read it twice.
-2. Check for QA feedback on the issue (previous rejection comments).
-3. Read related code — understand patterns, naming, architecture.
-4. Read last 5 journal entries from `log/` for this repo.
+Conditional:
+7. `arch-ddd/domain-stories/{flow}.md` if a specific flow is touched
+8. ADRs (under `docs/adr/`) referenced in the spec
 
-**Gate**: Can you explain the change in one sentence?
+After reading: state in one sentence what the change is, in domain language. "I will add the cancellation endpoint to the Booking context, which subscribes to current cargo state and emits CargoCancelledEvent on success." If you can't, switch to `workflow/feedback.md`.
 
-## Phase 2: Plan
+## Phase 2 — Author the contract (if FE-facing)
 
-1. List files to change and why.
-2. Determine test strategy — what exists, what's needed.
-3. Check for blockers (missing deps, unclear spec).
-4. Ambiguous spec → conservative interpretation + comment.
-5. **Spec feasibility check** — does the spec conflict with:
-   - Existing DB schema or API contracts?
-   - Performance rules? (e.g. spec implies N+1 pattern)
-   - Security rules? (e.g. spec exposes data without auth check)
-   - An existing module that already does this? (extend vs create new)
+If FE has a sibling task with `<!-- deps: #THIS_ISSUE -->`, FE is waiting on you to define the API contract. Write it now, BEFORE writing any code.
 
-### If spec has problems → feedback to ARCH
-
-You know the codebase deeper than ARCH. If the spec's approach conflicts with what exists or violates your rules, feed back:
+The contract goes into the **issue body** via `actions/publish-contract.sh`:
 
 ```bash
-# 1. Comment with technical insight
-gh issue comment {N} --repo {REPO_SLUG} \
-  --body "## Technical Feedback from \`{AGENT_ID}\`
-
-### Conflict
-{what the spec asks} vs {what the codebase actually has/needs}.
-
-### Suggestion
-{your recommended approach}
-
-### Affected
-{which parts of the spec need revision}"
-
-# 2. Hand back to ARCH (MUST use route.sh)
-bash scripts/route.sh "{REPO_SLUG}" {N} arch "{AGENT_ID}"
+bash actions/publish-contract.sh \
+  --issue $ISSUE_N \
+  --contract-file /tmp/contract-$ISSUE_N.md
 ```
 
-Move on to next task. Don't wait.
+Where `contract-$ISSUE_N.md` is:
 
-**Gate**: Spec is feasible. If not, feed back and move on.
+```markdown
+## Contract (defined by BE, consumed by FE)
 
-## Phase 3: Implement (TDD)
+POST /billing/subscriptions/{id}/cancel
+- Auth: required (subscription must belong to authenticated user)
+- Request body: empty
+- Success: 200 {effectiveDate: ISO8601}
+- Errors:
+  - 404 if subscription not found or doesn't belong to user
+  - 409 if already cancelled
+- Side effects: publishes CargoCancelledEvent (per service-chain)
+```
 
-1. Create branch: `agent/{AGENT_ID}/issue-{N}`
-2. For each behavior unit, follow **Red → Green → Refactor**:
-   - **Red**: Write a single failing test that defines the expected behavior. Run it. Confirm it fails.
-   - **Green**: Write the minimum code to make the test pass. Run it. Confirm it passes.
-   - **Refactor**: Clean up implementation. Run tests. Confirm they still pass.
-3. Repeat step 2 for each behavior: happy path → error paths → edge cases.
-4. Do NOT batch — one cycle per behavior, not "write all tests then implement."
+The action appends this section to the issue body in a designated block (idempotent — re-running updates rather than duplicating). Once published, **FE can start work**. The contract is now binding for you.
 
-## Phase 4: Validate
+**Why now, not after implementation?** Because FE is waiting. Publishing the contract upfront unblocks them; they can mock and stub their UI against it while you write tests + impl. This is the parallelism the system is designed for.
 
-Run `validate/check-all.sh` which executes all rule validations.
-Max 3 rounds: validate → fix → re-validate.
+If you're tempted to "design as I code" and publish the contract after, you've inverted the dependency: FE will be late starting, and changes you make to the contract during implementation will be silent (nobody sees them) until FE breaks.
 
-## Phase 5: Deliver
+## Phase 3 — Tests first
 
-1. Run full test suite.
-2. **Self-test** — before opening PR, verify your own work:
-   - [ ] Happy path works end-to-end
-   - [ ] Error paths return correct status codes and error shape
-   - [ ] No regressions in existing tests
-   - [ ] DB migrations run cleanly (up + down)
-   - [ ] No secrets or .env committed
-3. **Write self-test record** to `/tmp/self-test-issue-{N}.md`:
-   ```markdown
-   # Self-Test: {Issue Title}
-   - [x] Happy path works end-to-end
-   - [x] Error paths return correct status codes (404, 422, 401)
-   - [x] All tests pass (`go test ./...` or `pnpm test`)
-   - [x] DB migration up/down clean
-   - [x] No secrets in code
-   ```
-4. Run `actions/deliver.sh` — commit, push, open PR, post self-test as PR comment, route to ARCH.
-5. Update API status + release claim.
+Per the TDD iron law:
 
-## Phase 6: Journal
+1. Write one failing test per AC item, mapping each to a test name
+2. Confirm tests fail (compile, run, see red) — this proves they're real tests
+3. Commit: `test(billing): add tests for cancellation endpoint\n\nRefs: #N`
 
-Read `cases/` for any relevant patterns. Write entry to `log/` using the journal template.
+Test scope:
+- Unit tests for new functions / methods
+- Integration tests (with a real DB or a recorded in-memory DB) for endpoint flows
+- Contract tests: the published contract from Phase 2 should map 1:1 to integration tests
+
+Don't skip the "see red" step. Tests that pass on the first run before any implementation are usually testing nothing.
+
+## Phase 4 — Implement to green
+
+Make tests pass, one at a time. Refactor as needed but only against green:
+
+1. Write minimal implementation to make one test pass
+2. Run tests — that one passes, others remain red
+3. Commit: `feat(billing): cancellation endpoint persists effective date\n\nRefs: #N`
+4. Move to the next test
+
+Resist the temptation to "implement everything then run tests". The TDD rhythm is **red → green → refactor**, repeated per test.
+
+## Phase 5 — Refactor + non-functional
+
+Once all tests are green:
+
+- Refactor for clarity. Tests guard against regression.
+- Add benchmarks for any AC mentioning performance characteristics
+- Verify race conditions: `go test -race` (or equivalent)
+- Verify concurrency safety if any goroutines / threads / async tasks introduced
+
+Never refactor against red. If a refactor introduces a failure, you've introduced a bug; fix before moving on.
+
+## Phase 6 — Self-test
+
+Write `/tmp/self-test-issue-{N}.md`:
+
+```markdown
+# Self-test record — issue #143
+
+## Acceptance criteria
+- [x] AC #1: POST /billing/subscriptions/{id}/cancel exists and routes correctly
+  - Verified: integration test `TestCancelEndpoint_Routes` passes
+- [x] AC #2: returns 200 with effectiveDate on success
+  - Verified: `TestCancel_Success_ReturnsEffectiveDate`
+- [x] AC #3: returns 404 if subscription not found
+  - Verified: `TestCancel_404_WhenNotFound`
+- [x] AC #4: returns 409 if already cancelled
+  - Verified: `TestCancel_409_WhenAlreadyCancelled`
+- [x] AC #5: publishes CargoCancelledEvent
+  - Verified: `TestCancel_PublishesEvent` checks event bus
+
+## Contract conformance
+The published contract on this issue body matches:
+- Path: POST /billing/subscriptions/{id}/cancel ✓
+- Auth required ✓
+- Request body empty ✓
+- 200 + {effectiveDate} ✓
+- 404 / 409 cases match ✓
+
+## Validators
+- lint (go vet, staticcheck): pass
+- test (go test -race -cover): pass; coverage 87%
+- security (sqlc-aware grep + govulncheck): pass
+- contract (handler-vs-doc diff): pass
+
+## Manual verification
+- Tested locally with `curl -X POST localhost:8080/billing/subscriptions/test-id/cancel`
+  with a valid auth token; got 200 + effectiveDate
+- Tested 404 path with non-existent ID; got 404 with sensible body
+- Tested 409 path by calling twice in a row; second call returned 409
+
+## Ready for review: yes
+```
+
+## Phase 7 — Deliver
+
+```bash
+bash actions/deliver.sh \
+  --issue $ISSUE_N \
+  --self-test /tmp/self-test-issue-$ISSUE_N.md \
+  --pr-title "feat(billing): cancellation endpoint" \
+  --pr-body-file /tmp/pr-body.md
+```
+
+The deliver action's gate also checks:
+
+- The branch has at least one commit with message starting with `test(`. (TDD evidence)
+- The contract block in the issue body, if present, matches what the handler exposes (basic sanity)
+
+If TDD evidence is missing, the gate refuses. You can't open a PR without a test commit.
+
+## Anti-patterns
+
+- **Implementing first, tests later** — TDD iron law violation. The gate catches it; don't try.
+- **Publishing the contract after implementation** — defeats Phase 2's parallelism point. FE is sitting blocked while you code.
+- **Committing tests + implementation in the same commit** — loses the TDD rhythm visibility. Reviewers want to see "tests added, then implementation makes them pass".
+- **Skipping `-race`** — Go's race detector catches data races that elude code review. Cheap; always run.
+- **"Refactoring" while still red** — that's not refactor, that's continued debugging in disguise.

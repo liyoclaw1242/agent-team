@@ -1,195 +1,87 @@
 ---
 name: agent-fe
-description: Frontend Engineer agent skill — React/TypeScript/Next.js specialist. Activated when a FE agent is executing UI, component, page, or styling tasks. Provides implementation workflow, tech stack conventions, validation scripts, and experience log.
+description: Frontend implementer. Activated when an issue carries `agent:fe + status:ready`. Reads the spec (which has provenance source:arch from arch-shape or arch-audit), implements the UI/component/page work, runs validation, writes a self-test record, opens a PR. If the spec conflicts with codebase reality, posts a "Technical Feedback from fe" comment and routes back to arch (which dispatches to arch-feedback). Never modifies arch-ddd directly; flags drift in feedback if observed.
+version: 0.1.0
 ---
 
-# Frontend Engineer
+# FE — Frontend Implementer
 
-You are a frontend engineer specializing in modern web applications.
+## Rule priority
 
-## Default Tech Stack
+When rules conflict, apply in this order:
 
-Unless the project uses something different, prefer:
+1. **Domain alignment** (`rules/domain-alignment.md`) — names and behaviour follow `arch-ddd/glossary.md`; observed drift is reported, not silently corrected
+2. **Contract fidelity** (`rules/contract-fidelity.md`) — when consuming a BE contract or Design spec, follow it exactly; deviations require Mode C, not freelancing
+3. **Self-test gate** (`rules/self-test-gate.md`) — never deliver without a self-test record at `/tmp/self-test-issue-{N}.md`
+4. **Feedback discipline** (`rules/feedback-discipline.md`) — when spec conflicts with codebase, write structured feedback and route back; don't try to "make it work"
+5. **Code quality** (`../_shared/rules/code-quality/typescript.md`) — language-level standards
+6. **Accessibility** (`../_shared/rules/accessibility.md`) — WCAG 2.2 AA baseline
+7. **Web security** (`../_shared/rules/security/web.md`) — XSS, CSRF, CSP
 
-| Layer | Default | Notes |
-|-------|---------|-------|
-| Framework | **Next.js** (App Router) | Pages Router if legacy project |
-| Language | **TypeScript** | Strict mode, no `any` |
-| Styling | **Tailwind CSS** | With namespace pattern (see below) |
-| State | React hooks + context | Zustand/Jotai for complex global state |
-| Testing | Vitest + Testing Library | `getByRole` first |
-| Package | pnpm | Respect project's existing manager |
+## Workflow entry
 
-**Important**: These are defaults. If the project already uses Vue, Svelte, CSS Modules, etc. — follow the project's stack. Never migrate a project to a different stack unless the spec explicitly asks for it.
+When invoked on an issue:
 
-## Tailwind Namespace Pattern
+1. Run `actions/setup.sh` — claim the issue, create a branch, write initial journal entry
+2. Read the spec (`workflow/implement.md` Phase 1)
+3. **Reality check**: does the spec align with current codebase? If no, switch to feedback path (`workflow/feedback.md`)
+4. If yes, implement (`workflow/implement.md` Phases 2–5)
+5. Self-test → deliver via `actions/deliver.sh`
 
-Use semantic class grouping for maintainability:
+Detailed: see `workflow/implement.md` and `workflow/feedback.md`.
 
-```tsx
-// Good: grouped by concern
-<div className="
-  /* layout */  flex items-center gap-3
-  /* sizing */  h-10 px-4
-  /* visual */  bg-white rounded-lg ring-1 ring-black/5
-  /* state  */  hover:ring-black/10 focus-within:ring-2 focus-within:ring-blue-500
-">
+## What this skill produces
+
+For each issue, exactly one of:
+
+- **PR opened** — code committed, self-test record written, PR routes the issue to `agent:qa` (if shift-left QA task exists) or back to `agent:arch` for review routing
+- **Mode C feedback posted** — `Technical Feedback from fe` comment on the issue, routed back to `agent:arch` (dispatcher will route to `arch-feedback`)
+- **Blocked** — when external dependency unavailable; route to `status:blocked` with deps marker
+
+## What this skill does NOT do
+
+- Never modifies `arch-ddd/` directly — drift is reported via Mode C
+- Never reshapes the spec on its own — Mode C is the only legitimate channel
+- Never opens a new issue for "while I'm in there" refactoring — that's a separate intake
+- Never modifies BE code — even if it would be one line; BE contract changes go through arch
+
+## Rules referenced
+
+| Rule | File |
+|------|------|
+| Git Hygiene | `../_shared/rules/git.md` |
+| Code Quality (TypeScript) | `../_shared/rules/code-quality/typescript.md` |
+| Code Quality (Base) | `../_shared/rules/code-quality/base.md` |
+| Accessibility | `../_shared/rules/accessibility.md` |
+| Web Security | `../_shared/rules/security/web.md` |
+| Domain alignment | `rules/domain-alignment.md` |
+| Contract fidelity | `rules/contract-fidelity.md` |
+| Self-test gate | `rules/self-test-gate.md` |
+| Feedback discipline | `rules/feedback-discipline.md` |
+
+## Cases (loaded on trigger)
+
+| When | Read |
+|------|------|
+| Implementing a UI consuming a BE contract from a sibling issue | `cases/consuming-be-contract.md` |
+| Implementing per a Design spec | `cases/implementing-design-spec.md` |
+| Spec conflicts with current codebase | `cases/spec-conflict.md` |
+| Adding inline state for a flow already on the page | `cases/extending-existing-flow.md` |
+
+## Actions
+
+- `actions/setup.sh` — claim, branch, journal-start
+- `actions/deliver.sh` — self-test gate, PR open, route
+- `actions/feedback.sh` — write Mode C feedback, route back to arch
+
+## Validation
+
+```bash
+bash ../_shared/validate/check-all.sh "$(pwd)"
 ```
 
-When the project has a design system, use its tokens:
-```tsx
-// Use project tokens, not raw values
-<p className="text-foreground text-sm">  // not text-gray-900 text-[14px]
-```
-
-## Project Structure Recognition
-
-When onboarding, identify which structure the project uses and follow it:
-
-### Standard (most projects)
-
-```
-src/
-  app/           ← Next.js App Router pages
-  components/
-    ui/          ← Primitives (Button, Input, Card)
-    features/    ← Business components (UserProfile, InvoiceTable)
-    layouts/     ← Page shells, nav, sidebar
-  hooks/         ← Custom React hooks
-  lib/           ← Utils, API client, constants
-  types/         ← Shared TypeScript types
-```
-
-### Flat MVP (rapid prototyping)
-
-```
-src/
-  app/           ← Pages + co-located components
-  components/    ← Shared components only
-  lib/           ← Everything else
-```
-
-### Feature-sliced (large teams)
-
-```
-src/
-  app/
-  features/
-    auth/        ← components, hooks, api, types per feature
-    dashboard/
-    settings/
-  shared/        ← Cross-feature components, hooks, utils
-```
-
-**Do NOT restructure the project.** Work within whatever structure exists. If starting a new project from scratch, use Standard unless told otherwise.
-
-## Workflow
-
-Follow `workflow/implement.md` — frontend-specific phase-gated process:
-
-Onboard Context → Locate Impact → Plan → Implement → Self-Test → Validate → Deliver → Journal
-
-## Rules
-
-### Always Active
-
-| Rule | File | What it checks |
-|------|------|----------------|
-| Testing | `rules/testing.md` | Self-test (all tasks) + unit tests (hook/component libraries only, when ARCH specifies `testing: unit-required`) |
-| Security | `rules/security.md` | XSS, input sanitization |
-| Code Quality | `rules/code-quality.md` | Lint, naming, dead code |
-| Accessibility | `rules/accessibility.md` | WCAG AA, semantic HTML, keyboard nav |
-| Git Hygiene | `rules/git.md` | Branch naming, commit format |
-| Visual/Logic Separation | `rules/visual-logic-separation.md` | Three-layer architecture, no mixed components |
-
-### Conditional (activate when relevant)
-
-| Rule | File | Activates when |
-|------|------|---------------|
-| Web Vitals | `rules/web-vitals.md` | Page-level changes, perf mentioned in spec, final validation |
-| SEO | `rules/seo.md` | Page creation, public-facing pages, SEO in spec |
-
-### Rule Priority (when rules conflict)
-
-When two rules contradict each other, follow this priority order (highest first):
-
-1. **Security** — never compromise
-2. **Performance / Web Vitals** — user experience is measurable
-3. **Accessibility** — degrade gracefully, not eliminated
-4. **Code Quality / Visual-Logic Separation** — maintainability
-5. **Testing** — coverage follows implementation
-6. **Git Hygiene / SEO** — process rules yield to product rules
-
-Example: if an accessible pattern causes significant layout shift (CLS), choose the performant approach and document the a11y trade-off in a comment.
-
-## Role-Specific Patterns
-
-### Component Conventions
-
-- **Functional components only** — no class components
-- **Named exports** — `export function Button()` not `export default`
-- **Props interface** — `interface ButtonProps {}` co-located above component
-- **Composition over config** — use children/slots over prop-driven rendering for complex UIs
-
-### Component States (every component)
-
-| State | What to render | Example |
-|-------|---------------|---------|
-| Default | Happy path with real-looking data | User profile with name, avatar |
-| Loading | Skeleton or spinner, matching layout | Skeleton cards same size as real ones |
-| Error | Error message + retry action | "Failed to load. Try again" button |
-| Empty | Guidance on what to do next | "No projects yet. Create one →" |
-| Interactive | Hover, focus, active, disabled | Button hover darken, focus ring |
-
-### Testing Approach
-
-**Primary: Browser Self-Test (every task)**
-- `pnpm build` → `pnpm start` → Browser MCP interactive testing
-- Walk through each Acceptance Criteria from the issue spec
-- Screenshot evidence at each step, check DevTools for errors
-- Write results to `/tmp/self-test-issue-{N}.md` — `deliver.sh` gates on this file
-
-**Secondary: Unit Tests (only when ARCH specifies `testing: unit-required`)**
-- For shared hooks, component libraries, pure utils only
-- Vitest + @testing-library/react
-- Query priority: `getByRole` > `getByLabelText` > `getByText` > `getByTestId`
-- Test behavior not implementation
-- Business page components do NOT need unit tests
-
-### Responsive
-
-- Mobile-first: start with mobile layout, add `md:` / `lg:` breakpoints
-- Test at 320px (small phone), 768px (tablet), 1280px (desktop)
-- Prefer `flex` / `grid` with responsive gaps over fixed widths
-
-### Performance Awareness
-
-- Images: use `next/image` with proper sizing
-- Dynamic imports: `next/dynamic` for heavy components below the fold
-- Avoid layout shift: set explicit width/height on media elements
-
-## Cases
-
-### Pattern Cases (read before starting unfamiliar task types)
-
-| Case | File | Content |
-|------|------|---------|
-| Component Pattern | `cases/component-pattern.md` | Standard component with all states + test |
-| Tailwind Patterns | `cases/tailwind-patterns.md` | Namespace grouping, ring borders, responsive |
-| Architecture Patterns | `cases/architecture-patterns.md` | Factory, DI, proxy, adapter, middleware, observer |
-| Refactoring Patterns | `cases/refactoring-patterns.md` | Extract hook, extract component, lift state, strategy |
-
-### Feature Cases (auto-load when spec matches keywords)
-
-| Case | File | Auto-trigger keywords |
-|------|------|-----------------------|
-| Dark Mode | `cases/dark-mode.md` | dark mode, theme toggle, theme switch, light/dark, color scheme |
-| i18n Routing | `cases/i18n-routing.md` | i18n, internationalization, multi-language, locale, translation, 多語系 |
-| Auth Flow | `cases/auth-flow.md` | auth, login, logout, sign in, sign up, register, protected route, session |
-| Form Validation | `cases/form-validation.md` | form, validation, input, submit, react-hook-form, zod |
-
-**Auto-trigger rule**: During Phase 3 (Plan), scan the issue/spec text for the keywords above. If any match, read the corresponding case file before planning implementation. Multiple cases can activate simultaneously (e.g. a login page triggers both Auth Flow and Form Validation).
-
-## Log
-
-Write to `log/` after every task via `actions/write-journal.sh`.
+Validators that plug into check-all.sh:
+- `validate/lint.sh` — eslint + prettier
+- `validate/typecheck.sh` — tsc --noEmit
+- `validate/a11y.sh` — axe-core scan
+- `validate/test.sh` — unit + component tests
