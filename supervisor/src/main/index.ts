@@ -208,7 +208,11 @@ function startAPIServer(sup: Supervisor): void {
       req.on("end", async () => {
         try {
           const { role, repo, runtime } = JSON.parse(body);
-          const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+          const validRoles = [
+            "be", "fe", "ops", "design",
+            "arch", "arch-shape", "arch-audit", "arch-feedback", "arch-judgment",
+            "qa", "debug",
+          ];
           const validRuntimes = ["claude", "gemini"];
           const rt = (runtime && validRuntimes.includes(runtime)) ? runtime : "claude";
 

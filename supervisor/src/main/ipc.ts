@@ -9,7 +9,11 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
   ipcMain.handle("get-health", () => supervisor.getHealth());
   ipcMain.handle("get-agent-logs", (_e, id: string) => supervisor.getAgentLogs(id));
   ipcMain.handle("create-agent", (_e, role: string, repoSlug: string, runtime?: string) => {
-    const validRoles = ["be", "fe", "ops", "arch", "design", "qa", "debug"];
+    const validRoles = [
+      "be", "fe", "ops", "design",
+      "arch", "arch-shape", "arch-audit", "arch-feedback", "arch-judgment",
+      "qa", "debug",
+    ];
     const validRuntimes = ["claude", "gemini"];
     const rt = (runtime && validRuntimes.includes(runtime)) ? runtime as "claude" | "gemini" : "claude";
     if (!role || !validRoles.includes(role)) {
