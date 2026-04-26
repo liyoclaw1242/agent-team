@@ -12,6 +12,7 @@ export function setupIPC(supervisor: Supervisor, tracker: Tracker): void {
     const validRoles = [
       "be", "fe", "ops", "design",
       "arch", "arch-shape", "arch-audit", "arch-feedback", "arch-judgment",
+      "fe-advisor", "be-advisor",
       "qa", "debug",
     ];
     const validRuntimes = ["claude", "gemini"];
