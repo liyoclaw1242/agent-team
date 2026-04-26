@@ -9,7 +9,7 @@ argument-hint: [role] [repo]
 Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe owner/my-repo`)
 
 Parse `$ARGUMENTS` by splitting on whitespace:
-- First token → role (be, fe, ops, arch, design, qa, debug)
+- First token → role (be, fe, ops, design, arch, arch-shape, arch-audit, arch-feedback, arch-judgment, qa, debug)
 - Second token → repo slug (owner/repo)
 
 If either is missing, prompt the user interactively (see steps below).
@@ -33,17 +33,21 @@ If a role was passed as argument, use it. Otherwise, ask:
 Which agent role should I take on?
 
  Implementation Agents:
-  1. BE     — Backend engineer (APIs, DB, business logic)
-  2. FE     — Frontend engineer (UI, components, styling)
-  3. OPS    — DevOps / infrastructure (CI, deployment, config)
+  1. BE            — Backend engineer (APIs, DB, business logic)
+  2. FE            — Frontend engineer (UI, components, styling)
+  3. OPS           — DevOps / infrastructure (CI, deployment, config)
+  4. DESIGN        — UI/UX designer (pencil-spec authoring, visual review)
 
- Architecture & Design Agents:
-  4. ARCH   — Software architect (sole dispatcher + merge authority, system design, triage)
-  5. DESIGN — UI/UX designer (design audit, component design, a11y)
+ Architecture (facade + 4 LLM specialists):
+  5. ARCH          — Facade: runs deterministic dispatcher, retags issues to a specialist
+  6. ARCH-SHAPE    — Decomposes business / architecture intake into role-ready tasks
+  7. ARCH-AUDIT    — Decomposes QA / Design audit findings into fix tasks
+  8. ARCH-FEEDBACK — Handles Mode C pushback from implementers
+  9. ARCH-JUDGMENT — Escape hatch for verdict conflicts and round-3 escalations
 
  Review & Quality Agents:
-  6. QA     — QA engineer (test plans, verification, verdicts)
-  7. DEBUG  — Investigator (root cause analysis, bug diagnosis)
+ 10. QA            — QA engineer (shift-left test plan, post-impl verify + verdict)
+ 11. DEBUG         — Investigator (root cause analysis, files separate fix issue)
 
 Reply with the number or name.
 ```
@@ -246,8 +250,12 @@ Every task ends with: **DONE** | **DONE_WITH_CONCERNS** | **BLOCKED** | **NEEDS_
 |---|------|----------|----------|
 | 1 | BE | implement | Code + PR → ARCH |
 | 2 | FE | implement | Code + PR → ARCH |
-| 3 | OPS | implement | Code + PR → ARCH |
-| 4 | ARCH | architect | Dispatch + merge + triage |
-| 5 | DESIGN | design | Code + PR or verdict → ARCH |
-| 6 | QA | verify | Verdict + report → ARCH |
-| 7 | DEBUG | investigate | Diagnosis + report → ARCH |
+| 3 | OPS | implement / investigation | Code + PR → ARCH, or alert triage |
+| 4 | DESIGN | pencil-spec / visual-review | Spec or verdict → ARCH |
+| 5 | ARCH | dispatcher.sh | Retags issues to a specialist (no LLM logic) |
+| 6 | ARCH-SHAPE | classify → business / architecture | Child issues + domain updates |
+| 7 | ARCH-AUDIT | decompose audit findings | Fix tasks tagged with the right role |
+| 8 | ARCH-FEEDBACK | handle-pushback (Mode C) | Accept (update spec) or counter |
+| 9 | ARCH-JUDGMENT | decide (single bounded call) | Routes issue to next handler |
+| 10 | QA | test-plan / verify | Test plan or PASS/FAIL verdict |
+| 11 | DEBUG | investigate | Root-cause report + separate fix issue |
