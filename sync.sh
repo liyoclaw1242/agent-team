@@ -16,16 +16,26 @@ mkdir -p "$TARGET/commands"
 cp "$SCRIPT_DIR/commands/create-agent-employ.md" "$TARGET/commands/"
 echo "  commands/create-agent-employ.md"
 
-# Shared scripts (claims, release-claim)
+# Shared scripts (route, claims, poll, pre-triage, scan-*)
 mkdir -p "$TARGET/scripts"
 cp "$SCRIPT_DIR/scripts/"*.sh "$TARGET/scripts/"
 chmod +x "$TARGET/scripts/"*.sh
 echo "  scripts/"
 
-# Skills (7 role-based skills with full directory structure)
+# Shared contract layer (rules, actions, validate, domain, design-foundations)
+# Skills reference _shared/ — must be present at the install target.
+rm -rf "$TARGET/_shared"
+cp -r "$SCRIPT_DIR/_shared" "$TARGET/_shared"
+find "$TARGET/_shared" -name '*.sh' -exec chmod +x {} +
+echo "  _shared/"
+
+# Skills (role-based skills with full directory structure)
+mkdir -p "$TARGET/skills"
 for skill_dir in "$SCRIPT_DIR/skills/"*/; do
   skill_name="$(basename "$skill_dir")"
+  rm -rf "$TARGET/skills/$skill_name"
   cp -r "$skill_dir" "$TARGET/skills/$skill_name"
+  find "$TARGET/skills/$skill_name" -name '*.sh' -exec chmod +x {} +
   echo "  skills/$skill_name/"
 done
 
