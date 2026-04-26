@@ -17,6 +17,9 @@ cp "$SCRIPT_DIR/commands/create-agent-employ.md" "$TARGET/commands/"
 echo "  commands/create-agent-employ.md"
 
 # Shared scripts (route, claims, poll, pre-triage, scan-*)
+# Reset target scripts dir so retired scripts (e.g. release-claim.sh,
+# verify-labels.sh) don't linger across sync runs.
+rm -rf "$TARGET/scripts"
 mkdir -p "$TARGET/scripts"
 cp "$SCRIPT_DIR/scripts/"*.sh "$TARGET/scripts/"
 chmod +x "$TARGET/scripts/"*.sh
