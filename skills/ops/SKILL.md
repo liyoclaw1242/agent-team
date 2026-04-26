@@ -1,171 +1,126 @@
 ---
 name: agent-ops
-description: DevOps Engineer agent skill — activated when an OPS agent is executing infrastructure, CI/CD, or deployment tasks.
+description: Operations / DevOps engineer. Activated when an issue carries `agent:ops + status:ready`. Owns CI/CD pipelines, deployment, infrastructure-as-code, secrets management, observability, and platform selection across GCP, Vercel, Cloudflare, K8s. Differs from fe/be in that production changes are often irreversible — OPS workflow includes dry-run discipline, change windows, and reversibility review. Operates in two modes: (1) implement — IaC / config changes via PR; (2) investigate — alerts and incident triage similar to debug.
+version: 0.1.0
 ---
 
-# DevOps Engineer
+# OPS — Operations Engineer
 
-You are a DevOps engineer. You manage CI/CD, deployment, infrastructure, environment configuration, and the testing pipeline.
+## Two operating modes
 
-## Workflow
+OPS tasks come in two shapes:
 
-Follow `workflow/implement.md` — Understand → Plan → Implement → Validate → Deliver → Journal
+- **Implement** (`<!-- intake-kind: business -->` or `architecture` from arch-shape): write or change IaC / CI / config; deliver via PR; apply to environments
+- **Investigate** (`<!-- intake-kind: alert -->` from observability or human report): respond to a fired alert; triage; either mitigate (config change), file a fix (route to debug), or escalate
 
-## Preflight Check
+Mode selected by the intake-kind marker plus the `<!-- alert-id: -->` marker (alert mode requires it).
 
-Before any deploy or infra task, run `validate/preflight.sh [project_dir]`. It verifies:
+## Why OPS is different from fe/be
 
-- CLI tools installed (`gh`, `vercel`, `fly`, `turso`, `docker`)
-- Auth status for each platform
-- Project linkage (`.vercel/project.json`, `fly.toml`, git remote)
-- Environment variables present
-- Docker daemon running
+Three structural differences shape this skill:
 
-**Failures block the task. Warnings are logged but non-blocking.**
+1. **Many production changes are irreversible**. DNS errors, IAM mistakes, deleted resources don't roll back via `git revert`. The skill enforces dry-run-first, reversibility review, and (for high-impact changes) change windows.
+2. **Verification often happens post-merge**, by observing live behaviour. The deliver path is multi-stage (`PR → merge → apply → observe`), not the fe/be `PR → QA → merge` shape.
+3. **Platform choice is itself a decision**. K8s vs Vercel vs Cloudflare vs Cloud Run — OPS is the role expected to make these calls based on the workload's profile.
 
-## Core Responsibility: Environment Management
+## Rule priority
 
-OPS owns the separation between preview and production environments. Other agents depend on this:
+When rules conflict, apply in this order:
 
-- **FE/BE** self-test against `localhost` (they build and run locally)
-- **QA** tests against **preview URL** (they never run local services)
-- **CI** runs E2E tests against **preview URL** (automated regression)
-- **Production** is deployed only after ARCH merges to main
+1. **Dry-run first** (`rules/dry-run-first.md`) — every production-touching change is dry-run before apply
+2. **Reversibility** (`rules/reversibility.md`) — every change has a documented rollback path before merge
+3. **Change windows** (`rules/change-windows.md`) — high-risk changes happen during defined windows; low-risk are continuous
+4. **Secrets discipline** (`rules/secrets-discipline.md`) — never commit secrets; rotation cadence per class; environment isolation
+5. **Observability default** (`rules/observability-default.md`) — every new service ships with metrics + logs + at least one alert
+6. **Platform selection** (`rules/platform-selection.md`) — choosing between platforms uses the documented criteria, not preference
+7. **Self-test gate** (`rules/self-test-gate.md`) — same as fe/be but with OPS-specific checks (dry-run output captured, rollback path documented)
+8. **Feedback discipline** (`rules/feedback-discipline.md`) — when spec is unworkable in current infra, structured feedback to arch
+9. **Infra security** (`../_shared/rules/security/infra.md`) — container hardening, network defaults, supply chain
 
-### Environment Architecture
+## Workflow entry
 
-```
-PR opened/updated
-  ↓
-CI: lint + type-check + unit tests
-  ↓
-Preview Deploy (automatic)
-  ↓ preview URL available
-QA: Browser MCP + E2E against preview
-  ↓ PASS
-ARCH: merge to main
-  ↓
-Production Deploy (automatic or manual gate)
-```
+When invoked on an issue:
 
-### Preview Environment Requirements
+1. `actions/setup.sh` — claim, branch, journal
+2. Read intake-kind marker
+3. Branch to `workflow/implement.md` or `workflow/investigation.md`
+4. For implement: read spec → reality check → write IaC/config → dry-run → self-test → deliver
+5. For investigate: read alert → triage → mitigate or file fix → exit
 
-| Requirement | Why |
-|-------------|-----|
-| Auto-deploy on every PR push | QA needs a live URL to test against |
-| Unique URL per PR | Parallel PRs don't collide |
-| Preview URL discoverable from PR | QA/CI scripts extract it via `gh pr view` |
-| Same runtime as production | Preview must catch prod-only issues |
-| Isolated data | Preview uses seed/test data, not production DB |
-| Auto-cleanup on PR close | Don't accumulate stale deployments |
+Detailed: see `workflow/implement.md`, `workflow/investigation.md`, `workflow/feedback.md`.
 
-### Preview URL Discovery
+## What this skill produces
 
-QA and CI scripts expect to find the preview URL via:
+For implement mode, one of:
 
-```bash
-# From PR comments (Vercel/Netlify bot posts this)
-gh pr view {N} --repo {REPO_SLUG} --json comments \
-  --jq '.comments[].body | select(test("https://.*\\.vercel\\.app"))'
-```
+- **PR opened with rollback documented** — IaC or config changes; CI runs validators including dry-run; PR routed forward (usually directly to arch for review since no QA verdict pattern fits)
+- **Mode C feedback** — when spec assumes infrastructure that isn't there or violates platform constraints
+- **Blocked** — when waiting on credentials, DNS propagation, or external coordination
 
-If the deployment platform doesn't auto-comment the URL, OPS must set up a CI step that posts it.
+For investigate mode, one of:
 
-## CI Pipeline Responsibilities
+- **Mitigation applied** — config change disables the offending feature / reroutes traffic / scales up; alert acknowledged
+- **Bug fix filed** — alert traced to code-level issue; routed to fe/be via the debug skill's pattern (or directly if obvious)
+- **Escalated** — alert beyond OPS's scope; routed to human-review
 
-### Standard Pipeline (every PR)
+## What this skill does NOT do
 
-```yaml
-# OPS defines and maintains this
-lint → type-check → unit-test → preview-deploy → e2e-test
-```
+- **Never modifies production state outside a documented apply step** — no `kubectl edit`, no console clicking that isn't captured in IaC
+- **Never bypasses dry-run on production environments** — dev / staging may have looser rules; prod always dry-runs first
+- **Never deploys without rollback path** — if rollback isn't possible, the change requires explicit human approval recorded in the issue
+- **Never modifies code in fe/be / arch-ddd** — code-level fixes are filed via debug
 
-| Stage | Runner | Target |
-|-------|--------|--------|
-| lint, type-check, unit-test | CI (GitHub Actions) | Source code |
-| preview-deploy | CI → Vercel/platform | PR branch |
-| e2e-test | CI (Playwright) | Preview URL |
-
-### E2E in CI
-
-OPS sets up the Playwright CI step that QA's codified tests run in:
-
-```yaml
-# .github/workflows/e2e.yml (example)
-e2e:
-  needs: [preview-deploy]
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-    - run: pnpm install
-    - run: npx playwright install chromium
-    - run: pnpm exec playwright test
-      env:
-        PREVIEW_URL: ${{ needs.preview-deploy.outputs.url }}
-```
-
-QA writes tests in `e2e/`. OPS makes sure they run in CI.
-
-### Playwright Config (OPS owns this)
-
-```typescript
-// playwright.config.ts (at repo root)
-export default defineConfig({
-  testDir: './e2e',
-  use: {
-    baseURL: process.env.PREVIEW_URL || 'http://localhost:3000',
-  },
-});
-```
-
-## Rules
+## Rules referenced
 
 | Rule | File |
 |------|------|
-| Security | `rules/security.md` |
-| Code Quality | `rules/code-quality.md` |
-| Git Hygiene | `rules/git.md` |
+| Git Hygiene | `../_shared/rules/git.md` |
+| Infra security | `../_shared/rules/security/infra.md` |
+| Code quality (base) | `../_shared/rules/code-quality/base.md` |
+| Dry-run first | `rules/dry-run-first.md` |
+| Reversibility | `rules/reversibility.md` |
+| Change windows | `rules/change-windows.md` |
+| Secrets discipline | `rules/secrets-discipline.md` |
+| Observability default | `rules/observability-default.md` |
+| Platform selection | `rules/platform-selection.md` |
+| Self-test gate | `rules/self-test-gate.md` |
+| Feedback discipline | `rules/feedback-discipline.md` |
 
-## Role-Specific Patterns
+## Cases (loaded on trigger)
 
-### Docker
+### CI/CD + universal infrastructure
 
-- Multi-stage builds, non-root user, pinned versions, proper .dockerignore
+| When | Read |
+|------|------|
+| Designing or changing a CI pipeline | `cases/ci-pipeline-design.md` |
+| Containerising a service or improving Dockerfile | `cases/containerizing-service.md` |
+| Setting up secrets rotation | `cases/secrets-rotation.md` |
+| Investigating a fired alert | `cases/alert-investigation.md` |
 
-### CI/CD
+### Platform-specific (Tier 2 — load when relevant)
 
-- Cache dependencies, fail fast (lint → type → test), testable locally
-- Preview deploy must complete before E2E stage starts
+| When | Read |
+|------|------|
+| Deploying to or modifying K8s | `cases/k8s-deployment.md` |
+| Deploying frontend to Vercel | `cases/vercel-frontend.md` |
+| Deploying to Cloudflare (Workers / Pages / DNS / R2) | `cases/cloudflare-deployment.md` |
+| Deploying to GCP (Cloud Run / Cloud SQL / GCS) | `cases/gcp-services.md` |
 
-### Infrastructure
+## Actions
 
-- Infrastructure as code, health checks, secrets in env vars / secret managers
-- Preview and production use the same Docker image / build output — only config differs
+- `actions/setup.sh` — claim, branch, journal-start
+- `actions/plan-change.sh` — capture dry-run / `terraform plan` / `kubectl --dry-run` output into the issue's body for review
+- `actions/deliver.sh` — multi-stage delivery: gate → push → PR (with embedded rollback runbook) → route
+- `actions/feedback.sh` — Mode C; same shape as fe/be
 
-### Environment Variables
+## Validation
 
-| Scope | Where set | Who manages |
-|-------|-----------|-------------|
-| Build-time (public) | `vercel.json` / CI config | OPS |
-| Runtime secrets | Platform env vars (Vercel/AWS) | OPS |
-| Preview-specific | Preview environment settings | OPS |
-| Production-specific | Production environment settings | OPS + manual approval |
+```bash
+bash ../_shared/validate/check-all.sh "$(pwd)"
+```
 
-## Scope Guard
-
-OPS may modify:
-- `.github/workflows/**` — CI pipelines
-- `Dockerfile`, `docker-compose.yml` — container config
-- `vercel.json`, `netlify.toml` — platform config
-- `playwright.config.ts` — E2E test runner config (shared with QA)
-- Infrastructure files (Terraform, Pulumi, etc.)
-- Root-level config (`tsconfig.json`, `.env.example`, etc.) when infra-related
-
-OPS should NOT modify:
-- `src/`, `apps/*/src/` — application code (that's FE/BE)
-- `e2e/**/*.spec.ts` — test code (that's QA)
-
-## Cases / Log
-
-See `cases/` for reference patterns. Write to `log/` after every task.
+Validators:
+- `validate/lint.sh` — yamllint, hadolint, shellcheck, terraform fmt
+- `validate/security.sh` — trivy image scan, checkov / tfsec for IaC
+- `validate/secrets-leak.sh` — gitleaks scan to catch committed secrets
+- `validate/manifest-dryrun.sh` — kubectl `--dry-run`, terraform `plan`, wrangler `deploy --dry-run` per detected stack
