@@ -9,7 +9,7 @@ argument-hint: [role] [repo]
 Arguments: `$ARGUMENTS` (format: `[role] [repo]`, e.g. `fe owner/my-repo`)
 
 Parse `$ARGUMENTS` by splitting on whitespace:
-- First token → role (be, fe, ops, design, arch, arch-shape, arch-audit, arch-feedback, arch-judgment, fe-advisor, be-advisor, ops-advisor, qa, debug)
+- First token → role (be, fe, ops, design, arch, arch-shape, arch-audit, arch-feedback, arch-judgment, fe-advisor, be-advisor, ops-advisor, design-advisor, qa, debug)
 - Second token → repo slug (owner/repo)
 
 If either is missing, prompt the user interactively (see steps below).
@@ -46,13 +46,14 @@ Which agent role should I take on?
   9. ARCH-JUDGMENT — Escape hatch for verdict conflicts and round-3 escalations
 
  Advisors (read-only consultants invoked by ARCH-SHAPE):
- 10. FE-ADVISOR    — Frontend consultant: posts structured advice; never writes code
- 11. BE-ADVISOR    — Backend consultant: posts structured advice; never writes code or contracts
- 12. OPS-ADVISOR   — Ops consultant: posts structured advice; never modifies infra
+ 10. FE-ADVISOR     — Frontend consultant: posts structured advice; never writes code
+ 11. BE-ADVISOR     — Backend consultant: posts structured advice; never writes code or contracts
+ 12. OPS-ADVISOR    — Ops consultant: posts structured advice; never modifies infra
+ 13. DESIGN-ADVISOR — Design consultant: posts structured advice; never writes specs or modifies tokens
 
  Review & Quality Agents:
- 13. QA            — QA engineer (shift-left test plan, post-impl verify + verdict)
- 14. DEBUG         — Investigator (root cause analysis, files separate fix issue)
+ 14. QA             — QA engineer (shift-left test plan, post-impl verify + verdict)
+ 15. DEBUG          — Investigator (root cause analysis, files separate fix issue)
 
 Reply with the number or name.
 ```
@@ -265,5 +266,6 @@ Every task ends with: **DONE** | **DONE_WITH_CONCERNS** | **BLOCKED** | **NEEDS_
 | 10 | FE-ADVISOR | respond | Structured FE advice comment (read-only) |
 | 11 | BE-ADVISOR | respond | Structured BE advice comment (read-only) |
 | 12 | OPS-ADVISOR | respond | Structured OPS advice comment (read-only) |
-| 13 | QA | test-plan / verify | Test plan or PASS/FAIL verdict |
-| 14 | DEBUG | investigate | Root-cause report + separate fix issue |
+| 13 | DESIGN-ADVISOR | respond | Structured Design advice comment (read-only) |
+| 14 | QA | test-plan / verify | Test plan or PASS/FAIL verdict |
+| 15 | DEBUG | investigate | Root-cause report + separate fix issue |
