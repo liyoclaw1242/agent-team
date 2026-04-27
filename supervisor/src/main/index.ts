@@ -211,7 +211,7 @@ function startAPIServer(sup: Supervisor): void {
           const validRoles = [
             "be", "fe", "ops", "design",
             "arch", "arch-shape", "arch-audit", "arch-feedback", "arch-judgment",
-            "fe-advisor", "be-advisor",
+            "fe-advisor", "be-advisor", "ops-advisor",
             "qa", "debug",
           ];
           const validRuntimes = ["claude", "gemini"];
