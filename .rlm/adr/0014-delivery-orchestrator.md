@@ -97,3 +97,65 @@ Notably:
 - **Token-budget control (deferred per ADR-0012) lands here naturally.** When the ADR materialises, DeliveryOrchestrator is the enforcement point.
 - **WorkPackage `depends_on` ordering** (audit hole) is the orchestrator's responsibility when introduced — it already owns the activation gate.
 - **The architecture no longer assumes invisible coordination.** Every lifecycle move is traceable to a named agent emitting triples.
+
+---
+
+## Amendment 2026-05-12 — DeliveryOrchestrator implementation = agent-sweet-home workflow engine (Path B)
+
+### What changed
+
+The original ADR specified DeliveryOrchestrator as **a cron-triggered Python orchestration script** that, within one cron tick, holds the global Worker lock and chains `claude -p` invocations sequentially (Worker → Validators → Arbiter as needed). Under Path B, that script is **replaced wholesale** by [agent-sweet-home](https://github.com/liyoclaw1242/agent-sweet-home)'s declarative workflow engine, configured by `D:/darfts/agent-team.workflow.yaml`.
+
+The orchestration **responsibilities** specified in the original ADR are preserved — they're just executed by sweet-home's runtime instead of bespoke Python. The mapping:
+
+| Original responsibility (ADR-0014 v1) | sweet-home equivalent (Path B) |
+|---|---|
+| Cron-triggered every N min | `entry.poll.interval_sec` in workflow YAML (v1: 30s) |
+| Consumes `type:workpackage`, `status:approved` | `dispatch.rules` matching `has_label: kind:workpackage` + `has_label: agent:worker` + `has_label: status:approved` → `directive: spawn_fresh role: worker` |
+| Acquires global Worker lock | `entry.poll.max_in_flight: 1` (v1: serializes ALL roles globally, not just Worker — see "v1 simplifications" below) |
+| `rlm mark-in-progress` before Worker activation | `pre_spawn: [{ if: { role: worker }, do: [ transition_status: { from: approved, to: in-progress } ] }]` |
+| Hands the WorkPackage to the Worker | `roles.worker.system_prompt_file` + `needs_worktree: true` (sweet-home auto-carves `spawn-<issue>-<ts>` worktree and prepends `BRANCH:`/`WORKTREE:` lines to the prompt header) |
+| Sequences the 5-stage ValidationPipeline | One dispatch rule per stage's `(agent:*, status:*)` combination. The "sequence" emerges from the label state machine: Worker sets `agent:validator + status:delivered` → next tick matches whitebox rule → WhiteBox sets `agent:blackbox-validator` → next tick matches blackbox rule → BlackBox sets `status:validated` → terminal until human merge |
+| Stage-1 automated tools (lint/typecheck/unit) | GitHub Actions CI on the Worker's PR — unchanged. CI failure does not gate `agent:validator` dispatch in v1; the WhiteBox validator role reads CI status as part of its review. |
+| Stage-3 sandbox deploy | Deferred to Phase 2. v1 BlackBoxValidator role runs against `wrangler dev` / `next dev` / `dotnet run` locally inside the worker's worktree (or against a manually-deployed preview URL). |
+| Post-condition checks after each agent exit | Replaced by **JSON envelope discipline**: each role emits `{"kind": "..."}` as its final assistant message; `on_result.<role>.<kind>` handler does the label transitions. Spawns that fail to emit parseable JSON fall through to `on_no_structured_output`, which auto-routes to `agent:arbiter`. The original ADR's exhaustive per-agent post-conditions (branch ✓, PR ✓, fact commits ✓, summary comment ✓, label flip ✓) become **convention enforced by the agent's JSON contract**, not separate verification steps. |
+| Retry budget counting + escalation | Arbiter role owns retry counter bumps via `set_body_marker: { retry-<stage>: N }`. Escalation = Arbiter emits `kind: escalate` → `on_result.arbiter.escalate` calls `rlm enqueue-message --kind=retry-exhausted` → daemon posts to Discord. |
+| Releases Worker lock at terminal state | Implicit — sweet-home's `max_in_flight` semaphore is held by the in-flight spawn's tokio task; releasing happens when the spawn future drops, automatically. |
+| `mark-delivered` after merge + CI pass | A separate poll-tick concern: a future dispatch rule (or a manual `rlm mark-delivered` from a human) handles the merged-PR → `status:done` transition. Not auto-wired in the v1 workflow yaml because PR merges happen outside the workflow's polling cadence; the human's merge is the trigger. |
+
+### Why this is a strict improvement over hand-rolled Python
+
+1. **Declarative > imperative** — the label state machine is one YAML file, not a Python state machine. New stages are 1-3 YAML lines, not new Python code with new tests.
+2. **Free infrastructure** — sweet-home already provides `claude -p` spawn, NDJSON log streaming, SQLite persistence, cost tracking, kill, HTTP API for observability, automatic worktree allocation, and `on_no_structured_output` degrade fallback. Our hand-rolled Python would have to build all of this.
+3. **Pre-existing UI** — sweet-home's One-Shot tab is a built-in Mission Control: every spawn appears with live log, total cost, kill button. We don't build a separate dashboard.
+4. **Single observability stream** — `one_shot_log_lines` SQLite captures every spawn end-to-end (see ADR-0011 amendment); no second event store.
+5. **Schema-validated config** — `cargo run --example check_yaml` catches YAML errors before runtime. Hand-rolled Python wouldn't have the same compile-time guarantee.
+
+### v1 simplifications (deliberate)
+
+These are called out in `agent-team.workflow.yaml` comments and should not be mistaken for missing features:
+
+1. **`max_in_flight: 1` is global, not per-role.** The original ADR's "global Worker lock" (ADR-0007 / ADR-0015) was Worker-specific — Validators could run in parallel against different WPs. Sweet-home's v0.1 semaphore is shared across all roles. v1 accepts this (single-user, low-volume dogfood); Phase 2 patches sweet-home to add per-role concurrency limits (~50-80 LOC Rust).
+2. **In-cycle chaining replaced by per-tick advancement.** The original ADR held the lock through Worker → Validators → Arbiter inside one cron run. Sweet-home does one dispatch per `(issue × tick)`, advancing the label state and letting the next tick pick up the next stage. Wallclock latency goes up (each transition = one tick interval = 30s); correctness is preserved.
+3. **Post-condition trust.** Original ADR specified Dispatch verifies branch exists, fact commits present, PR opened, etc., AFTER Worker exits — and invokes Arbiter on any failure. Path B trusts the agent's structured JSON: Worker says `kind: delivered` with a `branch`, we trust it. The Validators (which run next) catch lies — they're the real verification. Spawns that fail to emit JSON fall to Arbiter via `on_no_structured_output`. This is a real reduction in defensive verification, accepted for simplicity.
+4. **Stage 3 (sandbox deploy) is manual / local in v1.** Vercel preview deploys + Cloudflare wrangler dev are run by the agent itself in its worktree; the BlackBoxValidator role reads against `localhost:3000` / `:8787` rather than a separate deployed sandbox URL. Phase 2 can add `run_command: ["vercel", "deploy", "--prebuilt"]` to a pre-blackbox `on_result` step.
+5. **`mark-delivered` is not auto-wired.** The human merges the PR; then runs `rlm mark-delivered <wp-num>` manually (or wires GitHub Actions to call it on merge). The workflow doesn't watch PR merges. Phase 2 can add a webhook entry mode for this.
+
+### Access boundaries — unchanged in spirit
+
+The original ADR's access table for DeliveryOrchestrator (Code R: ❌, Code W: ❌, RLM W: WorkPackage labels only, ...) still holds. **Sweet-home as the runtime has no LLM identity** — it's pure infrastructure (Rust + tokio + axum + SQLite). It executes the YAML's `add_labels` / `remove_labels` / `transition_status` / `create_issue` / `run_command` actions, all of which shell out to `gh` and `git` — exactly what the original Python Dispatch would have done. The runtime itself does not have an LLM agent identity to grant code-read or code-write access to.
+
+### Migration cost from the original ADR-0014
+
+- **Python Dispatch scaffolding** — not built yet (we paused implementation before this amendment). No code to delete.
+- **`rlm` CLI** — 17 subcommands implemented, all still useful. The `mark-in-progress` subcommand is now called by sweet-home's `pre_spawn` `transition_status` action (which is internally `gh issue edit --add-label status:in-progress --remove-label status:approved`), so the CLI subcommand is effectively shadowed by inline `gh` calls — but it remains valid for manual / one-shot operations.
+- **Worker SKILL.md (`tdd-loop`)** — already amended in the same round (Path B step A) to drop "push branch / open PR / post summary comment / flip label" responsibilities (those moved to `on_result.worker.delivered`).
+
+### See
+
+- `D:/darfts/agent-team.workflow.yaml` — full v1 dispatcher configuration; ~530 lines
+- `D:/agent-sweet-home/WORKFLOW.md` — schema reference (some sections outdated; Phase 1.5 status table predates runtime completion — runtime is actually implemented; verified by `cargo test` and our smoke test)
+- `D:/agent-sweet-home/src-tauri/src/workflow/` — Rust source for the runtime
+- ADR-0008 amendment (same date) — Hermes split into daemon + workflow-spawned skills
+- ADR-0011 amendment (same date) — events store now sweet-home SQLite
+- ADR-0017 (unchanged) — Arbiter contract still applies, just runs as a workflow role

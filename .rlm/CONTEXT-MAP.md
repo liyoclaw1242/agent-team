@@ -5,6 +5,24 @@ following a layered architecture with three Bounded Contexts and one cross-cutti
 Supervision concern. Designed for the "actually ships" school of agent design —
 human-in-the-loop at three deliberate gates, autonomous between them.
 
+> **2026-05-12 amendment notice — Path B adoption.** This document was authored
+> before [agent-sweet-home](https://github.com/liyoclaw1242/agent-sweet-home) was
+> selected as the workflow runtime. Three ADRs carry the architectural deltas:
+>
+> - **ADR-0008** — Hermes splits into Discord-bridge daemon + workflow-spawned
+>   intake/design skills (sweet-home spawns `claude -p` for the skills; daemon
+>   handles only Discord I/O).
+> - **ADR-0011** — Event store moves from Redis stream `rlm:events` to
+>   sweet-home's SQLite `one_shot_log_lines` + HTTP `/one-shot/{id}/log` API.
+> - **ADR-0014** — DeliveryOrchestrator implementation is now sweet-home's
+>   declarative workflow engine; config lives in `agent-team.workflow.yaml`
+>   at the repo root. The "cron-triggered Python script" model in this doc's
+>   bullet #2 below is superseded by sweet-home's poll loop.
+>
+> Each ADR's amendment is at its file's end. Inline references in this map
+> still point at the right ADR — readers should follow the link and read the
+> amendment alongside the original.
+
 ## Quick orientation (read first if you're new)
 
 Four things that are easy to misread on a first pass:

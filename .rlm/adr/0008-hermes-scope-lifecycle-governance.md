@@ -84,3 +84,50 @@ Hermes hands off to Delivery at WorkPackage `status:approved` and does not re-en
 - **The Delivery BC's agents (Worker, Dispatch, Validators, Arbiter) are unchanged.** Hermes's expansion stops at the WorkPackage handoff.
 - **Cross-agent routing for design discussion is no longer needed** — no `discussion-request` outbound kind. See [ADR-0015](./0015-message-router-contract.md) revision in this round.
 - **A future Worker domain (e.g., UE5) only requires new Worker skills**, not new dialogue/design skills (those are Hermes's job, and they generalise across Worker domains).
+
+---
+
+## Amendment 2026-05-12 — Hermes splits into Discord bridge + workflow-spawned skills (Path B / sweet-home runtime)
+
+### What changed
+
+The original ADR placed **all** Hermes responsibilities (Discord I/O **+** every intake / design skill invocation) inside one long-running `nousresearch/hermes-agent` daemon. After adopting [agent-sweet-home](https://github.com/liyoclaw1242/agent-sweet-home) as the project's declarative workflow runtime (see ADR-0014 amendment), Hermes splits into **two layers** with a clean Issue-label boundary between them:
+
+1. **Hermes daemon (unchanged-ish, slimmer)** — the long-running `hermes-agent`-runtime process that owns Discord credentials. Its job shrinks to:
+   - Listen on `#product`, capture user messages.
+   - Create / update GitHub Issues (`kind:spec` / `kind:business-snapshot` / labels) based on user intent.
+   - Drain the outbound queue (per ADR-0015 — `outbound:*`-labelled comments + `type:supervision-alert` issues) and post to Discord.
+   - Flip `agent:hermes-intake` / `agent:hermes-design` / `agent:human-help` labels per Discord-side state transitions (user said "yes" → flip blocked → proposed; user typed a new question → keep on human-help; etc.).
+
+2. **Hermes intake & design SKILLS (new home)** — every Hermes skill listed in the v1 outline (`business-model-probe`, `signal-to-spec`, `decompose-spec`, `compute-impact-scope`, `select-deployment-strategy`, `draft-adr`, `draft-contract`, `intake-confirmation`, `design-approval`, `design-dialogue`) is now spawned by **agent-sweet-home's workflow engine** as the `hermes-intake` and `hermes-design` roles defined in `D:/darfts/agent-team.workflow.yaml`. Each invocation is a separate `claude -p` subprocess gated by `agent:hermes-intake` / `agent:hermes-design` labels on the relevant Issue.
+
+The two layers communicate **only through GitHub Issue state** (labels + body + comments) — there is no direct Hermes-daemon ↔ workflow IPC. This is deliberate: the daemon-side Discord work and the LLM-side design work proceed at very different cadences and need decoupling.
+
+### Why split
+
+| Pressure | Resolution |
+|---|---|
+| `claude -p` lifecycle (spawn, stream, cost tracking, kill, log) is already implemented in sweet-home. Re-implementing it inside hermes-agent would be duplicate work. | Let sweet-home own the spawn surface. Hermes daemon stops spawning `claude -p` for intake/design skills. |
+| The hermes-agent daemon was carrying *both* event-loop concerns (Discord listening) and LLM-skill concerns (intake/design dispatch). Two cadences, two failure modes — hard to debug as one process. | Daemon becomes single-purpose: Discord I/O bridge. The label-state-machine on Issues is the system of record. |
+| Cross-skill auditability — sweet-home's SQLite event log (per ADR-0011 amendment) captures every spawned skill's full stream. If skills ran inside a Hermes daemon, we'd need a second observability path. | Single observability stream: every Hermes-skill spawn appears in sweet-home's `one_shot_log_lines` like every other agent. |
+| Adding a new skill required hot-reloading the Hermes daemon. | Adding a skill now means: write the SKILL.md, add the `hermes-*` `add_dirs` entry in `agent-team.workflow.yaml`, optionally add a new dispatch rule / on_result kind. No daemon restart. |
+
+### What stays the same from the original ADR-0008
+
+- **Hermes's *agent identity* is unchanged.** The five Hermes-class skills (intake-domain, design-domain, cross-domain) still belong to Hermes — they just *run* in sweet-home's runtime instead of hermes-agent's. From the human-facing perspective, "Hermes" is still the entity having the conversation; the implementation detail (which process spawns the LLM call) is invisible to the user.
+- **Per-skill tool access** still applies. RoleConfig in `agent-team.workflow.yaml` carries `allowed_tools` / `disallowed_tools` / `add_dirs` per role, matching the per-skill scoping the original ADR specified.
+- **No code write privilege** for Hermes-class skills — `disallowed_tools: ["Edit", "Write"]` in the workflow yaml's `hermes-intake` and `hermes-design` roles.
+- **Discord credential-holder invariant** is preserved — only the Hermes daemon talks to Discord. Workflow-spawned skills emit structured-JSON `kind: intake-question` / `kind: clarification-needed` outputs that the workflow's `on_result` handler translates into `rlm enqueue-message` calls. The daemon drains that queue and posts to Discord.
+
+### What no longer applies
+
+- The "Triggers" section's items #1 (Discord event) and #2 (Cron) are now split:
+  - Item #1 lives in the Hermes daemon (Discord listen → Issue update).
+  - Item #2 lives in sweet-home's `entry.poll` loop (Issue scan → role dispatch).
+- "Skill set is human-curated" governance — same intent, different mechanism: skills are checked in to `.claude/skills/` and referenced from `agent-team.workflow.yaml`. There is no daemon-level "load on restart" anymore.
+
+### See
+
+- `D:/darfts/agent-team.workflow.yaml` — roles `hermes-intake` and `hermes-design`, their `system_prompt_file` paths, `add_dirs`, `allowed_tools`, and the `on_result.hermes-*.kind:*` handlers
+- ADR-0011 amendment (same date) — events store change
+- ADR-0014 amendment (same date) — DeliveryOrchestrator now = sweet-home workflow runtime
