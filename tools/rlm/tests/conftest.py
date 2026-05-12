@@ -378,3 +378,103 @@ def runner_env(
     # Chdir into the tmp repo so walk-up works
     monkeypatch.chdir(tmp_rlm_repo)
     yield {"repo": tmp_rlm_repo, "github": fake_github}
+
+
+# ---- Real-git fixtures (for Layer 4 direct-commit + Layer 5 PR-routed) ----
+#
+# Strategy (Path 3 hybrid): real git on tmp dir + mocked push + fake gh.
+# This way `git add` / `git commit` / `git checkout` really run, but `git push`
+# is intercepted (no real remote needed).
+
+
+@pytest.fixture
+def tmp_git_repo(tmp_rlm_repo: Path) -> Path:
+    """Init a real git repo on top of tmp_rlm_repo:
+      - main branch with an initial commit containing the .rlm/ skeleton
+      - bare origin remote (so `origin/main` exists as a local ref;
+        checkout -B branch origin/main works without a real GitHub)
+    Push to origin is mocked separately by `captured_pushes`.
+    """
+    import subprocess as sp
+
+    repo = tmp_rlm_repo
+    sp.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    sp.run(
+        ["git", "config", "user.email", "test@rlm.local"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    sp.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    sp.run(
+        ["git", "config", "commit.gpgsign", "false"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    sp.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    sp.run(
+        ["git", "commit", "-m", "init"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    # Create a bare clone next to the repo to serve as `origin`.
+    # This makes `origin/main` exist as a local remote-tracking ref so that
+    # `git checkout -B foo origin/main` succeeds without hitting any network.
+    # Use a per-test name (repo.name) so concurrent / sequential tests don't
+    # collide on the shared pytest tmp-parent.
+    bare = repo.parent / f"origin-{repo.name}.git"
+    sp.run(
+        ["git", "clone", "--bare", str(repo), str(bare)],
+        check=True,
+        capture_output=True,
+    )
+    sp.run(
+        ["git", "remote", "add", "origin", str(bare)],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    sp.run(
+        ["git", "fetch", "origin"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    return repo
+
+
+@pytest.fixture
+def captured_pushes(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Monkeypatch git.push to record calls instead of actually pushing.
+
+    The bare origin in `tmp_git_repo` does not need pushed updates — tests
+    inspect the local tmp_git_repo's branches + the recorded push calls.
+    """
+    pushes: list[dict[str, Any]] = []
+
+    def fake_push(branch: str, *, remote: str = "origin", cwd: Path | None = None) -> None:
+        pushes.append({"branch": branch, "remote": remote, "cwd": str(cwd) if cwd else None})
+
+    monkeypatch.setattr("rlm.adapters.git.push", fake_push)
+    return pushes
+
+
+@pytest.fixture
+def git_runner_env(
+    tmp_git_repo: Path,
+    fake_github: FakeGitHub,
+    captured_pushes: list[dict[str, Any]],
+    clean_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[dict[str, Any], None, None]:
+    """Real-git + fake_github + push-mocked. Used by Layer 4 / 5 tests."""
+    monkeypatch.chdir(tmp_git_repo)
+    yield {"repo": tmp_git_repo, "github": fake_github, "pushes": captured_pushes}
