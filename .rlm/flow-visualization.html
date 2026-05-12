@@ -687,9 +687,11 @@
           </div>
           <div class="msg-title">一次性把 RLM / Issue / 確認都跑完</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/business-model-2026-05-12.md</code></div>
-            <div class="act add"><span class="icon">+</span>建 Issue #143 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
-            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue=143</code></div>
+            <div class="act note"><span class="icon">$</span><code>rlm append-business-model --signal-ref 142 --snapshot-date 2026-05-12 --body-file /tmp/bm.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ <code>.rlm/business/business-model-2026-05-12.md</code>(direct-commit to main)</div>
+            <div class="act note"><span class="icon">$</span><code>rlm commit-spec --signal-ref 142 --title "Recover mobile booking conversion to ≥ 8.2%" --business-model-ref .rlm/business/business-model-2026-05-12.md --body-file /tmp/spec.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ Issue #143 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
+            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue 143</code></div>
             <div class="act flip"><span class="icon">↻</span>#143 <span class="label-pill draft">status:draft</span><span class="arrow">→</span><span class="label-pill confirmed">status:confirmed</span> · body immutable</div>
           </div>
           <div class="att thread">
@@ -795,7 +797,8 @@
           </div>
           <div class="msg-title">拆兩個 WorkPackage 草稿</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span><code>rlm commit-workpackage --status=draft</code> × 2</div>
+            <div class="act note"><span class="icon">$</span><code>rlm commit-workpackage --parent-spec 143 --title "Revert calendar widget to v1.2" --worker-class web-stack --impact-scope-file /tmp/wp144-scope.yaml --body-file /tmp/wp144.md</code></div>
+            <div class="act note"><span class="icon">$</span><code>rlm commit-workpackage --parent-spec 143 --title "Diagnose + fix v2.0 mobile regression" --worker-class web-stack --depends-on 144 --impact-scope-file /tmp/wp145-scope.yaml --body-file /tmp/wp145.md</code></div>
             <div class="act note"><span class="icon">·</span><strong>WP #144</strong>:Revert calendar widget to v1.2(緊急、無 ADR、無 deps)</div>
             <div class="act note"><span class="icon">·</span><strong>WP #145</strong>:Diagnose + fix v2.0 mobile regression(<code>depends_on: [#144]</code>)</div>
           </div>
@@ -911,8 +914,10 @@ Mobile regression test must pass.</pre>
           <div class="actions">
             <div class="act add"><span class="icon">+</span>branch <code>wp/144-revert-calendar</code>,checkout v1.2 內容</div>
             <div class="act add"><span class="icon">+</span>commit code 變更</div>
-            <div class="act add"><span class="icon">+</span><code>rlm append-fact</code> → <code>.rlm/facts/2026-05-12-calendar-widget-version.md</code></div>
-            <div class="act add"><span class="icon">+</span><code>rlm open-pr</code> 開 PR #146,close #144</div>
+            <div class="act note"><span class="icon">$</span><code>rlm append-fact --slug 2026-05-12-calendar-widget-version --about "code:src/calendar-widget/" --body-file /tmp/fact.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ <code>.rlm/facts/2026-05-12-calendar-widget-version.md</code>(commit 在 wp/144 branch)</div>
+            <div class="act note"><span class="icon">$</span><code>rlm open-pr --issue 144 --branch wp/144-revert-calendar --title "Revert calendar widget to v1.2" --body-file /tmp/pr.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ PR #146,close #144</div>
             <div class="act add"><span class="icon">+</span>在 #144 留 summary comment</div>
             <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill agent">agent:worker</span><span class="arrow">→</span><span class="label-pill agent validator">agent:validator</span></div>
           </div>
@@ -1253,10 +1258,13 @@ Mobile regression test must pass.</pre>
           <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">signal-to-spec → intake-confirmation</span><span class="ts">T+12 min</span><span class="trigger event">event</span></div>
           <div class="msg-title">一次性把 RLM + Spec + 商模都寫</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/business-model-2026-05-12.md</code>(新檔)</div>
-            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/deployment-constraints-2026-05-12.md</code></div>
-            <div class="act add"><span class="icon">+</span>建 Issue #1 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
-            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue=1</code></div>
+            <div class="act note"><span class="icon">$</span><code>rlm append-business-model --signal-ref 1 --snapshot-date 2026-05-12 --body-file /tmp/bm.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ <code>.rlm/business/business-model-2026-05-12.md</code>(新檔)</div>
+            <div class="act note"><span class="icon">$</span><code>rlm append-deployment-constraints --signal-ref 1 --snapshot-date 2026-05-12 --region Taiwan --operations managed_only --budget-monthly-cap 10 --body-file /tmp/dc.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ <code>.rlm/business/deployment-constraints-2026-05-12.md</code></div>
+            <div class="act note"><span class="icon">$</span><code>rlm commit-spec --signal-ref 1 --title "Shared household list — lightweight grocery &amp; chores" --business-model-ref .rlm/business/business-model-2026-05-12.md --deployment-constraints-ref .rlm/business/deployment-constraints-2026-05-12.md --body-file /tmp/spec.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ Issue #1 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
+            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue 1</code></div>
             <div class="act flip"><span class="icon">↻</span>#1 <span class="label-pill draft">status:draft</span><span class="arrow">→</span><span class="label-pill confirmed">status:confirmed</span> · body immutable</div>
           </div>
           <div class="att thread">
@@ -1324,8 +1332,10 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
           <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">draft-adr ×2</span><span class="ts">T+14 min</span></div>
           <div class="msg-title">寫 2 個 ADR + 開 PR(PR-routed,等 liyo merge 才能用)</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span><code>rlm propose-adr</code> → ADR-0001 PR #2(Next.js 14 + Vercel)</div>
-            <div class="act add"><span class="icon">+</span><code>rlm propose-adr</code> → ADR-0002 PR #3(Vercel Postgres + Prisma)</div>
+            <div class="act note"><span class="icon">$</span><code>rlm propose-adr --slug 0001-next-on-vercel --title "Next.js 14 App Router on Vercel" --body-file /tmp/adr1.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ ADR-0001 PR #2</div>
+            <div class="act note"><span class="icon">$</span><code>rlm propose-adr --slug 0002-postgres-prisma --title "Vercel Postgres + Prisma" --body-file /tmp/adr2.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ ADR-0002 PR #3</div>
             <div class="act note"><span class="icon">·</span><em>CLI 持 GitHub token 開 PR;Hermes 自己沒 PR 權限(per ADR-0009)</em></div>
           </div>
           <div class="att gh-adr">
@@ -1379,7 +1389,8 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
           <div class="actions">
             <div class="act read"><span class="icon">→</span>Spec #1 + 兩個 ADR(現在已在 main)</div>
             <div class="act read"><span class="icon">→</span><code>src/</code>:仍空 —— ImpactScope 是<em>將被建立的</em>檔案</div>
-            <div class="act add"><span class="icon">+</span><code>rlm commit-workpackage</code> × 6</div>
+            <div class="act note"><span class="icon">$</span><code>rlm commit-workpackage --parent-spec 1 --title "Project scaffold + Vercel deploy" --worker-class web-stack --adr-refs 1,2 --impact-scope-file /tmp/wp4-scope.yaml --body-file /tmp/wp4.md</code></div>
+            <div class="act note"><span class="icon">·</span><em>+ 5 more in dependency order: #5 (deps #4), #6 (deps #5), #7 (deps #6), #8 (deps #7), #9 (deps #8) — placeholder depends_on resolved to real Issue # at publish time</em></div>
           </div>
           <div class="att file">
             <div class="att-source"><span class="src-icon">🧱</span>WorkPackage breakdown</div>
@@ -1430,7 +1441,7 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
         <div class="msg-content">
           <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">design-approval</span><span class="ts">T+30 min</span><span class="trigger event">event</span></div>
           <div class="actions">
-            <div class="act note"><span class="icon">$</span><code>rlm approve-workpackage --issue=4..7</code></div>
+            <div class="act note"><span class="icon">$</span><code>for n in 4 5 6 7; do rlm approve-workpackage --issue $n; done</code></div>
             <div class="act note"><span class="icon">·</span>CLI 機械驗證 <code>adr_refs: [#2, #3]</code> 都已在 main ✓</div>
             <div class="act flip"><span class="icon">↻</span>#4 #5 #6 #7 全部 <span class="label-pill draft">draft</span><span class="arrow">→</span><span class="label-pill approved">approved</span></div>
             <div class="act note"><span class="icon">·</span>#8 #9 仍 draft,comment「holding for backend confirmation」</div>
@@ -1471,8 +1482,10 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
             <div class="act add"><span class="icon">+</span>branch <code>wp/4-scaffold</code></div>
             <div class="act add"><span class="icon">+</span><code>create-next-app</code>(App Router、TS、Tailwind)</div>
             <div class="act add"><span class="icon">+</span><code>vercel.json</code>、<code>.env.example</code>、minimal landing page</div>
-            <div class="act add"><span class="icon">+</span><code>rlm append-fact</code> → <code>.rlm/facts/2026-05-12-scaffold.md</code>(Next.js 14 + Vercel)</div>
-            <div class="act add"><span class="icon">+</span><code>rlm open-pr</code> → PR #10</div>
+            <div class="act note"><span class="icon">$</span><code>rlm append-fact --slug 2026-05-12-scaffold --about "code:package.json:1-50,code:app/layout.tsx" --body-file /tmp/fact.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ <code>.rlm/facts/2026-05-12-scaffold.md</code>(Next.js 14 + Vercel,commit 在 wp/4 branch)</div>
+            <div class="act note"><span class="icon">$</span><code>rlm open-pr --issue 4 --branch wp/4-scaffold --title "Scaffold Next.js 14 + Vercel deploy" --body-file /tmp/pr.md</code></div>
+            <div class="act add"><span class="icon">+</span>→ PR #10</div>
             <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill agent">agent:worker</span><span class="arrow">→</span><span class="label-pill agent validator">agent:validator</span></div>
           </div>
           <div class="att gh-pr">
