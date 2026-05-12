@@ -237,7 +237,7 @@
 
 | 區塊 | 條目數 | 已動工 |
 |---|---|---|
-| A. 實作前置(pre-v1) | 6 | 3.75(A4 / A5 / A6 已定 + A3 75% — intake 4 + design 5 / 12 skill 已寫,剩 cross 3) |
+| A. 實作前置(pre-v1) | 6 | 4.75(A1 contract 已寫 + A4 / A5 / A6 已定 + A3 75% — intake 4 + design 5 / 12 skill 已寫) |
 | B. 結構缺口(pre-v2) | 7 | 0 |
 | C. v2 能力 | 5 | 0 |
 | D. polish | 3 | 0 |
@@ -250,7 +250,8 @@
 - **A4 Supervision event log backend**:**Redis(熱資料) + JSONL append-only file(durable archive)**。每個 event 同時寫 Redis stream(供 Arbiter / Supervision 快讀)和 `.local/events.jsonl`(供 audit / replay)。Schema 遵 ADR-0012 event spec。
 - **A5 Global Worker lock**:**Redis key + TTL**(`SETNX rlm:worker:lock <dispatch_id>` + `EXPIRE`)。TTL 待 Worker iteration 上限定下後決定(估 30 min)。
 - **A6 Discord bot 部署**:已部署(user-managed,跑 hermes-agent daemon),不擋 v1 開發。
-- **未定**:A2 CI fact-commit check、A3 Skill 名稱清單剩 3/12(cross-domain:intake-confirmation / design-approval / design-dialogue)。
+- **未定**:A2 CI fact-commit check 細節(check name 暫定 `rlm/fact-commit-required`,定義在 `.rlm/contracts/rlm-cli.md` open questions 第 4 項)、A3 Skill 名稱清單剩 3/12(cross-domain:intake-confirmation / design-approval / design-dialogue)。
+- **A1 rlm CLI 規格已釘**(`.rlm/contracts/rlm-cli.md`,1126 行)—— 鎖定 17 個 subcommand 的 invocation surface、frontmatter / Issue body schemas、caller-identity 機制(`RLM_AGENT_ROLE` env var)、triple emission(Redis stream + JSONL dual-sink)、error model(8 個 stable exit codes)、idempotency keys。借自舊版的 `--from-file` + `--json` + walk-up discovery + slug 慣例。實作從這份契約走,不從 ADR-0004 表格走(它是 high-level)。
 - **A3 已寫**(`.claude/skills/<name>/SKILL.md`,Claude Agent SDK 格式):
 
   **Intake (4)** — 改編自 gstack/office-hours
