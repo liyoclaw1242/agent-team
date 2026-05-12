@@ -46,7 +46,7 @@ echo ""
 # ---------------------------------------------------------------------------
 # 1. GitHub labels
 # ---------------------------------------------------------------------------
-echo "[1/3] Creating GitHub labels in $REPO…"
+echo "[1/3] Creating GitHub labels in $REPO..."
 
 create_label() {
   local name="$1" color="$2" description="$3"
@@ -62,31 +62,31 @@ create_label() {
   fi
 }
 
-# kind — blue family
+# kind -- blue family
 create_label "kind:spec"        "0075ca" "Specification document"
 create_label "kind:workpackage" "0052cc" "Vertical-slice work unit for Worker"
 
-# status — lifecycle progression
-create_label "status:proposed"   "e4e669" "Draft created, awaiting confirmation"
-create_label "status:approved"   "0e8a16" "Approved, ready for next agent"
+# status -- lifecycle progression
+create_label "status:proposed"    "e4e669" "Draft created, awaiting confirmation"
+create_label "status:approved"    "0e8a16" "Approved, ready for next agent"
 create_label "status:in-progress" "f9d0c4" "Agent is actively working"
-create_label "status:blocked"    "b60205" "Waiting on human input"
-create_label "status:delivered"  "6f42c1" "Work delivered, in validation"
-create_label "status:validated"  "0e8a16" "All validators passed"
-create_label "status:done"       "006b75" "Merged and closed"
-create_label "status:cancelled"  "e4e669" "Cancelled"
+create_label "status:blocked"     "b60205" "Waiting on human input"
+create_label "status:delivered"   "6f42c1" "Work delivered, in validation"
+create_label "status:validated"   "0e8a16" "All validators passed"
+create_label "status:done"        "006b75" "Merged and closed"
+create_label "status:cancelled"   "e4e669" "Cancelled"
 
-# agent routing — teal family
-create_label "agent:hermes-intake"       "00aabb" "Assigned to Hermes intake skill"
-create_label "agent:hermes-design"       "00aabb" "Assigned to Hermes design skill"
-create_label "agent:worker"              "00aabb" "Assigned to Worker"
-create_label "agent:validator"           "00aabb" "Assigned to WhiteBox Validator"
-create_label "agent:blackbox-validator"  "00aabb" "Assigned to BlackBox Validator"
-create_label "agent:arbiter"             "00aabb" "Assigned to Arbiter (recovery)"
-create_label "agent:human-help"          "d93f0b" "Blocked — needs human response"
+# agent routing -- teal family
+create_label "agent:hermes-intake"      "00aabb" "Assigned to Hermes intake skill"
+create_label "agent:hermes-design"      "00aabb" "Assigned to Hermes design skill"
+create_label "agent:worker"             "00aabb" "Assigned to Worker"
+create_label "agent:validator"          "00aabb" "Assigned to WhiteBox Validator"
+create_label "agent:blackbox-validator" "00aabb" "Assigned to BlackBox Validator"
+create_label "agent:arbiter"            "00aabb" "Assigned to Arbiter (recovery)"
+create_label "agent:human-help"         "d93f0b" "Blocked -- needs human response"
 
 # coordination
-create_label "human-review"          "e99695" "PR ready for human merge"
+create_label "human-review"           "e99695" "PR ready for human merge"
 create_label "awaiting-wp-completion" "c5def5" "Spec waiting for all WPs to complete"
 
 echo ""
@@ -94,22 +94,22 @@ echo ""
 # ---------------------------------------------------------------------------
 # 2. Update .workflow-repos.json
 # ---------------------------------------------------------------------------
-echo "[2/3] Updating .workflow-repos.json…"
+echo "[2/3] Updating .workflow-repos.json..."
 
 REPOS_FILE="$SCRIPT_DIR/.workflow-repos.json"
 printf '[{"repo":"%s","path":"%s"}]\n' "$REPO" "$LOCAL_PATH" > "$REPOS_FILE"
 echo "  Wrote: $REPOS_FILE"
-echo "  → repo: $REPO  path: $LOCAL_PATH"
+echo "  repo: $REPO  path: $LOCAL_PATH"
 echo ""
 
 # ---------------------------------------------------------------------------
 # 3. Write ~/.hermes/agent-team.env
 # ---------------------------------------------------------------------------
-echo "[3/3] Writing ~/.hermes/agent-team.env…"
+echo "[3/3] Writing ~/.hermes/agent-team.env..."
 
 HERMES_ENV="$HOME/.hermes/agent-team.env"
 cat > "$HERMES_ENV" <<EOF
-# Written by init-target-repo.sh — source this in Hermes skills that need
+# Written by init-target-repo.sh -- source this in Hermes skills that need
 # to know the active agent-team target repo.
 AGENT_TEAM_REPO="$REPO"
 AGENT_TEAM_LOCAL_PATH="$LOCAL_PATH"
@@ -129,6 +129,5 @@ echo "     cd ~/Projects/agent-sweet-home"
 echo "     WORKFLOW_FILE=$SCRIPT_DIR/agent-team.workflow.yaml \\"
 echo "         cargo run --manifest-path src-tauri/Cargo.toml --no-default-features"
 echo ""
-echo "  2. Send a test signal in Discord #product."
-echo "     Hermes will create a kind:spec issue in $REPO"
-echo "     and sweet-home will dispatch hermes-intake."
+echo "  2. Open sweet-home Persistent tab, cwd = $SCRIPT_DIR"
+echo "     Tell Claude: 'Run signal-to-spec -- I want to build a todo list app'"
