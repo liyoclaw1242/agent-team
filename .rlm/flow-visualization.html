@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>AI Agent-Team Flow (v2 — Slack view)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', "Microsoft JhengHei", sans-serif;
+    background: #1a1d21;
+    color: #d1d2d3;
+    font-size: 15px;
+    line-height: 1.46;
+  }
+
+  [hidden] { display: none !important; }
+
+  .app { display: flex; min-height: 100vh; max-width: 1500px; margin: 0 auto; }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    width: 260px;
+    background: #19171d;
+    border-right: 1px solid #2c2d30;
+    flex-shrink: 0;
+    display: flex; flex-direction: column;
+  }
+  .workspace {
+    padding: 14px 16px;
+    border-bottom: 1px solid #2c2d30;
+    color: #fff; font-weight: 900; font-size: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .workspace .ws-status {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #2bac76;
+  }
+  .nav-section { padding: 12px 0 6px; }
+  .nav-section h4 {
+    font-size: 11px; color: #9a9b9d;
+    text-transform: lowercase; font-weight: 700;
+    padding: 4px 16px; letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .nav-item {
+    padding: 4px 16px;
+    color: #bcabbc; font-size: 14px;
+    cursor: default;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .nav-item[data-scenario] {
+    cursor: pointer;
+    transition: background .08s;
+  }
+  .nav-item[data-scenario]:hover { background: #27242c; }
+  .nav-item.active {
+    background: #1164a3 !important; color: #fff; font-weight: 700;
+  }
+  .nav-item .hash, .nav-item .dot {
+    color: #9a9b9d; font-weight: 400; width: 14px;
+    display: inline-block; text-align: center;
+  }
+  .nav-item.active .hash { color: #fff; }
+  .nav-item .dot.online { color: #2bac76; }
+  .nav-item .dot.offline { color: #696a6c; }
+  .nav-item.muted { color: #696a6c; }
+  .nav-item .badge-new {
+    background: #e01e5a; color: #fff;
+    font-size: 10px; padding: 0 5px; border-radius: 8px;
+    margin-left: auto; font-weight: 700;
+  }
+
+  /* ============ CHANNEL MAIN ============ */
+  .channel {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: #1a1d21;
+    min-width: 0;
+  }
+  .channel-header {
+    padding: 12px 24px;
+    border-bottom: 1px solid #2c2d30;
+    display: flex; align-items: baseline; gap: 12px;
+    background: #1a1d21; position: sticky; top: 0; z-index: 10;
+  }
+  .channel-name {
+    font-size: 18px; color: #fff; font-weight: 900;
+  }
+  .channel-name .hash { color: #9a9b9d; margin-right: 4px; }
+  .channel-topic {
+    font-size: 13px; color: #9a9b9d;
+    border-left: 1px solid #2c2d30;
+    padding-left: 12px;
+  }
+  .channel-topic code {
+    background: #1d1c1d; padding: 1px 5px; border-radius: 3px;
+    font-family: 'SF Mono', Consolas, monospace; color: #e8912d;
+  }
+  .channel-members {
+    margin-left: auto; font-size: 13px; color: #9a9b9d;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .pinned-bar {
+    padding: 8px 24px;
+    background: #222529;
+    border-bottom: 1px solid #2c2d30;
+    font-size: 13px; color: #9a9b9d;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pinned-bar strong { color: #d1d2d3; }
+
+  /* ============ MESSAGE STREAM ============ */
+  .messages { padding: 16px 0 40px; }
+
+  /* Date / phase divider */
+  .divider {
+    display: flex; align-items: center;
+    padding: 16px 24px 8px;
+    position: sticky; top: 53px;
+    background: linear-gradient(180deg, #1a1d21 70%, transparent);
+    z-index: 5;
+  }
+  .divider .line {
+    flex: 1; height: 1px; background: #383b40;
+  }
+  .divider .label {
+    margin: 0 12px;
+    padding: 3px 12px;
+    border: 1px solid #383b40;
+    border-radius: 24px;
+    font-size: 13px; font-weight: 700;
+    background: #1a1d21;
+    color: #d1d2d3;
+  }
+  .divider.intake .label { color: #2bac76; border-color: #2bac76; }
+  .divider.design .label { color: #c39bd3; border-color: #c39bd3; }
+  .divider.delivery .label { color: #ecb22e; border-color: #ecb22e; }
+  .divider.merge .label { color: #36c5f0; border-color: #36c5f0; }
+  .divider.infra .label { color: #9a9b9d; border-color: #9a9b9d; }
+  .divider.retry .label { color: #e01e5a; border-color: #e01e5a; }
+
+  /* Message */
+  .msg {
+    padding: 8px 24px;
+    display: flex; gap: 10px;
+    transition: background .08s;
+  }
+  .msg:hover { background: #222529; }
+
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 15px;
+    color: #fff;
+    user-select: none;
+  }
+  .avatar.user { background: #1abc9c; color: #fff; }
+  .avatar.system { background: #4a154b; }
+  .avatar.hermes-intake { background: #2bac76; }
+  .avatar.hermes-design { background: #c39bd3; color: #1a1d21; }
+  .avatar.worker { background: #ecb22e; color: #1a1d21; }
+  .avatar.dispatch { background: #616061; }
+  .avatar.whitebox { background: #36c5f0; color: #1a1d21; }
+  .avatar.blackbox { background: #1d4d6b; }
+  .avatar.arbiter { background: #e01e5a; }
+  .avatar.supervision { background: #616061; }
+  .avatar.ci { background: #28a745; }
+
+  .msg-content { flex: 1; min-width: 0; }
+
+  .msg-head {
+    display: flex; align-items: baseline;
+    gap: 6px; flex-wrap: wrap;
+    margin-bottom: 2px;
+  }
+  .msg-head .name {
+    font-weight: 900; color: #fff; font-size: 15px;
+  }
+  .msg-head .app-tag {
+    background: #4a4b4d; color: #d1d2d3;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px;
+    text-transform: uppercase;
+  }
+  .msg-head .skill-tag {
+    background: #c39bd333; color: #c39bd3;
+    border: 1px solid #c39bd344;
+    font-size: 11px; padding: 1px 6px;
+    border-radius: 3px; font-family: 'Operator Mono', 'SF Mono', Consolas, monospace;
+  }
+  .msg-head .skill-tag.intake {
+    background: #2bac7633; color: #2bac76; border-color: #2bac7644;
+  }
+  .msg-head .skill-tag.worker {
+    background: #ecb22e22; color: #ecb22e; border-color: #ecb22e44;
+  }
+  .msg-head .skill-tag.cross {
+    background: #36c5f033; color: #36c5f0; border-color: #36c5f044;
+  }
+  .msg-head .ts { color: #9a9b9d; font-size: 12px; }
+  .msg-head .trigger {
+    font-size: 10px; padding: 1px 6px;
+    border-radius: 8px;
+    font-family: 'SF Mono', Consolas, monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .msg-head .trigger.event { background: #c39bd322; color: #c39bd3; }
+  .msg-head .trigger.cron  { background: #1d9bd122; color: #36c5f0; }
+  .msg-head .trigger.user  { background: #ecb22e22; color: #ecb22e; }
+
+  .msg-title { font-weight: 700; color: #fff; margin: 2px 0 6px; font-size: 15px; }
+
+  .msg-body { color: #d1d2d3; font-size: 14.6px; }
+  .msg-body p + p { margin-top: 6px; }
+  .msg-body ul, .msg-body ol { margin-left: 20px; margin-top: 4px; }
+  .msg-body li { margin: 2px 0; }
+  .msg-body code {
+    background: #1d1c1d;
+    border: 1px solid #313234;
+    padding: 1px 5px; border-radius: 3px;
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 12.5px; color: #e8912d;
+  }
+  .msg-body a { color: #1d9bd1; text-decoration: none; }
+  .msg-body a:hover { text-decoration: underline; }
+
+  /* Action chips */
+  .actions {
+    margin-top: 8px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .act {
+    font-size: 13px;
+    display: flex; align-items: flex-start; gap: 8px;
+    color: #bbbcbe;
+  }
+  .act .icon {
+    flex-shrink: 0;
+    width: 18px; text-align: center;
+    font-weight: 900;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+  .act.read .icon { color: #1d9bd1; }
+  .act.add .icon  { color: #2bac76; }
+  .act.remove .icon { color: #e01e5a; }
+  .act.flip .icon { color: #c39bd3; }
+  .act.note .icon { color: #9a9b9d; }
+
+  /* Attachment */
+  .att {
+    margin-top: 8px;
+    padding: 10px 12px 12px;
+    border-radius: 4px;
+    background: #1d1c1d;
+    border-left: 4px solid #4a154b;
+    max-width: 720px;
+  }
+  .att.thread { border-left-color: #5865f2; }
+  .att.gh-pr { border-left-color: #2bac76; }
+  .att.gh-issue { border-left-color: #ecb22e; }
+  .att.gh-adr { border-left-color: #c39bd3; }
+  .att.file { border-left-color: #616061; }
+  .att.warn { border-left-color: #e01e5a; }
+  .att-source {
+    font-size: 11px; color: #9a9b9d;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .att-source .src-icon { font-size: 13px; }
+  .att-title { color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .att-body { font-size: 14px; color: #d1d2d3; }
+  .att-body p + p { margin-top: 4px; }
+  .att-body em { color: #9a9b9d; font-style: normal; }
+  .att-body pre {
+    margin-top: 6px;
+    padding: 10px 12px;
+    background: #0e0e0e;
+    border: 1px solid #2c2d30;
+    border-radius: 4px;
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 12.5px;
+    color: #d1d2d3;
+    white-space: pre-wrap; word-break: break-word;
+    overflow-x: auto;
+  }
+  .att-meta {
+    margin-top: 8px;
+    font-size: 12px; color: #9a9b9d;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+
+  /* Labels */
+  .label-pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-family: 'SF Mono', Consolas, monospace;
+    border: 1px solid transparent;
+    line-height: 1.6;
+  }
+  .label-pill.draft     { background: #6e768122; color: #9a9b9d; border-color: #6e768144; }
+  .label-pill.confirmed { background: #2bac7622; color: #56d364; border-color: #2bac7644; }
+  .label-pill.approved  { background: #196c2e22; color: #56d364; border-color: #196c2e44; }
+  .label-pill.progress  { background: #bf872022; color: #ecb22e; border-color: #bf872044; }
+  .label-pill.delivered { background: #1d9bd122; color: #36c5f0; border-color: #1d9bd144; }
+  .label-pill.cancelled { background: #e01e5a22; color: #e01e5a; border-color: #e01e5a44; }
+  .label-pill.agent     { background: #ecb22e22; color: #ecb22e; border-color: #ecb22e44; }
+  .label-pill.agent.human { background: #e01e5a22; color: #e01e5a; border-color: #e01e5a44; }
+  .label-pill.agent.validator { background: #36c5f022; color: #36c5f0; border-color: #36c5f044; }
+  .label-pill.spec      { background: #4a154b44; color: #c39bd3; border-color: #4a154b66; }
+  .label-pill.retry     { background: #30363d; color: #d1d2d3; }
+  .label-pill.outbound  { background: #1d9bd122; color: #36c5f0; border-color: #1d9bd144; }
+  .arrow { color: #9a9b9d; margin: 0 4px; }
+
+  /* Pinned message */
+  .msg.pinned {
+    background: #1e2128;
+    border-left: 3px solid #ecb22e;
+  }
+  .msg.pinned:hover { background: #222529; }
+
+  /* Reactions */
+  .reactions {
+    margin-top: 6px;
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .reaction {
+    background: #222529;
+    border: 1px solid #383b40;
+    padding: 1px 7px;
+    border-radius: 12px;
+    font-size: 12px; color: #d1d2d3;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .reaction .emoji { font-size: 13px; }
+  .reaction .count { color: #9a9b9d; font-weight: 700; }
+
+  /* Final state card */
+  .final-card {
+    margin: 24px;
+    padding: 20px 24px;
+    background: #1d1c1d;
+    border: 1px solid #2c2d30;
+    border-radius: 6px;
+  }
+  .final-card h2 {
+    color: #fff; font-size: 18px; font-weight: 900;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .final-card h3 {
+    color: #c39bd3; font-size: 13px;
+    margin: 14px 0 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .final-card ul { margin-left: 20px; }
+  .final-card li { margin: 3px 0; font-size: 14px; }
+
+  /* Key obs */
+  .key-obs {
+    margin: 20px 24px;
+    padding: 16px 20px;
+    background: #1e2128;
+    border-left: 3px solid #36c5f0;
+    border-radius: 4px;
+  }
+  .key-obs h3 {
+    color: #36c5f0; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .key-obs ol { margin-left: 18px; }
+  .key-obs li { margin: 6px 0; font-size: 14px; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="workspace">
+      <span class="ws-status"></span>
+      AI Agent-Team
+    </div>
+
+    <div class="nav-section">
+      <h4>▾ Scenarios</h4>
+      <div class="nav-item active" data-scenario="conversion-drop">
+        <span class="hash">#</span> conversion-drop
+      </div>
+      <div class="nav-item" data-scenario="todolist-build">
+        <span class="hash">#</span> todolist-build
+        <span class="badge-new">NEW</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <h4>▾ Channels</h4>
+      <div class="nav-item muted"><span class="hash">#</span> product</div>
+      <div class="nav-item muted"><span class="hash">#</span> intake-confirmation</div>
+      <div class="nav-item muted"><span class="hash">#</span> design-approval</div>
+      <div class="nav-item muted"><span class="hash">#</span> supervision-alerts</div>
+    </div>
+
+    <div class="nav-section">
+      <h4>▾ Direct messages</h4>
+      <div class="nav-item"><span class="dot online">●</span> liyo</div>
+      <div class="nav-item"><span class="dot online">●</span> Hermes</div>
+      <div class="nav-item"><span class="dot online">●</span> Dispatch <small style="color:#696a6c">(cron)</small></div>
+      <div class="nav-item"><span class="dot offline">○</span> Worker</div>
+      <div class="nav-item"><span class="dot offline">○</span> WhiteBoxValidator</div>
+      <div class="nav-item"><span class="dot offline">○</span> BlackBoxValidator</div>
+      <div class="nav-item"><span class="dot offline">○</span> Arbiter</div>
+      <div class="nav-item"><span class="dot online">●</span> Supervision</div>
+    </div>
+
+    <div class="nav-section">
+      <h4>▾ Apps</h4>
+      <div class="nav-item muted"><span class="dot">▮</span> hermes-agent</div>
+      <div class="nav-item muted"><span class="dot">▮</span> GitHub</div>
+      <div class="nav-item muted"><span class="dot">▮</span> ProductionMonitor</div>
+    </div>
+  </aside>
+
+  <!-- ===================== CHANNEL MAIN ===================== -->
+  <main class="channel">
+
+    <header class="channel-header">
+      <div class="channel-name"><span class="hash">#</span><span id="channel-name-text">conversion-drop</span></div>
+      <div class="channel-topic" id="channel-topic-text">
+        情境:小型 SaaS 線上預約系統,轉換率突然下滑。對話跑在 <code>#product</code> thread「conversion drop」
+      </div>
+      <div class="channel-members">👥 9</div>
+    </header>
+
+    <div class="pinned-bar">
+      📌 <strong>2 pinned</strong> · v2 changes from v1 · Legend (avatars / triggers)
+    </div>
+
+    <div class="messages">
+
+      <!-- ============== GLOBAL PINNED ============== -->
+      <article class="msg pinned">
+        <div class="avatar system">📌</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Pinned by admin</span>
+            <span class="app-tag">PIN</span>
+            <span class="ts">v2 changes from v1</span>
+          </div>
+          <div class="msg-body">
+            <ul>
+              <li><strong>Architect agent 消失</strong> —— Design 工作變成 Hermes 的 design-domain skills</li>
+              <li><strong>RelayBot 消失</strong> —— hermes-agent runtime 直接連 Discord(long-running daemon)</li>
+              <li><strong>Hermes 跨 Intake + Design 兩個 BC</strong>(BC 仍是語言邊界,operational owner 同一個)</li>
+              <li><strong>對話先在 Discord thread 完整跑,共識後才寫進 RLM / 建 Issue</strong></li>
+              <li><strong>Per-skill tool access</strong> —— Hermes 的 code R 只在 design-domain skills 啟用時開放</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg pinned">
+        <div class="avatar system">🎨</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Pinned by admin</span>
+            <span class="app-tag">PIN</span>
+            <span class="ts">Avatar legend</span>
+          </div>
+          <div class="msg-body">
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:4px;">
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar hermes-intake" style="width:22px;height:22px;font-size:11px;">H</span> Hermes(Intake)</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar hermes-design" style="width:22px;height:22px;font-size:11px;">H</span> Hermes(Design)</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar worker" style="width:22px;height:22px;font-size:11px;">W</span> Worker</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar dispatch" style="width:22px;height:22px;font-size:11px;">D</span> Dispatch</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar whitebox" style="width:22px;height:22px;font-size:11px;">V</span> WhiteBox</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar blackbox" style="width:22px;height:22px;font-size:11px;">V</span> BlackBox</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar arbiter" style="width:22px;height:22px;font-size:11px;">A</span> Arbiter</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar user" style="width:22px;height:22px;font-size:11px;">L</span> liyo(人)</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar ci" style="width:22px;height:22px;font-size:11px;">CI</span> GitHub</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span class="avatar system" style="width:22px;height:22px;font-size:11px;">⚙</span> 系統 / Infra</span>
+            </div>
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <span class="trigger event" style="font-size:10px;padding:1px 6px;border-radius:8px;font-family:monospace;font-weight:700;background:#c39bd322;color:#c39bd3;">EVENT</span><span style="font-size:13px;color:#9a9b9d;">秒級(Discord → daemon → fresh invocation)</span>
+              <span class="trigger cron" style="font-size:10px;padding:1px 6px;border-radius:8px;font-family:monospace;font-weight:700;background:#1d9bd122;color:#36c5f0;">CRON</span><span style="font-size:13px;color:#9a9b9d;">分鐘級(scan queue / 新 Spec / 輪詢)</span>
+              <span class="trigger user" style="font-size:10px;padding:1px 6px;border-radius:8px;font-family:monospace;font-weight:700;background:#ecb22e22;color:#ecb22e;">USER</span><span style="font-size:13px;color:#9a9b9d;">人類動作</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+
+      <!-- =================================================================
+           SCENARIO 1: conversion-drop
+           ================================================================= -->
+      <div class="scenario-content" data-scenario="conversion-drop">
+
+      <!-- ============== PHASE 0 ============== -->
+      <div class="divider infra">
+        <div class="line"></div>
+        <div class="label">Phase 0 — 系統就位</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">⚙</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">System</span>
+            <span class="app-tag">APP</span>
+            <span class="ts">T−∞ · 一次性設定</span>
+          </div>
+          <div class="msg-title">Repo + hermes-agent daemon + cron 都備好</div>
+          <div class="msg-body">
+            <ul>
+              <li>GitHub repo 存在,<code>.rlm/adr/</code> / <code>.rlm/facts/</code> / <code>.rlm/business/</code> / <code>.rlm/contracts/</code> 結構就位</li>
+              <li>hermes-agent daemon 跑在 server,connected to Discord <code>#product</code></li>
+              <li>cron 排程:Dispatch 5 min、ProductionMonitor 15 min、Hermes 內建 cron 由框架管</li>
+              <li><code>rlm</code> CLI 安裝就緒</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 1 ============== -->
+      <div class="divider intake">
+        <div class="line"></div>
+        <div class="label">Phase 1 — Intake:Discord 對話直到共識</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>關鍵差異:</strong>整個 Phase 1 結束前,RLM 跟 Issue 都不會被動。<em>對話先跑完,共識後才落地。</em></p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">liyo</span>
+            <span class="ts">T+0</span>
+            <span class="trigger user">user</span>
+          </div>
+          <div class="msg-body">
+            <p>這週轉換率掉了 15%,上週 8.2%,這週 7.0%。好像主要是 mobile。能不能 look at 這個</p>
+            <div class="reactions"><span class="reaction"><span class="emoji">🧵</span><span class="count">new thread: conversion drop</span></span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag intake">business-model-probe</span>
+            <span class="ts">T+0.3s</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">daemon spawn fresh invocation</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>讀 Discord thread(目前只有 liyo 那則)</div>
+            <div class="act read"><span class="icon">→</span>讀 RLM <code>.rlm/business/saas-appointments-2026-04.md</code></div>
+            <div class="act read"><span class="icon">→</span>讀 RLM <code>.rlm/contracts/</code></div>
+            <div class="act note"><span class="icon">·</span>判定:商業脈絡有,但細節缺,要追問</div>
+            <div class="act note"><span class="icon">·</span><em>還沒動 Issue / RLM,只在 thread 回覆</em></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread · <code style="background:#0e0e0e;padding:1px 4px;border-radius:3px;color:#36c5f0;font-family:monospace;font-size:11px;">#product / conversion drop</code></div>
+            <div class="att-body">
+              <p>嗨,先釐清三件事再判斷要怎麼處理:</p>
+              <ol>
+                <li>mobile 是你的主力流量嗎?還是這次只 mobile 掉?</li>
+                <li>漏斗哪段你最懷疑?預約 / 付款 / 帳號?</li>
+                <li>「恢復」目標是?回 8.2% 還是新目標?</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+12 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>1. mobile ≈ 70% &nbsp;·&nbsp; 2. 預約 flow,週二改了 calendar widget &nbsp;·&nbsp; 3. 下個 sprint 回 8.2%</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag intake">business-model-probe</span>
+            <span class="ts">T+12 min</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">整理脈絡 → 共識 90%,再追問一次</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>re-read 整個 thread</div>
+            <div class="act note"><span class="icon">·</span>還缺「Tuesday widget 是什麼版本」和「驗證方式」</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>再兩件事:</p>
+              <ul>
+                <li>週二改的 widget 是 v1.2 → v2.0 對嗎?(git log 看不到,需要你確認)</li>
+                <li>「回 8.2%」要怎麼測? ProductionMonitor 自動驗證,還是你自己看?</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+15 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>yes v2.0,用 ProductionMonitor 跑 7 天平均</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag intake">business-model-probe → signal-to-spec</span>
+            <span class="ts">T+15 min</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">達成共識,主動詢問 commit</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span>內部判定:資訊夠了,可以收斂成 Spec</div>
+            <div class="act note"><span class="icon">·</span><em>還沒寫 RLM / 還沒建 Issue,只在 Discord 提案</em></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread · 📋 proposed Spec</div>
+            <div class="att-body">
+              <p>OK,我有共識了,要把這個記成 Spec 嗎?</p>
+              <p><strong>📋 提案 Spec:</strong> Recover mobile booking conversion to ≥ 8.2%</p>
+              <p><strong>AcceptanceCriteria:</strong></p>
+              <ul>
+                <li>✓ Mobile booking conversion ≥ 8.2%(測 = ProductionMonitor 7d 平均,end of sprint)</li>
+                <li>✓ No regression in desktop conversion</li>
+                <li>✓ No regression in fraud-block rate</li>
+              </ul>
+              <p><strong>Business context:</strong> 70% mobile;週二 v1.2 → v2.0 widget change 是主要疑點。</p>
+              <p>回 <code>yes</code> 我建 Issue 並寫進 RLM,然後切到 design mode 開始拆 WorkPackage。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+16 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>yes</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag intake">signal-to-spec → intake-confirmation</span>
+            <span class="ts">T+16 min</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">一次性把 RLM / Issue / 確認都跑完</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/business-model-2026-05-12.md</code></div>
+            <div class="act add"><span class="icon">+</span>建 Issue #143 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
+            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue=143</code></div>
+            <div class="act flip"><span class="icon">↻</span>#143 <span class="label-pill draft">status:draft</span><span class="arrow">→</span><span class="label-pill confirmed">status:confirmed</span> · body immutable</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ Spec confirmed: <a>Issue #143</a></p>
+              <p>✓ Business context 更新:<code>.rlm/business/business-model-2026-05-12.md</code></p>
+              <p>開始進 design mode,讀 code 找根因,等我幾分鐘。</p>
+            </div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">✅</span><span class="count">spec gate passed</span></span>
+            <span class="reaction"><span class="emoji">🔒</span><span class="count">body frozen</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>Phase 1 結束:</strong> Spec Issue #143(immutable)+ business model snapshot。16 分鐘 Discord thread 作為 audit trail,<strong>不重複寫進 Issue body</strong>。</p></div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 2 ============== -->
+      <div class="divider design">
+        <div class="line"></div>
+        <div class="label">Phase 2 — Design:同個 Hermes,切 skill 模式</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>同一個 Hermes、同一個 Discord thread、不同 skill 模式。</strong>avatar 配色換成紫色標示 design mode。</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag">decompose-spec / compute-impact-scope</span>
+            <span class="ts">T+18 min</span><span class="trigger cron">cron / 接續</span>
+          </div>
+          <div class="msg-title">啟動 design-domain skill(此 skill 開放 code R)</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>Spec #143 + 過去對話 link</div>
+            <div class="act read"><span class="icon">→</span><strong>Code (read-only, per-skill 開放)</strong>:<code>src/booking/</code> <code>src/calendar-widget/</code></div>
+            <div class="act read"><span class="icon">→</span><code>.rlm/facts/</code> 找跟 calendar widget 相關</div>
+            <div class="act read"><span class="icon">→</span>git log 找週二改動</div>
+            <div class="act note"><span class="icon">·</span>識別關鍵歧義:revert vs fix-forward vs hybrid</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag">design-dialogue</span>
+            <span class="ts">T+19 min</span>
+          </div>
+          <div class="msg-title">在同個 thread 問人類拍板</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span><em>不用 outbound:* label、不用 cross-agent routing —— Hermes 自己就是對話代理</em></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>讀完 code,需要你拍板一件事:</p>
+              <p>週二的 widget v1.2 → v2.0 改動很大(server-rendered → React)。三條路:</p>
+              <ul>
+                <li><strong>revert</strong>(1 天)— 回 v1.2,失去 v2.0 的 a11y / desktop 速度</li>
+                <li><strong>fix-forward</strong>(2-48h)— 在 v2.0 找 mobile regression</li>
+                <li><strong>hybrid</strong> — 今晚 revert 止血,平行修 v2.0</li>
+              </ul>
+              <p>我傾向 fix-forward。24h 沒回我就照這個。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+30 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>hybrid please, revert tonight 止血, 平行修 v2.0</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag">decompose-spec</span>
+            <span class="ts">T+30 min</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">拆兩個 WorkPackage 草稿</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span><code>rlm commit-workpackage --status=draft</code> × 2</div>
+            <div class="act note"><span class="icon">·</span><strong>WP #144</strong>:Revert calendar widget to v1.2(緊急、無 ADR、無 deps)</div>
+            <div class="act note"><span class="icon">·</span><strong>WP #145</strong>:Diagnose + fix v2.0 mobile regression(<code>depends_on: [#144]</code>)</div>
+          </div>
+          <div class="att gh-issue">
+            <div class="att-source"><span class="src-icon">📄</span>GitHub · Issue #144 body</div>
+            <pre>type: workpackage
+id: wp-2026-05-12-revert-calendar
+parent_spec: #143
+status: draft
+worker_class: web-stack
+impact_scope:
+  files: [src/calendar-widget/]
+adr_refs: []
+depends_on: []
+
+# Revert calendar widget to v1.2
+Restore v1.2 server-rendered snapshot.
+Mobile regression test must pass.</pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag">design-approval</span>
+            <span class="ts">T+31 min</span>
+          </div>
+          <div class="msg-title">在同 thread 請你核 WP</div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>拆好了,等你核:</p>
+              <ul>
+                <li><strong>📦 #144</strong> — Revert calendar widget to v1.2 (ImpactScope: <code>src/calendar-widget/</code>;no ADR)</li>
+                <li><strong>📦 #145</strong> — Fix v2.0 mobile regression (<code>depends_on: [#144]</code>)</li>
+              </ul>
+              <p>30 分鐘沒回兩個都自動 approve。可分開:<code>approve 144</code> / <code>approve 145</code> / <code>approve all</code>。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+33 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p><code>approve 144, hold 145</code></p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Hermes</span><span class="app-tag">APP</span>
+            <span class="skill-tag">design-approval</span>
+            <span class="ts">T+33 min</span><span class="trigger event">event</span>
+          </div>
+          <div class="msg-title">機械化驗證 + 推進</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">$</span><code>rlm approve-workpackage --issue=144</code></div>
+            <div class="act note"><span class="icon">·</span>CLI 機械驗證 #144 的 <code>adr_refs: []</code>(無 ADR ref,通過)</div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill draft">status:draft</span><span class="arrow">→</span><span class="label-pill approved">status:approved</span> · body immutable</div>
+            <div class="act note"><span class="icon">·</span>#145 仍 draft,留 comment「approved-pending-#144」</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ #144 approved,進 Delivery queue。</p>
+              <p>#145 等 #144 deliver 後再開,有變動我跟你說。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>Phase 2 結束:</strong> #143 confirmed、#144 approved、#145 draft。Hermes 退場 —— 接下來是 Delivery BC。</p></div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 3 ============== -->
+      <div class="divider delivery">
+        <div class="line"></div>
+        <div class="label">Phase 3 — Delivery:Dispatch + Worker + Validators</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+38 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">拿 global Worker lock,開 in-cycle chain</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span>檢查 lock:無</div>
+            <div class="act read"><span class="icon">→</span>掃 <span class="label-pill approved">status:approved</span> 沒 <span class="label-pill agent">agent:*</span>:找到 #144</div>
+            <div class="act add"><span class="icon">🔒</span>取 lock + <code>rlm mark-in-progress --issue=144</code></div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill approved">status:approved</span><span class="arrow">→</span><span class="label-pill progress">status:in_progress</span> + <span class="label-pill agent">agent:worker</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar worker">W</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Worker</span><span class="app-tag">APP</span><span class="skill-tag worker">web-stack profile</span><span class="ts">T+38 ~ T+40 min</span></div>
+          <div class="msg-title">5 件式 atomic output(同一個 claude -p 內)</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>branch <code>wp/144-revert-calendar</code>,checkout v1.2 內容</div>
+            <div class="act add"><span class="icon">+</span>commit code 變更</div>
+            <div class="act add"><span class="icon">+</span><code>rlm append-fact</code> → <code>.rlm/facts/2026-05-12-calendar-widget-version.md</code></div>
+            <div class="act add"><span class="icon">+</span><code>rlm open-pr</code> 開 PR #146,close #144</div>
+            <div class="act add"><span class="icon">+</span>在 #144 留 summary comment</div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill agent">agent:worker</span><span class="arrow">→</span><span class="label-pill agent validator">agent:validator</span></div>
+          </div>
+          <div class="att gh-pr">
+            <div class="att-source"><span class="src-icon">🔀</span>GitHub · PR #146 opened</div>
+            <div class="att-title">Revert calendar widget to v1.2</div>
+            <div class="att-body">closes #144 · branch <code>wp/144-revert-calendar</code></div>
+            <div class="att-meta"><span>📄 1 file</span><span>+ fact commit ✓</span><span>✓ links Issue</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+40 ~ T+45 min · in-cycle chain</span></div>
+          <div class="msg-title">ValidationPipeline · 5 階段</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">✓</span>Post-condition check:branch / fact / PR / comment / label 全有 → pass</div>
+          </div>
+          <div class="att file">
+            <div class="att-source"><span class="src-icon">🧪</span>Pipeline run</div>
+            <div class="att-body">
+              <p><strong>Stage 1</strong>(auto tools)— lint / typecheck / test 全綠 ✅</p>
+              <p><strong>Stage 2</strong>(WhiteBoxValidator)— pass ✅</p>
+              <p><strong>Stage 3</strong>(Sandbox deploy)— PR branch 部到隔離環境 ✅</p>
+              <p><strong>Stage 4</strong>(BlackBoxValidator)— 跑 mobile 預約 flow → pass ✅</p>
+              <p><strong>Stage 5</strong>(human review handoff)</p>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill agent validator">agent:validator</span><span class="arrow">→</span><span class="label-pill agent human">agent:human-review</span></div>
+            <div class="act note"><span class="icon">·</span>Dispatch 退出 chain;<strong>lock 仍持有等 PR merge</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="ts">T+46 min</span><span class="trigger cron">cron · 處理 outbound</span></div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body"><p>#144 通過驗證,PR <a>#146</a> 等你 review + merge</p></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 4 ============== -->
+      <div class="divider merge">
+        <div class="line"></div>
+        <div class="label">Phase 4 — Merge &amp; Deliver</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+52 min</span><span class="trigger user">user</span></div>
+          <div class="msg-title">在 GitHub 上 review + merge PR #146</div>
+          <div class="att gh-pr">
+            <div class="att-source"><span class="src-icon">🔀</span>GitHub · PR #146</div>
+            <div class="att-title">Revert calendar widget to v1.2 · closes #144</div>
+            <div class="att-body">Files: <code>src/calendar-widget/</code> · Fact commit ✓</div>
+            <div class="att-meta"><span>✅ Merged</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar ci">CI</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">GitHub Actions</span><span class="app-tag">APP</span><span class="ts">T+53 min</span><span class="trigger event">event</span></div>
+          <div class="msg-title">CI 機械檢查 PR 含 fact commit</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">✓</span>PR 內至少一個 <code>rlm append-fact</code> / <code>supersede-fact</code> commit → pass</div>
+            <div class="act add"><span class="icon">+</span>PR merged 進 main</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+58 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">收尾,釋放 lock</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>看到 #144 仍持 lock + agent:human-review + PR merged + CI ✓</div>
+            <div class="act note"><span class="icon">$</span><code>rlm mark-delivered --issue=144</code></div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill progress">status:in_progress</span><span class="arrow">→</span><span class="label-pill delivered">status:delivered</span></div>
+            <div class="act remove"><span class="icon">−</span>移除 agent:* label</div>
+            <div class="act add"><span class="icon">🔓</span>釋放 global Worker lock</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="ts">T+59 min</span><span class="trigger cron">outbound</span></div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ #144 delivered。calendar 已 revert,進 prod。</p>
+              <p>ProductionMonitor 會在 7 天後驗 7d 平均達標。</p>
+              <p>要不要現在開 #145(diagnose v2.0 regression)?</p>
+            </div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">🚀</span><span class="count">shipped</span></span>
+            <span class="reaction"><span class="emoji">📈</span><span class="count">monitoring</span></span>
+          </div>
+        </div>
+      </article>
+
+      <div class="final-card">
+        <h2>📊 最終狀態(T+59 min)</h2>
+        <h3>GitHub Issues</h3>
+        <ul>
+          <li><code>#143</code> — Spec · <span class="label-pill confirmed">status:confirmed</span></li>
+          <li><code>#144</code> — WP · <span class="label-pill delivered">status:delivered</span> · refs PR #146</li>
+          <li><code>#145</code> — WP · <span class="label-pill draft">status:draft</span> · 等 liyo 決定</li>
+          <li><code>#146</code> — PR · merged · closes #144</li>
+        </ul>
+        <h3>RLM markdown(git-tracked)</h3>
+        <ul>
+          <li><code>.rlm/business/business-model-2026-05-12.md</code></li>
+          <li><code>.rlm/facts/2026-05-12-calendar-widget-version.md</code></li>
+        </ul>
+        <h3>Discord</h3>
+        <ul>
+          <li>Thread「conversion drop」留全紀錄:Intake + Design 對話 + 通知 + 詢問 #145</li>
+        </ul>
+        <h3>Supervision event log</h3>
+        <ul>
+          <li>~12 個 stateless agent invocation,~40-50 條 narration triples</li>
+        </ul>
+      </div>
+
+      <div class="key-obs">
+        <h3>🔑 關鍵觀察 vs v1</h3>
+        <ol>
+          <li><strong>只有一個 Hermes</strong> 跨 Intake 跟 Design 兩個 BC,內部依 skill 模式切換能力(綠 = intake、紫 = design)。</li>
+          <li><strong>Issue 是對話的<em>結果</em>,不是對話的<em>容器</em>。</strong>共識後才寫 Issue / RLM。</li>
+          <li><strong>Per-skill tool access</strong> —— Hermes 的 code R 只在 design-domain skill 啟動時開放。</li>
+          <li><strong>RelayBot 不存在</strong> —— hermes-agent daemon 直接連 Discord。</li>
+          <li><strong>從 liyo 的視角</strong>:只跟一個 thread 講話,一條龍。</li>
+        </ol>
+      </div>
+
+      </div><!-- /scenario-content conversion-drop -->
+
+
+      <!-- =================================================================
+           SCENARIO 2: todolist-build (from zero)
+           ================================================================= -->
+      <div class="scenario-content" data-scenario="todolist-build" hidden>
+
+      <div class="divider infra">
+        <div class="line"></div>
+        <div class="label">Phase 0 — 系統就位(從零)</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">⚙</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System</span><span class="app-tag">APP</span><span class="ts">T−∞</span></div>
+          <div class="msg-title">空 repo + hermes-agent daemon + cron 就位</div>
+          <div class="msg-body">
+            <ul>
+              <li>GitHub repo 是<strong>空的</strong>,只有 <code>docs/</code> 結構跟 <code>rlm</code> CLI</li>
+              <li>還沒有任何 ADR、code、fact、contract</li>
+              <li>hermes-agent daemon 連好 Discord <code>#product</code></li>
+              <li>liyo 想做點東西 —— 但還沒拍板要做什麼</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 1 ============== -->
+      <div class="divider intake">
+        <div class="line"></div>
+        <div class="label">Phase 1 — Intake:從 0 開始的商模對話</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>從零專案的差異:</strong>沒有歷史 business model、沒有 code 可讀。Hermes 用 <code>business-model-probe</code>(office-hours 式)整輪 framing 釐清要做什麼,接 <code>deployment-constraints-probe</code> 抓部署限制。</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+0</span><span class="trigger user">user</span></div>
+          <div class="msg-body">
+            <p>想做一個 todo list app,跟室友共用。手機優先,簡單就好</p>
+            <div class="reactions"><span class="reaction"><span class="emoji">🧵</span><span class="count">new thread: household-todo</span></span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">business-model-probe</span><span class="ts">T+0.2s</span><span class="trigger event">event</span></div>
+          <div class="msg-title">spawn fresh invocation · office-hours 式追問</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>Discord thread(目前只有 liyo 那則)</div>
+            <div class="act read"><span class="icon">→</span>RLM <code>.rlm/business/</code>:<em>無檔案</em>(新專案)</div>
+            <div class="act read"><span class="icon">→</span>RLM <code>.rlm/contracts/</code>:<em>無</em></div>
+            <div class="act note"><span class="icon">·</span>判定:wedge 不明,要 framing 問題</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread · <code style="background:#0e0e0e;padding:1px 4px;border-radius:3px;color:#36c5f0;font-family:monospace;font-size:11px;">#product / household-todo</code></div>
+            <div class="att-body">
+              <p>好,先抓味道。三個 framing 問題:</p>
+              <ol>
+                <li>為什麼不用現成的(Todoist / Apple Reminders / Google Tasks)?</li>
+                <li>痛點是<strong>個人 todo</strong> 還是 <strong>共享 list</strong>?</li>
+                <li>你 + 室友 = 2 人,還是想做給更多人?</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+4 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>1. 現成都太重,我們只想 grocery + 家事清單<br>2. 共享,而且要看到「誰買了 / 誰做了」<br>3. 先 2 人,朋友也想加入</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">business-model-probe</span><span class="ts">T+4 min</span><span class="trigger event">event</span></div>
+          <div class="msg-title">抓到 wedge,再追細節</div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>抓到了 —— wedge 是 <strong>「給室友 / 同住者用的輕量共享 list」</strong>。再三件事(影響技術選型):</p>
+              <ul>
+                <li>願意付 hosting 嗎?多少之內?</li>
+                <li>手機優先還是電腦?(都用還是「能用就好」)</li>
+                <li>「誰做了」= checkbox + 名字 就夠?還是要完整活動 log(誰加了什麼、改了什麼)?</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+8 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>願意付一點,$10/月內。手機優先(室友幾乎不開電腦)。checkbox + 名字 + 完成時間就好,完整 log 太複雜</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">deployment-constraints-probe</span><span class="ts">T+8 min</span><span class="trigger event">event</span></div>
+          <div class="msg-title">切到 deployment 限制 probe</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span><em>per-skill access:這個 skill 沒 code R,純收集事實</em></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>good,商模收斂。換 deployment 限制:</p>
+              <ul>
+                <li>region 在哪?(影響資料中心 / 法規)</li>
+                <li>個資合規 GDPR / 台個資法要不要管?</li>
+                <li>vendor 偏好?(AWS / GCP / Vercel / Fly / Railway)</li>
+                <li>自架還是 managed?</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+10 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>台灣。只給認識的人用,合規先不管。vendor 沒偏好,挑便宜+簡單。一定要 managed,我沒空運維</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">signal-to-spec → intake-confirmation</span><span class="ts">T+11 min</span><span class="trigger event">event</span></div>
+          <div class="msg-title">10 分鐘對話收斂成 Spec 提案</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span>共識:wedge、user、付費上限、平台、合規範圍都清楚</div>
+            <div class="act note"><span class="icon">·</span><em>還沒寫 Issue,先在 Discord 提案</em></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread · 📋 proposed Spec</div>
+            <div class="att-body">
+              <p>OK 收斂:</p>
+              <p><strong>📋 提案 Spec:</strong> Shared household list — lightweight grocery &amp; chores</p>
+              <p><strong>AcceptanceCriteria:</strong></p>
+              <ul>
+                <li>✓ 兩人以上的 household 可共建多個 list(grocery / chores 至少各一)</li>
+                <li>✓ 每項 = 標題 + checkbox + 完成者名字 + 完成時間</li>
+                <li>✓ Mobile-first(iOS Safari + Android Chrome 通過 BlackBox 驗證)</li>
+                <li>✓ hosting < $10/月,起跑階段 free tier</li>
+                <li>✓ 邀請朋友加 household 的 flow(magic link 或類似)</li>
+              </ul>
+              <p><strong>DeploymentConstraints:</strong> Taiwan region · managed · no compliance overhead · vendor TBD</p>
+              <p>回 <code>yes</code> 我建 Spec + 寫 business model + 進 design mode 選技術棧。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+12 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>yes</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag intake">signal-to-spec → intake-confirmation</span><span class="ts">T+12 min</span><span class="trigger event">event</span></div>
+          <div class="msg-title">一次性把 RLM + Spec + 商模都寫</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/business-model-2026-05-12.md</code>(新檔)</div>
+            <div class="act add"><span class="icon">+</span>寫 RLM <code>.rlm/business/deployment-constraints-2026-05-12.md</code></div>
+            <div class="act add"><span class="icon">+</span>建 Issue #1 <span class="label-pill spec">type:spec</span> <span class="label-pill draft">status:draft</span></div>
+            <div class="act note"><span class="icon">$</span><code>rlm confirm-spec --issue=1</code></div>
+            <div class="act flip"><span class="icon">↻</span>#1 <span class="label-pill draft">status:draft</span><span class="arrow">→</span><span class="label-pill confirmed">status:confirmed</span> · body immutable</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ Spec <a>Issue #1</a> confirmed</p>
+              <p>✓ Business model + deployment constraints 已寫進 RLM</p>
+              <p>進 design mode,先選技術棧 → ADR PR → 等你 review → 再拆 WorkPackage。給我幾分鐘。</p>
+            </div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">✅</span><span class="count">spec gate passed</span></span>
+            <span class="reaction"><span class="emoji">🔒</span><span class="count">body frozen</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 2 ============== -->
+      <div class="divider design">
+        <div class="line"></div>
+        <div class="label">Phase 2 — Design:選棧 → ADR PR → 拆 WP</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>從零的 Design 跟 conversion-drop 不同:</strong>沒有 existing code、沒有過去 ADR 可援引。要先用 <code>select-deployment-strategy</code> 選整套棧,寫 ADR 開 PR,<strong>等 ADR merge 進 main</strong>,才能 commit 帶 <code>adr_refs</code> 的 WorkPackage(per ADR-0013,<code>approve-workpackage</code> 會機械驗證)。</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">select-deployment-strategy</span><span class="ts">T+13 min</span></div>
+          <div class="msg-title">選棧分析(design-domain,開放 code R 但沒 code 可讀)</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>讀 DeploymentConstraints:TW / managed / &lt;$10mo / mobile-first / no compliance</div>
+            <div class="act read"><span class="icon">→</span>讀 RLM <code>.rlm/facts/</code>:<em>空</em>(新專案無歷史)</div>
+            <div class="act read"><span class="icon">→</span>讀 <code>src/</code>:<em>空</em></div>
+            <div class="act note"><span class="icon">·</span>比較選項(寫進 ADR 草稿)</div>
+          </div>
+          <div class="att file">
+            <div class="att-source"><span class="src-icon">⚖</span>Deployment trade-off matrix(內部判定)</div>
+            <pre>選項                    region    free tier   DB add-on        DX
+─────────────────────── ───────── ─────────── ──────────────── ──────────
+Vercel + Vercel Postgres  Tokyo     yes/yes     same vendor       ★★★★★
+Fly.io + Fly Postgres     Singapore yes/no      $1.94/mo          ★★★★
+Railway                   US-W      yes         bundled           ★★★
+Render                    Oregon    yes         $7/mo Postgres    ★★★
+
+判定:Vercel + Vercel Postgres
+ ✓ Tokyo region 最近 Taiwan
+ ✓ Next.js 14 與 Vercel 整合最深(zero-config)
+ ✓ 兩個服務 free tier 起跑足夠 2-10 人用量
+ ✓ 一個 vendor billing,簡化財務</pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">draft-adr ×2</span><span class="ts">T+14 min</span></div>
+          <div class="msg-title">寫 2 個 ADR + 開 PR(PR-routed,等 liyo merge 才能用)</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span><code>rlm propose-adr</code> → ADR-0001 PR #2(Next.js 14 + Vercel)</div>
+            <div class="act add"><span class="icon">+</span><code>rlm propose-adr</code> → ADR-0002 PR #3(Vercel Postgres + Prisma)</div>
+            <div class="act note"><span class="icon">·</span><em>CLI 持 GitHub token 開 PR;Hermes 自己沒 PR 權限(per ADR-0009)</em></div>
+          </div>
+          <div class="att gh-adr">
+            <div class="att-source"><span class="src-icon">📜</span>GitHub · PR #2 opened</div>
+            <div class="att-title">ADR-0001 — Next.js 14 App Router on Vercel</div>
+            <div class="att-body">
+              <em>What was decided:</em> Next.js 14 (App Router) deployed on Vercel.<br>
+              <em>Rejected:</em> Fly.io(SG region 雖近但 DB 要錢、DX 較重)、Railway(region 遠)、Render(DB 起跑就 $7)。<br>
+              <em>Trade:</em> 鎖 vendor 但 free tier 起跑、Tokyo region 對 TW 延遲可接受。
+            </div>
+            <div class="att-meta"><span>📄 .rlm/adr/0001-next-on-vercel.md</span><span>review required</span></div>
+          </div>
+          <div class="att gh-adr">
+            <div class="att-source"><span class="src-icon">📜</span>GitHub · PR #3 opened</div>
+            <div class="att-title">ADR-0002 — Vercel Postgres + Prisma</div>
+            <div class="att-body">Schema 由 Prisma 管;migration 隨 Worker 一起 commit。</div>
+            <div class="att-meta"><span>📄 .rlm/adr/0002-postgres-prisma.md</span></div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>📋 2 個 ADR PR 已開,等你 review:</p>
+              <ul>
+                <li><a>PR #2</a> — ADR-0001 Next.js + Vercel</li>
+                <li><a>PR #3</a> — ADR-0002 Postgres + Prisma</li>
+              </ul>
+              <p>approve 後我才能 commit WorkPackage(<code>rlm approve-workpackage</code> 會機械驗 <code>adr_refs</code> 已 merged)。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+25 min</span><span class="trigger user">user</span></div>
+          <div class="msg-title">在 GitHub 看 ADR PR · merge 兩個</div>
+          <div class="att gh-pr">
+            <div class="att-source"><span class="src-icon">🔀</span>GitHub · PR #2 + #3</div>
+            <div class="att-body">兩個 ADR PR 都 merged 進 main</div>
+            <div class="att-meta"><span>✅ Merged ×2</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">decompose-spec / compute-impact-scope</span><span class="ts">T+27 min</span><span class="trigger cron">cron 偵測 ADR merge</span></div>
+          <div class="msg-title">拆 6 個 WorkPackage,標 depends_on</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>Spec #1 + 兩個 ADR(現在已在 main)</div>
+            <div class="act read"><span class="icon">→</span><code>src/</code>:仍空 —— ImpactScope 是<em>將被建立的</em>檔案</div>
+            <div class="act add"><span class="icon">+</span><code>rlm commit-workpackage</code> × 6</div>
+          </div>
+          <div class="att file">
+            <div class="att-source"><span class="src-icon">🧱</span>WorkPackage breakdown</div>
+            <pre>#4 Project scaffold + Vercel deploy           depends_on: []
+#5 Prisma schema + DB migrations              depends_on: [#4]
+#6 NextAuth (email magic link)                depends_on: [#5]
+#7 Household + invite model + API             depends_on: [#6]
+#8 List + Item CRUD API                       depends_on: [#7]
+#9 Mobile UI (Tailwind, mobile-first)         depends_on: [#8]
+
+每個 WP 的 adr_refs: [#2, #3] 都已 merged ✓</pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">design-approval</span><span class="ts">T+28 min</span></div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>拆好了,6 個 WP 都已驗 <code>adr_refs</code>。等你核:</p>
+              <ul>
+                <li><strong>#4</strong> Scaffold + Vercel deploy</li>
+                <li><strong>#5</strong> Prisma schema + migrations &nbsp;<code>depends_on: [#4]</code></li>
+                <li><strong>#6</strong> NextAuth &nbsp;<code>depends_on: [#5]</code></li>
+                <li><strong>#7</strong> Household + invite &nbsp;<code>depends_on: [#6]</code></li>
+                <li><strong>#8</strong> List + Item CRUD &nbsp;<code>depends_on: [#7]</code></li>
+                <li><strong>#9</strong> Mobile UI &nbsp;<code>depends_on: [#8]</code></li>
+              </ul>
+              <p>指令:<code>approve all</code> / <code>approve 4-7 hold 8-9</code> / 單獨 <code>approve N</code>。30 分鐘自動 approve all。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+30 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p><code>approve 4-7, hold 8-9</code> — 先把 backend 確定再做 UI</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">design-approval</span><span class="ts">T+30 min</span><span class="trigger event">event</span></div>
+          <div class="actions">
+            <div class="act note"><span class="icon">$</span><code>rlm approve-workpackage --issue=4..7</code></div>
+            <div class="act note"><span class="icon">·</span>CLI 機械驗證 <code>adr_refs: [#2, #3]</code> 都已在 main ✓</div>
+            <div class="act flip"><span class="icon">↻</span>#4 #5 #6 #7 全部 <span class="label-pill draft">draft</span><span class="arrow">→</span><span class="label-pill approved">approved</span></div>
+            <div class="act note"><span class="icon">·</span>#8 #9 仍 draft,comment「holding for backend confirmation」</div>
+          </div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body"><p>✓ #4-#7 approved,Dispatch 下輪 cron 接手 #4(無 deps)。#8 #9 等 #7 deliver 後我再問你。</p></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 3 ============== -->
+      <div class="divider delivery">
+        <div class="line"></div>
+        <div class="label">Phase 3 — Delivery:#4 詳寫,#5-#7 condense,#7 出現重試</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+35 min · cron</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">取 lock,#4 進場(#5 #6 #7 depends_on 未滿足,跳過)</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>掃 <span class="label-pill approved">approved</span>:#4(deps 空)/ #5 #6 #7(deps 未 delivered)</div>
+            <div class="act add"><span class="icon">🔒</span>取 lock + <code>rlm mark-in-progress --issue=4</code></div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill approved">approved</span><span class="arrow">→</span><span class="label-pill progress">in_progress</span> + <span class="label-pill agent">agent:worker</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar worker">W</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Worker</span><span class="app-tag">APP</span><span class="skill-tag worker">web-stack profile</span><span class="ts">T+35 ~ T+42 min</span></div>
+          <div class="msg-title">#4 · 5 件式 atomic output</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>branch <code>wp/4-scaffold</code></div>
+            <div class="act add"><span class="icon">+</span><code>create-next-app</code>(App Router、TS、Tailwind)</div>
+            <div class="act add"><span class="icon">+</span><code>vercel.json</code>、<code>.env.example</code>、minimal landing page</div>
+            <div class="act add"><span class="icon">+</span><code>rlm append-fact</code> → <code>.rlm/facts/2026-05-12-scaffold.md</code>(Next.js 14 + Vercel)</div>
+            <div class="act add"><span class="icon">+</span><code>rlm open-pr</code> → PR #10</div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill agent">agent:worker</span><span class="arrow">→</span><span class="label-pill agent validator">agent:validator</span></div>
+          </div>
+          <div class="att gh-pr">
+            <div class="att-source"><span class="src-icon">🔀</span>GitHub · PR #10 opened</div>
+            <div class="att-title">Scaffold Next.js 14 + Vercel deploy</div>
+            <div class="att-body">closes #4 · 14 files (app/, package.json, vercel.json, tailwind, ts config)</div>
+            <div class="att-meta"><span>📄 14 files</span><span>+ fact commit ✓</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+42 ~ T+46 min</span></div>
+          <div class="msg-title">#4 跑 ValidationPipeline</div>
+          <div class="att file">
+            <div class="att-source"><span class="src-icon">🧪</span>Pipeline run · #4</div>
+            <div class="att-body">
+              <p>Stage 1(lint / tsc / test)✅ &nbsp;&nbsp; Stage 2(WhiteBox)✅</p>
+              <p>Stage 3(Vercel preview deploy)✅ <em>https://wp4-xxx.vercel.app</em></p>
+              <p>Stage 4(BlackBox · 確認 landing page render + 200)✅</p>
+              <p>Stage 5 handoff</p>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent human">human-review</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+50 min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>merged PR #10 ✓</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+55 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">#4 收尾 · 釋放 lock</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">$</span><code>rlm mark-delivered --issue=4</code> &nbsp; (CI fact-commit ✓)</div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill progress">in_progress</span><span class="arrow">→</span><span class="label-pill delivered">delivered</span></div>
+            <div class="act add"><span class="icon">🔓</span>釋放 lock。#5 deps 已滿足,下輪 cron 進場</div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Condensed #5 #6 -->
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch + Worker(condensed)</span><span class="app-tag">SCRIPT</span><span class="ts">T+1h ~ T+2h 10min</span></div>
+          <div class="msg-title">#5(Prisma schema)、#6(NextAuth)依序完成</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>#5 → PR #11(Prisma schema + migration)→ pipeline 全綠 → liyo merge → delivered</div>
+            <div class="act add"><span class="icon">+</span>#6 → PR #12(NextAuth email magic link)→ pipeline 全綠 → liyo merge → delivered</div>
+            <div class="act note"><span class="icon">·</span>都是 happy path,各跑一次 5-stage 通過</div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ====== #7 with retry ====== -->
+      <div class="divider retry">
+        <div class="line"></div>
+        <div class="label">#7 出現 BlackBox 重試(寫實一點)</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 15min · cron</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">#7(Household + invite + API)進場,first attempt</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">🔒</span>取 lock + <code>mark-in-progress #7</code> + <span class="label-pill agent">agent:worker</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar worker">W</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Worker</span><span class="app-tag">APP</span><span class="skill-tag worker">web-stack</span><span class="ts">T+2h 15 ~ 25min</span></div>
+          <div class="msg-title">寫 Household / Invite API + Prisma model</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>branch <code>wp/7-household</code></div>
+            <div class="act add"><span class="icon">+</span><code>app/api/household/route.ts</code>、<code>app/api/invite/route.ts</code></div>
+            <div class="act add"><span class="icon">+</span>migration + fact commit</div>
+            <div class="act add"><span class="icon">+</span>PR #13、relabel <span class="label-pill agent validator">agent:validator</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar whitebox">V</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">WhiteBoxValidator</span><span class="app-tag">APP</span><span class="ts">T+2h 26 ~ 28min</span></div>
+          <div class="msg-body"><p><strong>Pass.</strong> 小註:<code>app/api/invite/route.ts</code> 沒寫 unit test cover 過期 token 路徑,建議補。不阻擋。</p></div>
+          <div class="reactions"><span class="reaction"><span class="emoji">✅</span><span class="count">stage 2 pass</span></span></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 29min</span></div>
+          <div class="msg-body"><p>Stage 3 sandbox deploy ✅(<code>wp7-xxx.vercel.app</code>)</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar blackbox">V</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">BlackBoxValidator</span><span class="app-tag">APP</span><span class="ts">T+2h 30min</span></div>
+          <div class="msg-title">Stage 4 · <span style="color:#e01e5a;">FAIL</span></div>
+          <div class="att warn">
+            <div class="att-source"><span class="src-icon">⚠</span>Verdict · attempt 1</div>
+            <div class="att-body">
+              <p><strong>AC violated:</strong> 「邀請朋友加 household 的 flow」</p>
+              <p>呼叫 <code>POST /api/invite</code> <em>不帶 auth cookie</em> 回 <code>200</code> + 建出 invite。應該回 <code>401</code>。</p>
+              <p>從 Spec AC 看,只有 household 成員才能發邀請。這是實作 defect,非 AC 模糊 — 路由 missing auth middleware。</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 30min</span></div>
+          <div class="msg-title">分類失敗 → 計入 retry budget → 翻回 worker</div>
+          <div class="actions">
+            <div class="act note"><span class="icon">·</span>BlackBox classification:implementation defect(非 AC-ambiguity)→ 走 retry 路</div>
+            <div class="act add"><span class="icon">+</span>label <span class="label-pill retry">retry:black-box:1</span>(預算 2,還剩 1)</div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent">agent:worker</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar worker">W</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Worker</span><span class="app-tag">APP</span><span class="skill-tag worker">web-stack</span><span class="ts">T+2h 31 ~ 35min</span></div>
+          <div class="msg-title">attempt 2 · fresh claude -p,讀 retry 標籤 + BlackBox comment</div>
+          <div class="actions">
+            <div class="act read"><span class="icon">→</span>讀 <span class="label-pill retry">retry:black-box:1</span> 知道是第 2 次</div>
+            <div class="act read"><span class="icon">→</span>讀 BlackBox comment 知道 root cause(missing auth middleware)</div>
+            <div class="act add"><span class="icon">+</span>新增 <code>middleware.ts</code> 對 <code>/api/invite/*</code> 強制 session</div>
+            <div class="act add"><span class="icon">+</span>補 unit test cover 401 路徑(順便回應 WhiteBox 建議)</div>
+            <div class="act add"><span class="icon">+</span>push 到 <code>wp/7-household</code>(PR #13 update)</div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent">worker</span><span class="arrow">→</span><span class="label-pill agent validator">validator</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar blackbox">V</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">BlackBoxValidator</span><span class="app-tag">APP</span><span class="ts">T+2h 37min</span></div>
+          <div class="msg-title">attempt 2 · <span style="color:#56d364;">PASS</span></div>
+          <div class="msg-body"><p>所有 AC 通過。<code>POST /api/invite</code> 無 auth → 401 ✓;有 auth → 200 + invite 建立 ✓。</p></div>
+          <div class="reactions"><span class="reaction"><span class="emoji">🎯</span><span class="count">retry succeeded</span></span></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 38min</span></div>
+          <div class="actions">
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent human">agent:human-review</span></div>
+            <div class="act note"><span class="icon">·</span>留 <span class="label-pill retry">retry:black-box:1</span>(歷史紀錄,Supervision event log 可查)</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+2h 50min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>review + merge PR #13。瞄了一眼 middleware,合理</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 55min</span><span class="trigger cron">cron</span></div>
+          <div class="actions">
+            <div class="act flip"><span class="icon">↻</span>#7 → <span class="label-pill delivered">delivered</span></div>
+            <div class="act add"><span class="icon">🔓</span>release lock</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="ts">T+3h</span><span class="trigger cron">cron · outbound</span></div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ #7 delivered(1 次 BlackBox 重試後過,middleware bug)。</p>
+              <p>backend 全綠了。#8 #9 之前你 hold,要 lift 嗎?</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+3h 5min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>go, approve 8 9</p></div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar hermes-design">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="skill-tag">design-approval</span><span class="ts">T+3h 5min</span></div>
+          <div class="actions">
+            <div class="act flip"><span class="icon">↻</span>#8 #9 <span class="label-pill draft">draft</span><span class="arrow">→</span><span class="label-pill approved">approved</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar dispatch">D</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Dispatch + Worker(condensed)</span><span class="app-tag">SCRIPT</span><span class="ts">T+3h 5min ~ T+4h 30min</span></div>
+          <div class="msg-title">#8(List/Item CRUD)、#9(Mobile UI)依序 happy path 完成</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>#8 → PR #14 → pipeline ✅ → liyo merge → delivered</div>
+            <div class="act add"><span class="icon">+</span>#9 → PR #15 → pipeline ✅(BlackBox 模擬 iOS Safari / Android Chrome viewport)→ liyo merge → delivered</div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== PHASE 4 ============== -->
+      <div class="divider merge">
+        <div class="line"></div>
+        <div class="label">Phase 4 — 上線 &amp; ProductionMonitor onboard</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar hermes-intake">H</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Hermes</span><span class="app-tag">APP</span><span class="ts">T+4h 35min</span><span class="trigger cron">outbound</span></div>
+          <div class="att thread">
+            <div class="att-source"><span class="src-icon">💬</span>Posted in thread</div>
+            <div class="att-body">
+              <p>✓ Spec #1 的全部 6 個 WP 都 delivered。App 在 <em>household-todo.vercel.app</em> 線上了。</p>
+              <p>Spec #1 仍維持 <span class="label-pill confirmed">status:confirmed</span> — 它是「過去的決策」,不是「現在的狀態」。<strong>現在的狀態 = main 上的 code + <code>.rlm/facts/</code></strong>(per ADR-0013 source-of-truth discipline)。</p>
+              <p>下一步建議:</p>
+              <ul>
+                <li>開 <code>production-monitor</code> 設定:DAU、items-created/day、household 數量</li>
+                <li>邀室友 + 朋友來 dogfood,回頭看哪些痛點要進新 Signal</li>
+              </ul>
+            </div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">🚀</span><span class="count">shipped</span></span>
+            <span class="reaction"><span class="emoji">📈</span><span class="count">monitor pending</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar user">L</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">liyo</span><span class="ts">T+4h 40min</span><span class="trigger user">user</span></div>
+          <div class="msg-body"><p>設好 monitor 我去找室友測 🙏</p></div>
+        </div>
+      </article>
+
+      <div class="final-card">
+        <h2>📊 最終狀態(T+4h 40min · 從 0 到上線)</h2>
+        <h3>GitHub Issues</h3>
+        <ul>
+          <li><code>#1</code> — Spec · <span class="label-pill confirmed">status:confirmed</span>(永遠不會「delivered」— Spec 不是當前狀態)</li>
+          <li><code>#2</code> ADR-0001 PR · merged · <code>#3</code> ADR-0002 PR · merged</li>
+          <li><code>#4-#9</code> — 6 個 WP · 全部 <span class="label-pill delivered">status:delivered</span></li>
+          <li><code>#10-#15</code> — 6 個 PR · 全部 merged</li>
+        </ul>
+        <h3>RLM markdown(git-tracked)</h3>
+        <ul>
+          <li><code>.rlm/business/business-model-2026-05-12.md</code> &nbsp; <code>.rlm/business/deployment-constraints-2026-05-12.md</code></li>
+          <li><code>.rlm/adr/0001-next-on-vercel.md</code> &nbsp; <code>.rlm/adr/0002-postgres-prisma.md</code></li>
+          <li><code>.rlm/facts/</code>:6 個 fact 檔(每個 WP 至少一個 — CI 強制)</li>
+        </ul>
+        <h3>Code</h3>
+        <ul>
+          <li>Next.js 14 + Prisma + NextAuth + Tailwind on Vercel</li>
+          <li>Tokyo region · free tier · &lt; $10/月 預算 hit</li>
+        </ul>
+        <h3>Supervision event log</h3>
+        <ul>
+          <li>~30 個 stateless agent invocation(其中 1 個是 Worker retry attempt 2)</li>
+          <li>~100+ narration triples</li>
+          <li>1 個 <code>retry:black-box:1</code> 事件可追溯</li>
+        </ul>
+      </div>
+
+      <div class="key-obs">
+        <h3>🔑 從零情境的觀察</h3>
+        <ol>
+          <li><strong>ADR 是 gate 不是裝飾</strong>。Hermes 開了 ADR PR 後必須等 liyo merge 才能 commit 帶 <code>adr_refs</code> 的 WP — <code>rlm approve-workpackage</code> 機械驗證會擋下未 merged 的 ADR ref(per ADR-0013)。這把「先決定再執行」變成可強制的契約。</li>
+          <li><strong>depends_on 串成 pipeline</strong>。Dispatch 看到 #5 #6 #7 的 deps 還沒 delivered 時直接跳過,只挑 #4 進場。Serial worker + dependency-aware queue 自然形成。</li>
+          <li><strong>Worker retry 是常態,不是異常</strong>。#7 的 BlackBox attempt 1 失敗只是 implementation defect(missing middleware),retry 計數標籤 + 失敗回饋足以讓 attempt 2 從 fresh <code>claude -p</code> 修對。Stateless 不等於沒記憶 — 記憶在 Issue / branch / event log。</li>
+          <li><strong>Spec 永遠停在 <code>confirmed</code></strong>。Spec 是「當時要解的問題」,code 上線後 Spec 不會變成 delivered。「當前狀態」永遠是 main + <code>.rlm/facts/</code>。這避免 SDD 走幾輪後「九個月前的 Spec 算不算現在的事實」這種崩塌。</li>
+          <li><strong>從 liyo 視角還是同一條 thread</strong>。從「想做 todo list」到「上線 4h 40min」全在「household-todo」這一個 thread 跑完。Hermes 切 skill、Dispatch / Worker / Validator 在背景跑、ADR / WP 走 GitHub — 但跟人類的接觸面只有一個 Discord thread + GitHub PR review 介面。</li>
+        </ol>
+      </div>
+
+      </div><!-- /scenario-content todolist-build -->
+
+    </div><!-- /messages -->
+
+  </main>
+</div>
+
+<script>
+  const scenarios = {
+    'conversion-drop': {
+      name: 'conversion-drop',
+      topic: '情境:小型 SaaS 線上預約系統,轉換率突然下滑。對話跑在 <code>#product</code> thread「conversion drop」'
+    },
+    'todolist-build': {
+      name: 'todolist-build',
+      topic: '情境:從 0 開始 — liyo 跟室友的共享家事 todo App。對話跑在 <code>#product</code> thread「household-todo」'
+    }
+  };
+
+  function switchScenario(scenarioId) {
+    // Switch sidebar active state
+    document.querySelectorAll('.nav-item[data-scenario]').forEach(item => {
+      item.classList.toggle('active', item.dataset.scenario === scenarioId);
+    });
+    // Show/hide scenario content
+    document.querySelectorAll('.scenario-content').forEach(sc => {
+      sc.hidden = sc.dataset.scenario !== scenarioId;
+    });
+    // Update channel header
+    const s = scenarios[scenarioId];
+    document.getElementById('channel-name-text').textContent = s.name;
+    document.getElementById('channel-topic-text').innerHTML = s.topic;
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.querySelectorAll('.nav-item[data-scenario]').forEach(item => {
+    item.addEventListener('click', () => switchScenario(item.dataset.scenario));
+  });
+</script>
+
+</body>
+</html>
