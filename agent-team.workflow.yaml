@@ -300,15 +300,10 @@ dispatch:
           - has_label: "status:proposed"
       then: { directive: spawn_fresh, role: hermes-intake }
 
-    # ---- Hermes design: approved Specs awaiting decomposition ----
-    - when:
-        all:
-          - has_label: "kind:spec"
-          - has_label: "agent:hermes-design"
-          - any:
-              - has_label: "status:proposed"
-              - has_label: "status:approved"
-      then: { directive: spawn_fresh, role: hermes-design }
+    # ---- Hermes design: intentionally NOT auto-dispatched ----
+    # decompose-spec requires a human-in-the-loop DesignApproval gate.
+    # The user runs /decompose-spec in a Persistent tab when ready.
+    # (Worker WPs with status:approved + agent:worker are auto-dispatched below.)
 
     # ---- Worker delivery cycle ----
     - when:

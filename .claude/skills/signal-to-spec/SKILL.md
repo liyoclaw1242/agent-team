@@ -90,6 +90,12 @@ sweet-home context → sweet-home prepends "ISSUE: #N" and "REPO: org/name"
    ```
    ✓ Spec Issue #N 建立: <issue-link>
    sweet-home 會在 30 秒內接手，進行 RLM 寫入與確認。
+
+   ── 下一步 ──
+   等 sweet-home 把 Issue label 翻成 agent:hermes-design 後，
+   請在 sweet-home Persistent tab 開新 session，輸入：
+     /decompose-spec
+   讓我把 Spec 拆成 WorkPackages 並跟你一起審核。
    ```
 5. **Exit**. sweet-home's next poll detects `kind:spec + agent:hermes-intake + status:proposed` and dispatches Phase B.
 
