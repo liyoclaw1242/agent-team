@@ -342,6 +342,64 @@
   .reaction .emoji { font-size: 13px; }
   .reaction .count { color: #9a9b9d; font-weight: 700; }
 
+  /* Chain link — connects consecutive steps showing what triggers the next */
+  .chain-link {
+    margin: 4px 0 4px 74px;   /* aligns under avatar gutter (36 + 24 + 10 + small) */
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #9a9b9d;
+    display: flex; align-items: flex-start; gap: 8px;
+    border-left: 2px dashed #383b40;
+    background: linear-gradient(90deg, #1a1d2155, transparent 80%);
+  }
+  .chain-link .arrow { color: #696a6c; font-weight: 700; flex-shrink: 0; }
+  .chain-link .kind {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 0 5px;
+    border-radius: 6px;
+    margin-right: 4px;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .chain-link.event .kind { background: #c39bd322; color: #c39bd3; }
+  .chain-link.event .arrow { color: #c39bd3; }
+  .chain-link.event { border-left-color: #c39bd344; }
+  .chain-link.cron .kind { background: #36c5f022; color: #36c5f0; }
+  .chain-link.cron .arrow { color: #36c5f0; }
+  .chain-link.cron { border-left-color: #36c5f044; }
+  .chain-link.user .kind { background: #ecb22e22; color: #ecb22e; }
+  .chain-link.user .arrow { color: #ecb22e; }
+  .chain-link.user { border-left-color: #ecb22e44; }
+  .chain-link.handoff .kind { background: #4a4b4d; color: #d1d2d3; }
+  .chain-link.handoff .arrow { color: #9a9b9d; }
+  .chain-link.gate .kind { background: #e01e5a22; color: #e01e5a; }
+  .chain-link.gate .arrow { color: #e01e5a; }
+  .chain-link.gate { border-left-color: #e01e5a44; }
+  .chain-link.label-flip .kind { background: #2bac7622; color: #2bac76; }
+  .chain-link.label-flip .arrow { color: #2bac76; }
+  .chain-link.label-flip { border-left-color: #2bac7644; }
+
+  /* Phase chain summary (in the divider area) */
+  .phase-chain {
+    margin: 0 24px 16px;
+    padding: 10px 14px;
+    background: #1e2128;
+    border-left: 3px solid #383b40;
+    border-radius: 4px;
+    font-size: 12.5px;
+    color: #bcabbc;
+    font-family: 'SF Mono', Consolas, monospace;
+    line-height: 1.7;
+  }
+  .phase-chain strong { color: #d1d2d3; }
+  .phase-chain .agent { color: #2bac76; }
+  .phase-chain .skill { color: #c39bd3; }
+  .phase-chain .cli  { color: #e8912d; }
+  .phase-chain .state { color: #36c5f0; }
+  .phase-chain .step-arrow { color: #696a6c; padding: 0 4px; }
+
   /* Final state card */
   .final-card {
     margin: 24px;
@@ -516,6 +574,19 @@
         <div class="line"></div>
       </div>
 
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        hermes-agent daemon
+        <span class="step-arrow">+</span>
+        cron schedulers
+        <span class="step-arrow">+</span>
+        <span class="cli">rlm</span> CLI
+        <span class="step-arrow">+</span>
+        Redis / event log infra
+        <span class="step-arrow">→</span>
+        <span class="state">等待 Discord 訊息 or ProductionMonitor signal</span>
+      </div>
+
       <article class="msg">
         <div class="avatar system">⚙</div>
         <div class="msg-content">
@@ -541,6 +612,26 @@
         <div class="line"></div>
         <div class="label">Phase 1 — Intake:Discord 對話直到共識</div>
         <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        <span class="agent">liyo</span> Discord 開 thread
+        <span class="step-arrow">→</span>
+        <span class="agent">Hermes</span> <span class="skill">business-model-probe</span>(N rounds)
+        <span class="step-arrow">→</span>
+        <span class="skill">signal-to-spec</span> 提案
+        <span class="step-arrow">→</span>
+        <span class="agent">liyo</span> yes <strong>(IntakeConfirmation gate)</strong>
+        <span class="step-arrow">→</span>
+        <span class="skill">intake-confirmation</span> 串:
+        <span class="cli">rlm append-business-model</span>
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm commit-spec</span>
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm confirm-spec</span>
+        <span class="step-arrow">→</span>
+        <span class="state">Spec #143 status:confirmed</span>
       </div>
 
       <article class="msg">
@@ -724,6 +815,27 @@
         <div class="line"></div>
       </div>
 
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        cron 偵測 status:confirmed Spec
+        <span class="step-arrow">→</span>
+        <span class="agent">Hermes</span> design mode:<span class="skill">compute-impact-scope</span> + <span class="skill">decompose-spec</span>
+        <span class="step-arrow">→</span>
+        <span class="skill">design-dialogue</span> 問 <span class="agent">liyo</span> 拍板 revert/fix/hybrid
+        <span class="step-arrow">→</span>
+        <span class="agent">liyo</span> hybrid
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm commit-workpackage</span> × 2
+        <span class="step-arrow">→</span>
+        <span class="skill">design-approval</span> <strong>(DesignApproval gate)</strong>
+        <span class="step-arrow">→</span>
+        <span class="agent">liyo</span> approve 144 hold 145
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm approve-workpackage</span>(機械驗 adr_refs)
+        <span class="step-arrow">→</span>
+        <span class="state">WP #144 status:approved</span>
+      </div>
+
       <article class="msg">
         <div class="avatar system">ℹ</div>
         <div class="msg-content">
@@ -892,6 +1004,23 @@ Mobile regression test must pass.</pre>
         <div class="line"></div>
       </div>
 
+      <div class="phase-chain">
+        <strong>鏈路(全在 Dispatch 一次 cron run 內鏈):</strong>
+        <span class="agent">Dispatch</span> cron 偵測 status:approved
+        <span class="step-arrow">→</span>
+        取 Redis lock
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm mark-in-progress</span>(+ agent:worker)
+        <span class="step-arrow">→</span>
+        spawn <span class="agent">Worker</span>(claude -p,<span class="skill">web-stack</span>)
+        <span class="step-arrow">→</span>
+        Worker 5 件式 atomic:branch + code + <span class="cli">rlm append-fact</span> + <span class="cli">rlm open-pr</span> + comment + label 翻
+        <span class="step-arrow">→</span>
+        <span class="agent">Dispatch</span> 接 ValidationPipeline:Stage 1(lint)<span class="step-arrow">→</span> Stage 2(<span class="agent">WhiteBox</span>)<span class="step-arrow">→</span> Stage 3(sandbox)<span class="step-arrow">→</span> Stage 4(<span class="agent">BlackBox</span>)
+        <span class="step-arrow">→</span>
+        <span class="state">agent:human-review</span>(lock 仍持有)
+      </div>
+
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
@@ -971,6 +1100,23 @@ Mobile regression test must pass.</pre>
         <div class="line"></div>
         <div class="label">Phase 4 — Merge &amp; Deliver</div>
         <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        <span class="agent">liyo</span> 在 GitHub merge PR #146 <strong>(PR-review gate)</strong>
+        <span class="step-arrow">→</span>
+        CI <code>.github/workflows/fact-commit-check.yml</code>:驗 ^fact: commit
+        <span class="step-arrow">→</span>
+        <span class="agent">Dispatch</span> 下輪 cron 偵測 PR merged
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm mark-delivered</span>(驗 CI passed + 翻 status:delivered + 移 agent:*)
+        <span class="step-arrow">→</span>
+        釋放 Redis lock
+        <span class="step-arrow">→</span>
+        <span class="state">WP #144 status:delivered;Spec #143 stays confirmed</span>
+        <span class="step-arrow">→</span>
+        <span class="agent">Hermes</span> cron outbound 通知 Discord
       </div>
 
       <article class="msg">
@@ -1082,6 +1228,19 @@ Mobile regression test must pass.</pre>
         <div class="line"></div>
       </div>
 
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        空 GitHub repo
+        <span class="step-arrow">+</span>
+        <code>.rlm/</code> 骨架
+        <span class="step-arrow">+</span>
+        hermes-agent daemon
+        <span class="step-arrow">+</span>
+        <span class="cli">rlm</span> CLI
+        <span class="step-arrow">→</span>
+        <span class="state">等待 liyo 開 thread</span>
+      </div>
+
       <article class="msg">
         <div class="avatar system">⚙</div>
         <div class="msg-content">
@@ -1103,6 +1262,24 @@ Mobile regression test must pass.</pre>
         <div class="line"></div>
         <div class="label">Phase 1 — Intake:從 0 開始的商模對話</div>
         <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>鏈路(從零比 conversion-drop 多一個 deployment-constraints-probe):</strong>
+        <span class="agent">liyo</span> Discord:「想做 todo list app」
+        <span class="step-arrow">→</span>
+        <span class="agent">Hermes</span> <span class="skill">business-model-probe</span>(2-3 rounds,office-hours framing)
+        <span class="step-arrow">→</span>
+        <span class="skill">deployment-constraints-probe</span>(5 dim 封閉題)
+        <span class="step-arrow">→</span>
+        <span class="skill">signal-to-spec</span> 提案 Spec(含 DeploymentConstraints)
+        <span class="step-arrow">→</span>
+        <span class="agent">liyo</span> yes <strong>(IntakeConfirmation gate)</strong>
+        <span class="step-arrow">→</span>
+        <span class="skill">intake-confirmation</span> 串:
+        <span class="cli">rlm append-business-model</span> + <span class="cli">rlm append-deployment-constraints</span> + <span class="cli">rlm commit-spec</span> + <span class="cli">rlm confirm-spec</span>
+        <span class="step-arrow">→</span>
+        <span class="state">Spec #1 status:confirmed</span>
       </div>
 
       <article class="msg">
@@ -1289,6 +1466,31 @@ Mobile regression test must pass.</pre>
         <div class="line"></div>
       </div>
 
+      <div class="phase-chain">
+        <strong>鏈路(從零 = 多了 ADR gate;ADR 沒 merge,WP 不能 approve):</strong>
+        <span class="agent">Hermes</span> <span class="skill">select-deployment-strategy</span>(≥3 候選 + trade-off matrix)
+        <span class="step-arrow">→</span>
+        <span class="skill">draft-adr</span> × 2
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm propose-adr</span> × 2(PR-routed)
+        <span class="step-arrow">→</span>
+        <strong>⏸ wait:</strong> <span class="agent">liyo</span> review + merge ADR PRs
+        <span class="step-arrow">→</span>
+        ADR-0001 / 0002 進 main
+        <span class="step-arrow">→</span>
+        <span class="skill">decompose-spec</span> + <span class="skill">compute-impact-scope</span> 拆 6 WP(depends_on chain)
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm commit-workpackage</span> × 6
+        <span class="step-arrow">→</span>
+        <span class="skill">design-approval</span> <strong>(DesignApproval gate)</strong>
+        <span class="step-arrow">→</span>
+        <span class="agent">liyo</span> approve 4-7, hold 8-9
+        <span class="step-arrow">→</span>
+        <span class="cli">rlm approve-workpackage</span> × 4(機械驗 adr_refs [1,2] 已 merged)
+        <span class="step-arrow">→</span>
+        <span class="state">WP #4-#7 status:approved</span>
+      </div>
+
       <article class="msg">
         <div class="avatar system">ℹ</div>
         <div class="msg-content">
@@ -1458,6 +1660,27 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
         <div class="line"></div>
         <div class="label">Phase 3 — Delivery:#4 詳寫,#5-#7 condense,#7 出現重試</div>
         <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>鏈路(serial WP execution,按 depends_on topological 順序):</strong>
+        <span class="agent">Dispatch</span> cron 掃 approved + deps 都 delivered
+        <span class="step-arrow">→</span>
+        #4(deps[])先進場
+        <span class="step-arrow">→</span>
+        每個 WP 一個 cycle:<span class="cli">mark-in-progress</span> <span class="step-arrow">→</span> <span class="agent">Worker</span> + <span class="cli">append-fact</span> + <span class="cli">open-pr</span> <span class="step-arrow">→</span> 5-stage ValidationPipeline <span class="step-arrow">→</span> human-review <span class="step-arrow">→</span> <span class="agent">liyo</span> merge <span class="step-arrow">→</span> <span class="cli">mark-delivered</span>
+        <span class="step-arrow">→</span>
+        #4 → #5 → #6 → #7
+        <span class="step-arrow">→</span>
+        <strong style="color:#e01e5a">#7 BlackBox 第一次失敗(invite middleware 漏 auth)</strong>
+        <span class="step-arrow">→</span>
+        <span class="state">retry:black-box:1</span> 標籤
+        <span class="step-arrow">→</span>
+        <span class="agent">Worker</span> attempt 2(fresh claude -p,讀 retry label + comment)
+        <span class="step-arrow">→</span>
+        補 middleware
+        <span class="step-arrow">→</span>
+        BlackBox PASS
       </div>
 
       <article class="msg">
@@ -1735,6 +1958,17 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
         <div class="line"></div>
         <div class="label">Phase 4 — 上線 &amp; ProductionMonitor onboard</div>
         <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>鏈路:</strong>
+        #9 (Mobile UI) 最後 deliver
+        <span class="step-arrow">→</span>
+        全 6 WPs <span class="state">status:delivered</span>
+        <span class="step-arrow">→</span>
+        Spec #1 <strong>stays status:confirmed</strong>(per ADR-0013:source-of-truth = main + <code>.rlm/facts/</code>,Spec 不會走到 delivered)
+        <span class="step-arrow">→</span>
+        <span class="agent">Hermes</span> 通知 Discord + 建議下一步:設 <span class="skill">production-monitor</span> 開始 dogfood
       </div>
 
       <article class="msg">
