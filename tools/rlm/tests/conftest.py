@@ -237,11 +237,21 @@ class FakeGitHub:
         if "comments" in fields:
             out["comments"] = [{"body": c} for c in issue.comments]
         if "closedByPullRequestsReferences" in fields:
-            # Simple heuristic for tests: PR head branch contains the issue number
+            # Simple heuristic for tests: PR head branch encodes the issue number.
+            # Accepts:
+            #   wp/<num>-<slug>            (Worker branches, contract pattern)
+            #   <prefix>/<num>-<slug>      (any single-slash prefix)
+            #   <prefix>-<num>-<slug>      (dash-encoded)
+            #   <prefix>-<num>             (trailing)
             out["closedByPullRequestsReferences"] = [
                 {"number": pr.number}
                 for pr in self.prs.values()
-                if f"-{number}-" in pr.head or pr.head.endswith(f"-{number}")
+                if (
+                    f"/{number}-" in pr.head
+                    or f"-{number}-" in pr.head
+                    or pr.head.endswith(f"-{number}")
+                    or pr.head.endswith(f"/{number}")
+                )
             ]
         return out
 

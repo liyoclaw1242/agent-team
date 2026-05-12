@@ -1,0 +1,46 @@
+name: fact-commit-check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  rlm-fact-commit-required:
+    # The job name is what shows up in PR statusCheckRollup. `mark-delivered`
+    # looks for exactly `rlm/fact-commit-required` (per .rlm/contracts/rlm-cli.md).
+    name: rlm/fact-commit-required
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify PR contains at least one `fact:` commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -e
+
+          # Accept both forms produced by `rlm append-fact` / `supersede-fact`:
+          #   fact: <date>-<slug>
+          #   fact: <date>-<slug> (supersedes <old>)
+          FACT_COUNT=$(git log --format="%s" "$BASE_SHA..$HEAD_SHA" \
+            | grep -c '^fact:' || true)
+
+          echo "PR commits ahead of base:"
+          git log --oneline "$BASE_SHA..$HEAD_SHA" || true
+          echo ""
+          echo "fact: commits found: $FACT_COUNT"
+
+          if [ "$FACT_COUNT" -eq 0 ]; then
+            echo ""
+            echo "::error::PR does not contain any 'fact:' commit."
+            echo "::error::Workers must call 'rlm append-fact' (or 'supersede-fact')"
+            echo "::error::before opening the PR."
+            echo "::error::See .rlm/adr/0013-spec-workpackage-lifecycle.md for the contract."
+            exit 1
+          fi
+
+          echo "OK At least one fact: commit present — fact-commit precondition satisfied."

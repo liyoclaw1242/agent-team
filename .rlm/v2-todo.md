@@ -237,7 +237,7 @@
 
 | 區塊 | 條目數 | 已動工 |
 |---|---|---|
-| A. 實作前置(pre-v1) | 6 | 5(A1 contract + scaffold,A3 100% 12/12 skill,A4 / A5 / A6 已定) |
+| A. 實作前置(pre-v1) | 6 | **6/6 全完成** ✓ |
 | B. 結構缺口(pre-v2) | 7 | 0 |
 | C. v2 能力 | 5 | 0 |
 | D. polish | 3 | 0 |
@@ -250,17 +250,17 @@
 - **A4 Supervision event log backend**:**Redis(熱資料) + JSONL append-only file(durable archive)**。每個 event 同時寫 Redis stream(供 Arbiter / Supervision 快讀)和 `.local/events.jsonl`(供 audit / replay)。Schema 遵 ADR-0012 event spec。
 - **A5 Global Worker lock**:**Redis key + TTL**(`SETNX rlm:worker:lock <dispatch_id>` + `EXPIRE`)。TTL 待 Worker iteration 上限定下後決定(估 30 min)。
 - **A6 Discord bot 部署**:已部署(user-managed,跑 hermes-agent daemon),不擋 v1 開發。
-- **未定**:A2 CI fact-commit check 細節(check name 暫定 `rlm/fact-commit-required`,定義在 `.rlm/contracts/rlm-cli.md` open questions 第 4 項)。
+- **A2 CI fact-commit check 完成**:`.github/workflows/fact-commit-check.yml`,check 名稱 `rlm/fact-commit-required`(job-name 對齊),驗 PR commit message 有 `^fact:` 開頭的 commit。`mark-delivered` 的 precondition 因此可以實打實跑。
 - **A1 rlm CLI 規格已釘 + scaffold 已建**:
   - **契約**:`.rlm/contracts/rlm-cli.md`(1126 行)—— 鎖定 17 個 subcommand 的 invocation surface、frontmatter / Issue body schemas、caller-identity 機制(`RLM_AGENT_ROLE` env var)、triple emission(Redis stream + JSONL dual-sink)、error model(8 個 stable exit codes)、idempotency keys。
   - **scaffold + impl**:`tools/rlm/`,uv-managed Python。foundation 完整跑:errors / discover / identity / frontmatter / triples / idempotency / adapters(gh, git, redis_log)/ routing(pr, commit, issue)/ cli + `SubcommandRun` context manager。
-  - **subcommand body 進度:14/17 done**,58 個 pytest 全綠 + ruff clean。
+  - **subcommand body 進度:17/17 done** ✓ — 67 個 pytest 全綠 + ruff clean
     - Layer 1(reference):record-signal ✓
     - Layer 2(label flips):confirm-spec ✓ mark-in-progress ✓ mark-superseded ✓
     - Layer 3(Issue create + body validation):commit-spec ✓ commit-workpackage ✓ enqueue-message ✓
     - Layer 4(direct-commit):append-fact ✓ supersede-fact ✓ append-business-model ✓ append-deployment-constraints ✓
     - Layer 5(PR-routed):propose-adr ✓ add-contract ✓ propose-context-change ✓
-    - **Layer 6(最硬,剩 3 個)**:approve-workpackage(機械驗 adr_refs merged)/ mark-delivered(PR merged + CI fact-commit check)/ open-pr(branch 含 fact commit + push + PR-from-Worker)
+    - Layer 6(多重 precondition):approve-workpackage ✓(機械驗 adr_refs merged)/ mark-delivered ✓(PR merged + CI check)/ open-pr ✓(branch + fact-commit verification)
   - **Test strategy**:fake_github(in-memory)+ real-git-on-tmp-dir + mocked push。每個 subcommand 至少 1 scenario test。e2e 跑通 Phase 1 全 chain(scenario test)+ 包含 dedup / supersession / WP create / 各種 PR-routed flow。
 - **A3 已寫**(`.claude/skills/<name>/SKILL.md`,Claude Agent SDK 格式):
 

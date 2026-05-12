@@ -100,6 +100,30 @@ def list_tree_main_paths(cwd: Path | None = None) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
+def list_branch_commits(
+    branch: str,
+    *,
+    base: str = "main",
+    cwd: Path | None = None,
+) -> list[str]:
+    """Return commit messages on `branch` not yet on `base` (newest first).
+
+    Used by `open-pr` to verify a fact commit exists on the Worker's branch.
+    """
+    result = _run_git(["log", "--format=%s", f"{base}..{branch}"], cwd=cwd)
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def branch_exists(branch: str, cwd: Path | None = None) -> bool:
+    """Return True if `branch` exists locally."""
+    result = _run_git(
+        ["rev-parse", "--verify", "--quiet", branch],
+        cwd=cwd,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 __all__ = [
     "current_branch",
     "repo_toplevel",
@@ -109,4 +133,6 @@ __all__ = [
     "commit",
     "push",
     "list_tree_main_paths",
+    "list_branch_commits",
+    "branch_exists",
 ]
