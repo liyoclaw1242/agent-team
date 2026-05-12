@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>AI Agent-Team Flow (v2 — Slack view)</title>
+<title>AI Agent-Team Flow (v1 — sweet-home runtime)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -463,6 +463,7 @@
         <span class="hash">#</span> todolist-build
         <span class="badge-new">NEW</span>
       </div>
+      <div class="nav-item" data-scenario="dogfood-2026-05-12"><span class="hash">#</span> dogfood-2026-05-12 <span class="badge-new" style="background:#2bac76">&#10003;</span></div>
     </div>
 
     <div class="nav-section">
@@ -477,7 +478,6 @@
       <h4>▾ Direct messages</h4>
       <div class="nav-item"><span class="dot online">●</span> liyo</div>
       <div class="nav-item"><span class="dot online">●</span> Hermes</div>
-      <div class="nav-item"><span class="dot online">●</span> Dispatch <small style="color:#696a6c">(cron)</small></div>
       <div class="nav-item"><span class="dot offline">○</span> Worker</div>
       <div class="nav-item"><span class="dot offline">○</span> WhiteBoxValidator</div>
       <div class="nav-item"><span class="dot offline">○</span> BlackBoxValidator</div>
@@ -488,6 +488,7 @@
     <div class="nav-section">
       <h4>▾ Apps</h4>
       <div class="nav-item muted"><span class="dot">▮</span> hermes-agent</div>
+      <div class="nav-item muted"><span class="dot">▮</span> sweet-home</div>
       <div class="nav-item muted"><span class="dot">▮</span> GitHub</div>
       <div class="nav-item muted"><span class="dot">▮</span> ProductionMonitor</div>
     </div>
@@ -576,15 +577,17 @@
 
       <div class="phase-chain">
         <strong>鏈路:</strong>
-        hermes-agent daemon
+        <span class="cli">init-target-repo.sh</span> → 19 labels + <code>.workflow-repos.json</code> + <code>~/.hermes/agent-team.env</code>
         <span class="step-arrow">+</span>
-        cron schedulers
+        <span class="cli">sync-hermes-skills.sh</span> → 12 skills to <code>~/.hermes/skills/</code>
         <span class="step-arrow">+</span>
-        <span class="cli">rlm</span> CLI
+        <span class="agent">hermes-agent</span> daemon → Discord <code>#product</code> I/O bridge
         <span class="step-arrow">+</span>
-        Redis / event log infra
+        <span class="agent">sweet-home</span> <code>cargo run</code> → polls target repo every 30s via GitHub API
+        <span class="step-arrow">+</span>
+        <span class="cli">rlm</span> CLI at <code>tools/rlm/</code>
         <span class="step-arrow">→</span>
-        <span class="state">等待 Discord 訊息 or ProductionMonitor signal</span>
+        <span class="state">waiting for Discord message or GitHub label match</span>
       </div>
 
       <article class="msg">
@@ -593,15 +596,16 @@
           <div class="msg-head">
             <span class="name">System</span>
             <span class="app-tag">APP</span>
-            <span class="ts">T−∞ · 一次性設定</span>
+            <span class="ts">T−∞ · one-time setup</span>
           </div>
-          <div class="msg-title">Repo + hermes-agent daemon + cron 都備好</div>
+          <div class="msg-title">Infrastructure bootstrapped</div>
           <div class="msg-body">
             <ul>
-              <li>GitHub repo 存在,<code>.rlm/adr/</code> / <code>.rlm/facts/</code> / <code>.rlm/business/</code> / <code>.rlm/contracts/</code> 結構就位</li>
-              <li>hermes-agent daemon 跑在 server,connected to Discord <code>#product</code></li>
-              <li>cron 排程:Dispatch 5 min、ProductionMonitor 15 min、Hermes 內建 cron 由框架管</li>
-              <li><code>rlm</code> CLI 安裝就緒</li>
+              <li><code>init-target-repo.sh --repo ORG/NAME --path /abs/path</code> — creates 19 GitHub labels in target repo, updates <code>.workflow-repos.json</code>, writes <code>~/.hermes/agent-team.env</code></li>
+              <li><code>sync-hermes-skills.sh</code> — copies 12 Hermes skills to <code>~/.hermes/skills/intake/</code> and <code>~/.hermes/skills/design/</code></li>
+              <li><strong>hermes-agent daemon</strong> starts — connects to Discord <code>#product</code>. Discord I/O bridge ONLY. Does not spawn <code>claude -p</code> directly.</li>
+              <li><strong>sweet-home</strong> starts: <code>WORKFLOW_FILE=~/agent-team/agent-team.workflow.yaml cargo run --no-default-features</code> — polls target repo every 30s via GitHub API, matches dispatch rules, fires <code>claude -p</code> subprocesses</li>
+              <li><code>rlm</code> CLI installed at <code>tools/rlm/</code></li>
             </ul>
           </div>
         </div>
@@ -610,26 +614,31 @@
       <!-- ============== PHASE 1 ============== -->
       <div class="divider intake">
         <div class="line"></div>
-        <div class="label">Phase 1 — Intake:Discord 對話直到共識</div>
+        <div class="label">Phase 1 — Intake: Discord signal → GitHub Issue → sweet-home dispatch</div>
         <div class="line"></div>
       </div>
 
       <div class="phase-chain">
         <strong>鏈路:</strong>
-        <span class="agent">liyo</span> Discord 開 thread
+        <span class="agent">liyo</span> sends signal in Discord <code>#product</code>
         <span class="step-arrow">→</span>
-        <span class="agent">Hermes</span> <span class="skill">business-model-probe</span>(N rounds)
+        <span class="agent">hermes-agent</span> daemon <span class="trigger event">EVENT</span> runs <span class="skill">signal-to-spec</span> / <span class="skill">business-model-probe</span> IN DISCORD (daemon-side, stateless)
         <span class="step-arrow">→</span>
-        <span class="skill">signal-to-spec</span> 提案
+        after consensus: daemon creates <code>kind:spec + agent:hermes-intake + status:proposed</code> GitHub Issue
         <span class="step-arrow">→</span>
-        <span class="agent">liyo</span> yes <strong>(IntakeConfirmation gate)</strong>
+        <span class="agent">sweet-home</span> poll <span class="trigger cron">CRON 30s</span> sees issue, matches dispatch rule, fires <code>hermes-intake</code> role
         <span class="step-arrow">→</span>
-        <span class="skill">intake-confirmation</span> 串:
-        <span class="cli">rlm append-business-model</span>
+        sweet-home pre_spawn: flips <code>status:proposed → status:in-progress</code>
         <span class="step-arrow">→</span>
-        <span class="cli">rlm commit-spec</span>
+        sweet-home spawns <code>claude -p</code> with <span class="skill">signal-to-spec</span> SKILL.md as system prompt
         <span class="step-arrow">→</span>
-        <span class="cli">rlm confirm-spec</span>
+        skill emits <code>{"kind":"intake-question"}</code> → sweet-home posts comment, calls <span class="cli">rlm enqueue-message</span>, flips to <code>agent:human-help + status:blocked</code>
+        <span class="step-arrow">→</span>
+        liyo says "yes" in Discord → daemon flips back to <code>agent:hermes-intake + status:proposed</code>
+        <span class="step-arrow">→</span>
+        sweet-home dispatches again → skill Phase B emits <code>{"kind":"intake-complete","spec":{...}}</code>
+        <span class="step-arrow">→</span>
+        sweet-home: flips to <code>agent:hermes-design + status:proposed</code>
         <span class="step-arrow">→</span>
         <span class="state">Spec #143 status:confirmed</span>
       </div>
@@ -638,7 +647,7 @@
         <div class="avatar system">ℹ</div>
         <div class="msg-content">
           <div class="msg-head"><span class="name">System note</span></div>
-          <div class="msg-body"><p><strong>關鍵差異:</strong>整個 Phase 1 結束前,RLM 跟 Issue 都不會被動。<em>對話先跑完,共識後才落地。</em></p></div>
+          <div class="msg-body"><p><strong>Key architecture:</strong> Daemon is Discord I/O bridge only. All LLM work is done by sweet-home-spawned <code>claude -p</code> subprocesses. They communicate via GitHub Issue labels — <strong>the state machine IS the contract.</strong></p></div>
         </div>
       </article>
 
@@ -817,23 +826,21 @@
 
       <div class="phase-chain">
         <strong>鏈路:</strong>
-        cron 偵測 status:confirmed Spec
+        <span class="agent">sweet-home</span> poll sees <code>agent:hermes-design + status:proposed</code>
         <span class="step-arrow">→</span>
-        <span class="agent">Hermes</span> design mode:<span class="skill">compute-impact-scope</span> + <span class="skill">decompose-spec</span>
+        spawns <code>claude -p</code> with <span class="skill">decompose-spec</span>/<span class="skill">compute-impact-scope</span>
         <span class="step-arrow">→</span>
-        <span class="skill">design-dialogue</span> 問 <span class="agent">liyo</span> 拍板 revert/fix/hybrid
+        skill emits <code>{"kind":"decomposed","workpackages":[...]}</code>
         <span class="step-arrow">→</span>
-        <span class="agent">liyo</span> hybrid
+        sweet-home <code>for_each wp</code>: creates <code>[WP] title</code> issues with <code>kind:workpackage + status:proposed + agent:hermes-design + parent-spec:#N</code>
         <span class="step-arrow">→</span>
-        <span class="cli">rlm commit-workpackage</span> × 2
+        <strong>[Gap 1 fix]</strong> calls <span class="cli">rlm enqueue-message --kind=design-approval-needed</span> → daemon posts WP list to Discord
         <span class="step-arrow">→</span>
-        <span class="skill">design-approval</span> <strong>(DesignApproval gate)</strong>
+        <span class="agent">liyo</span> replies "approve all" in Discord <strong>(DesignApproval gate)</strong>
         <span class="step-arrow">→</span>
-        <span class="agent">liyo</span> approve 144 hold 145
+        daemon flips each WP: <code>status:proposed → status:approved</code>, <code>agent:hermes-design → agent:worker</code>
         <span class="step-arrow">→</span>
-        <span class="cli">rlm approve-workpackage</span>(機械驗 adr_refs)
-        <span class="step-arrow">→</span>
-        <span class="state">WP #144 status:approved</span>
+        <span class="state">WP #144 status:approved + agent:worker</span>
       </div>
 
       <article class="msg">
@@ -1000,37 +1007,42 @@ Mobile regression test must pass.</pre>
       <!-- ============== PHASE 3 ============== -->
       <div class="divider delivery">
         <div class="line"></div>
-        <div class="label">Phase 3 — Delivery:Dispatch + Worker + Validators</div>
+        <div class="label">Phase 3 — Delivery: sweet-home replaces Python Dispatch</div>
         <div class="line"></div>
       </div>
 
       <div class="phase-chain">
-        <strong>鏈路(全在 Dispatch 一次 cron run 內鏈):</strong>
-        <span class="agent">Dispatch</span> cron 偵測 status:approved
+        <strong>鏈路 (sweet-home 30s poll, no Python lock, no Redis):</strong>
+        <span class="agent">sweet-home</span> poll sees <code>kind:workpackage + agent:worker + status:approved</code>
         <span class="step-arrow">→</span>
-        取 Redis lock
+        pre_spawn: <code>status:approved → status:in-progress</code>, carves git worktree at <code>&lt;target-repo&gt;-worktrees/spawn-&lt;issue&gt;-&lt;ts&gt;</code>
         <span class="step-arrow">→</span>
-        <span class="cli">rlm mark-in-progress</span>(+ agent:worker)
+        spawns <code>claude -p</code> with <span class="skill">tdd-loop</span> SKILL.md, cwd = worktree
         <span class="step-arrow">→</span>
-        spawn <span class="agent">Worker</span>(claude -p,<span class="skill">web-stack</span>)
+        Worker runs RGR loop, fact commits, emits <code>{"kind":"delivered","branch":"...","fact_commits":[...]}</code>
         <span class="step-arrow">→</span>
-        Worker 5 件式 atomic:branch + code + <span class="cli">rlm append-fact</span> + <span class="cli">rlm open-pr</span> + comment + label 翻
+        <code>on_result.worker.delivered</code>: posts comment, pushes branch, opens PR, flips <code>agent:worker → agent:validator + status:in-progress → status:delivered</code>
         <span class="step-arrow">→</span>
-        <span class="agent">Dispatch</span> 接 ValidationPipeline:Stage 1(lint)<span class="step-arrow">→</span> Stage 2(<span class="agent">WhiteBox</span>)<span class="step-arrow">→</span> Stage 3(sandbox)<span class="step-arrow">→</span> Stage 4(<span class="agent">BlackBox</span>)
+        poll sees <code>agent:validator + status:delivered</code> → dispatches <span class="agent">WhiteBox</span>
         <span class="step-arrow">→</span>
-        <span class="state">agent:human-review</span>(lock 仍持有)
+        WhiteBox emits <code>{"kind":"approved"}</code> → flips to <code>agent:blackbox-validator</code>
+        <span class="step-arrow">→</span>
+        BlackBox emits <code>{"kind":"approved"}</code> → <code>on_result</code>: flips <code>status:delivered → status:validated</code>, posts "ready for merge"
+        <span class="step-arrow">→</span>
+        <span class="state">agent:human-review</span> — no Python lock; sweet-home <code>max_in_flight:1</code> is the global semaphore
       </div>
 
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+38 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
-          <div class="msg-title">拿 global Worker lock,開 in-cycle chain</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+38 min · 30s poll</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">Poll matches dispatch rule — pre_spawn label flip, carve worktree</div>
           <div class="actions">
-            <div class="act note"><span class="icon">·</span>檢查 lock:無</div>
-            <div class="act read"><span class="icon">→</span>掃 <span class="label-pill approved">status:approved</span> 沒 <span class="label-pill agent">agent:*</span>:找到 #144</div>
-            <div class="act add"><span class="icon">🔒</span>取 lock + <code>rlm mark-in-progress --issue=144</code></div>
-            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill approved">status:approved</span><span class="arrow">→</span><span class="label-pill progress">status:in_progress</span> + <span class="label-pill agent">agent:worker</span></div>
+            <div class="act note"><span class="icon">·</span>in_flight: 0 &lt; max_in_flight: 1 — slot available</div>
+            <div class="act read"><span class="icon">→</span>scan <code>kind:workpackage + agent:worker + status:approved</code>: found #144</div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill approved">status:approved</span><span class="arrow">→</span><span class="label-pill progress">status:in-progress</span></div>
+            <div class="act add"><span class="icon">+</span>git worktree at <code>&lt;repo&gt;-worktrees/spawn-144-&lt;ts&gt;</code></div>
+            <div class="act add"><span class="icon">+</span>spawn <code>claude -p</code> with <code>tdd-loop</code> SKILL.md, cwd = worktree</div>
           </div>
         </div>
       </article>
@@ -1062,24 +1074,22 @@ Mobile regression test must pass.</pre>
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+40 ~ T+45 min · in-cycle chain</span></div>
-          <div class="msg-title">ValidationPipeline · 5 階段</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+40 ~ T+45 min · on_result chain</span></div>
+          <div class="msg-title">on_result.worker.delivered — push branch, open PR, dispatch validators</div>
           <div class="actions">
-            <div class="act note"><span class="icon">✓</span>Post-condition check:branch / fact / PR / comment / label 全有 → pass</div>
+            <div class="act note"><span class="icon">✓</span>Worker emitted <code>{"kind":"delivered"}</code> — branch / fact commits / PR opened</div>
           </div>
           <div class="att file">
-            <div class="att-source"><span class="src-icon">🧪</span>Pipeline run</div>
+            <div class="att-source"><span class="src-icon">🧪</span>Validation pipeline</div>
             <div class="att-body">
-              <p><strong>Stage 1</strong>(auto tools)— lint / typecheck / test 全綠 ✅</p>
-              <p><strong>Stage 2</strong>(WhiteBoxValidator)— pass ✅</p>
-              <p><strong>Stage 3</strong>(Sandbox deploy)— PR branch 部到隔離環境 ✅</p>
-              <p><strong>Stage 4</strong>(BlackBoxValidator)— 跑 mobile 預約 flow → pass ✅</p>
-              <p><strong>Stage 5</strong>(human review handoff)</p>
+              <p><strong>WhiteBoxValidator</strong> — spawned by sweet-home, emits <code>{"kind":"approved"}</code> ✅</p>
+              <p><strong>BlackBoxValidator</strong> — spawned by sweet-home, runs mobile booking flow → emits <code>{"kind":"approved"}</code> ✅</p>
+              <p>Any agent fails to emit valid JSON → <code>on_no_structured_output</code> → <code>agent:arbiter</code></p>
             </div>
           </div>
           <div class="actions" style="margin-top:8px">
-            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill agent validator">agent:validator</span><span class="arrow">→</span><span class="label-pill agent human">agent:human-review</span></div>
-            <div class="act note"><span class="icon">·</span>Dispatch 退出 chain;<strong>lock 仍持有等 PR merge</strong></div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill progress">status:in-progress</span><span class="arrow">→</span><span class="label-pill delivered">status:validated</span></div>
+            <div class="act note"><span class="icon">·</span>sweet-home posts "ready for merge" comment; <code>in_flight</code> slot held until PR merged</div>
           </div>
         </div>
       </article>
@@ -1108,15 +1118,13 @@ Mobile regression test must pass.</pre>
         <span class="step-arrow">→</span>
         CI <code>.github/workflows/fact-commit-check.yml</code>:驗 ^fact: commit
         <span class="step-arrow">→</span>
-        <span class="agent">Dispatch</span> 下輪 cron 偵測 PR merged
+        <span class="agent">sweet-home</span> next poll detects PR merged
         <span class="step-arrow">→</span>
-        <span class="cli">rlm mark-delivered</span>(驗 CI passed + 翻 status:delivered + 移 agent:*)
-        <span class="step-arrow">→</span>
-        釋放 Redis lock
+        <code>on_result</code>: flips <code>status:validated → status:delivered</code>, removes <code>agent:*</code> label, decrements <code>in_flight</code> counter
         <span class="step-arrow">→</span>
         <span class="state">WP #144 status:delivered;Spec #143 stays confirmed</span>
         <span class="step-arrow">→</span>
-        <span class="agent">Hermes</span> cron outbound 通知 Discord
+        <span class="agent">hermes-agent</span> daemon picks up enqueued outbound message → posts to Discord
       </div>
 
       <article class="msg">
@@ -1148,14 +1156,13 @@ Mobile regression test must pass.</pre>
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+58 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
-          <div class="msg-title">收尾,釋放 lock</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+58 min · next poll</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">PR merged detected — on_merged handler</div>
           <div class="actions">
-            <div class="act read"><span class="icon">→</span>看到 #144 仍持 lock + agent:human-review + PR merged + CI ✓</div>
-            <div class="act note"><span class="icon">$</span><code>rlm mark-delivered --issue=144</code></div>
-            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill progress">status:in_progress</span><span class="arrow">→</span><span class="label-pill delivered">status:delivered</span></div>
-            <div class="act remove"><span class="icon">−</span>移除 agent:* label</div>
-            <div class="act add"><span class="icon">🔓</span>釋放 global Worker lock</div>
+            <div class="act read"><span class="icon">→</span>detects #144 PR merged + CI ✓</div>
+            <div class="act flip"><span class="icon">↻</span>#144 <span class="label-pill delivered">status:validated</span><span class="arrow">→</span><span class="label-pill delivered">status:delivered</span></div>
+            <div class="act remove"><span class="icon">−</span>remove agent:* label</div>
+            <div class="act note"><span class="icon">·</span>decrement in_flight counter — slot freed for next WP</div>
           </div>
         </div>
       </article>
@@ -1230,28 +1237,32 @@ Mobile regression test must pass.</pre>
 
       <div class="phase-chain">
         <strong>鏈路:</strong>
-        空 GitHub repo
+        <span class="cli">init-target-repo.sh</span> → 19 labels + <code>.workflow-repos.json</code> + <code>~/.hermes/agent-team.env</code>
         <span class="step-arrow">+</span>
-        <code>.rlm/</code> 骨架
+        <span class="cli">sync-hermes-skills.sh</span> → 12 skills to <code>~/.hermes/skills/</code>
         <span class="step-arrow">+</span>
-        hermes-agent daemon
+        <span class="agent">hermes-agent</span> daemon → Discord <code>#product</code> I/O bridge
         <span class="step-arrow">+</span>
-        <span class="cli">rlm</span> CLI
+        <span class="agent">sweet-home</span> polls target repo every 30s
+        <span class="step-arrow">+</span>
+        <span class="cli">rlm</span> CLI at <code>tools/rlm/</code>
         <span class="step-arrow">→</span>
-        <span class="state">等待 liyo 開 thread</span>
+        <span class="state">waiting for liyo to open Discord thread</span>
       </div>
 
       <article class="msg">
         <div class="avatar system">⚙</div>
         <div class="msg-content">
           <div class="msg-head"><span class="name">System</span><span class="app-tag">APP</span><span class="ts">T−∞</span></div>
-          <div class="msg-title">空 repo + hermes-agent daemon + cron 就位</div>
+          <div class="msg-title">Empty repo + hermes-agent daemon + sweet-home runtime ready</div>
           <div class="msg-body">
             <ul>
-              <li>GitHub repo 是<strong>空的</strong>,只有 <code>docs/</code> 結構跟 <code>rlm</code> CLI</li>
-              <li>還沒有任何 ADR、code、fact、contract</li>
-              <li>hermes-agent daemon 連好 Discord <code>#product</code></li>
-              <li>liyo 想做點東西 —— 但還沒拍板要做什麼</li>
+              <li>GitHub repo is <strong>empty</strong> — only <code>docs/</code> structure and <code>rlm</code> CLI present</li>
+              <li>No ADR, code, fact, or contract yet</li>
+              <li><code>init-target-repo.sh</code> created 19 GitHub labels, wrote <code>~/.hermes/agent-team.env</code></li>
+              <li>hermes-agent daemon connected to Discord <code>#product</code> (I/O bridge only)</li>
+              <li>sweet-home polling: <code>WORKFLOW_FILE=~/agent-team/agent-team.workflow.yaml cargo run --no-default-features</code></li>
+              <li>liyo has an idea — but hasn't decided what to build yet</li>
             </ul>
           </div>
         </div>
@@ -1663,35 +1674,33 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       </div>
 
       <div class="phase-chain">
-        <strong>鏈路(serial WP execution,按 depends_on topological 順序):</strong>
-        <span class="agent">Dispatch</span> cron 掃 approved + deps 都 delivered
+        <strong>鏈路(serial WP execution, depends_on topological order, sweet-home max_in_flight:1):</strong>
+        <span class="agent">sweet-home</span> poll sees <code>kind:workpackage + agent:worker + status:approved</code> with deps all delivered
         <span class="step-arrow">→</span>
-        #4(deps[])先進場
+        #4 (deps[]) enters first — pre_spawn: flip to in-progress, carve worktree, spawn <code>claude -p</code>
         <span class="step-arrow">→</span>
-        每個 WP 一個 cycle:<span class="cli">mark-in-progress</span> <span class="step-arrow">→</span> <span class="agent">Worker</span> + <span class="cli">append-fact</span> + <span class="cli">open-pr</span> <span class="step-arrow">→</span> 5-stage ValidationPipeline <span class="step-arrow">→</span> human-review <span class="step-arrow">→</span> <span class="agent">liyo</span> merge <span class="step-arrow">→</span> <span class="cli">mark-delivered</span>
+        each WP cycle: Worker emits <code>{"kind":"delivered"}</code> → on_result: push branch, open PR, dispatch WhiteBox then BlackBox → status:validated → liyo merge → on_merged: status:delivered, decrement in_flight
         <span class="step-arrow">→</span>
         #4 → #5 → #6 → #7
         <span class="step-arrow">→</span>
-        <strong style="color:#e01e5a">#7 BlackBox 第一次失敗(invite middleware 漏 auth)</strong>
+        <strong style="color:#e01e5a">#7 BlackBox first fail (invite middleware missing auth)</strong>
         <span class="step-arrow">→</span>
-        <span class="state">retry:black-box:1</span> 標籤
+        <code>on_no_structured_output</code> / BlackBox emits <code>{"kind":"rejected-implementation-defect"}</code> → <span class="state">retry:black-box:1</span> label
         <span class="step-arrow">→</span>
-        <span class="agent">Worker</span> attempt 2(fresh claude -p,讀 retry label + comment)
+        <span class="agent">Worker</span> attempt 2 (fresh <code>claude -p</code>, reads retry label + comment)
         <span class="step-arrow">→</span>
-        補 middleware
-        <span class="step-arrow">→</span>
-        BlackBox PASS
+        adds middleware → BlackBox PASS
       </div>
 
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+35 min · cron</span><span class="trigger cron">cron</span></div>
-          <div class="msg-title">取 lock,#4 進場(#5 #6 #7 depends_on 未滿足,跳過)</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+35 min · 30s poll</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">Poll match — #4 enters (deps empty); #5 #6 #7 skipped (deps not delivered)</div>
           <div class="actions">
-            <div class="act read"><span class="icon">→</span>掃 <span class="label-pill approved">approved</span>:#4(deps 空)/ #5 #6 #7(deps 未 delivered)</div>
-            <div class="act add"><span class="icon">🔒</span>取 lock + <code>rlm mark-in-progress --issue=4</code></div>
-            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill approved">approved</span><span class="arrow">→</span><span class="label-pill progress">in_progress</span> + <span class="label-pill agent">agent:worker</span></div>
+            <div class="act read"><span class="icon">→</span>scan approved: #4 (deps []) ready; #5 #6 #7 deps not yet delivered — skip</div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill approved">approved</span><span class="arrow">→</span><span class="label-pill progress">in-progress</span></div>
+            <div class="act add"><span class="icon">+</span>carve worktree, spawn <code>claude -p</code> with <code>tdd-loop</code> SKILL.md</div>
           </div>
         </div>
       </article>
@@ -1723,19 +1732,19 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+42 ~ T+46 min</span></div>
-          <div class="msg-title">#4 跑 ValidationPipeline</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+42 ~ T+46 min · on_result chain</span></div>
+          <div class="msg-title">#4 on_result.worker.delivered — validators dispatched</div>
           <div class="att file">
-            <div class="att-source"><span class="src-icon">🧪</span>Pipeline run · #4</div>
+            <div class="att-source"><span class="src-icon">🧪</span>Validation · #4</div>
             <div class="att-body">
-              <p>Stage 1(lint / tsc / test)✅ &nbsp;&nbsp; Stage 2(WhiteBox)✅</p>
-              <p>Stage 3(Vercel preview deploy)✅ <em>https://wp4-xxx.vercel.app</em></p>
-              <p>Stage 4(BlackBox · 確認 landing page render + 200)✅</p>
-              <p>Stage 5 handoff</p>
+              <p>WhiteBox spawned by sweet-home — emits <code>{"kind":"approved"}</code> ✅</p>
+              <p>Vercel preview deploy ✅ <em>https://wp4-xxx.vercel.app</em></p>
+              <p>BlackBox spawned — confirms landing page render + 200 → <code>{"kind":"approved"}</code> ✅</p>
             </div>
           </div>
           <div class="actions" style="margin-top:8px">
-            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent human">human-review</span></div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill progress">in-progress</span><span class="arrow">→</span><span class="label-pill delivered">status:validated</span></div>
+            <div class="act note"><span class="icon">·</span>sweet-home posts "ready for merge"; in_flight slot held</div>
           </div>
         </div>
       </article>
@@ -1751,12 +1760,12 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+55 min · 下輪 cron</span><span class="trigger cron">cron</span></div>
-          <div class="msg-title">#4 收尾 · 釋放 lock</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+55 min · next poll</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">#4 PR merged — on_merged handler</div>
           <div class="actions">
-            <div class="act note"><span class="icon">$</span><code>rlm mark-delivered --issue=4</code> &nbsp; (CI fact-commit ✓)</div>
-            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill progress">in_progress</span><span class="arrow">→</span><span class="label-pill delivered">delivered</span></div>
-            <div class="act add"><span class="icon">🔓</span>釋放 lock。#5 deps 已滿足,下輪 cron 進場</div>
+            <div class="act note"><span class="icon">✓</span>CI fact-commit check ✓</div>
+            <div class="act flip"><span class="icon">↻</span>#4 <span class="label-pill delivered">status:validated</span><span class="arrow">→</span><span class="label-pill delivered">status:delivered</span></div>
+            <div class="act note"><span class="icon">·</span>decrement in_flight; #5 deps now satisfied — next poll dispatches #5</div>
           </div>
         </div>
       </article>
@@ -1765,12 +1774,12 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch + Worker(condensed)</span><span class="app-tag">SCRIPT</span><span class="ts">T+1h ~ T+2h 10min</span></div>
-          <div class="msg-title">#5(Prisma schema)、#6(NextAuth)依序完成</div>
+          <div class="msg-head"><span class="name">sweet-home + Worker (condensed)</span><span class="app-tag">RUNTIME</span><span class="ts">T+1h ~ T+2h 10min</span></div>
+          <div class="msg-title">#5 (Prisma schema), #6 (NextAuth) complete in sequence</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span>#5 → PR #11(Prisma schema + migration)→ pipeline 全綠 → liyo merge → delivered</div>
-            <div class="act add"><span class="icon">+</span>#6 → PR #12(NextAuth email magic link)→ pipeline 全綠 → liyo merge → delivered</div>
-            <div class="act note"><span class="icon">·</span>都是 happy path,各跑一次 5-stage 通過</div>
+            <div class="act add"><span class="icon">+</span>#5 → Worker emits <code>{"kind":"delivered"}</code> → PR #11 pushed → WhiteBox + BlackBox approve → liyo merge → status:delivered</div>
+            <div class="act add"><span class="icon">+</span>#6 → Worker emits <code>{"kind":"delivered"}</code> → PR #12 pushed → WhiteBox + BlackBox approve → liyo merge → status:delivered</div>
+            <div class="act note"><span class="icon">·</span>happy path, both pass on first attempt; in_flight released between each</div>
           </div>
         </div>
       </article>
@@ -1785,10 +1794,11 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 15min · cron</span><span class="trigger cron">cron</span></div>
-          <div class="msg-title">#7(Household + invite + API)進場,first attempt</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+2h 15min · 30s poll</span><span class="trigger cron">cron</span></div>
+          <div class="msg-title">#7 (Household + invite + API) enters — first attempt</div>
           <div class="actions">
-            <div class="act add"><span class="icon">🔒</span>取 lock + <code>mark-in-progress #7</code> + <span class="label-pill agent">agent:worker</span></div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill approved">approved</span><span class="arrow">→</span><span class="label-pill progress">in-progress</span></div>
+            <div class="act add"><span class="icon">+</span>carve worktree, spawn <code>claude -p</code></div>
           </div>
         </div>
       </article>
@@ -1819,8 +1829,8 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 29min</span></div>
-          <div class="msg-body"><p>Stage 3 sandbox deploy ✅(<code>wp7-xxx.vercel.app</code>)</p></div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+2h 29min · on_result chain</span></div>
+          <div class="msg-body"><p>on_result.worker.delivered: branch pushed, PR opened, WhiteBox approved. Sandbox deploy ✅ (<code>wp7-xxx.vercel.app</code>). Dispatching BlackBox.</p></div>
         </div>
       </article>
 
@@ -1843,12 +1853,12 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 30min</span></div>
-          <div class="msg-title">分類失敗 → 計入 retry budget → 翻回 worker</div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+2h 30min · on_result</span></div>
+          <div class="msg-title">BlackBox emits rejected — on_result.blackbox.rejected-implementation-defect → retry</div>
           <div class="actions">
-            <div class="act note"><span class="icon">·</span>BlackBox classification:implementation defect(非 AC-ambiguity)→ 走 retry 路</div>
-            <div class="act add"><span class="icon">+</span>label <span class="label-pill retry">retry:black-box:1</span>(預算 2,還剩 1)</div>
-            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent">agent:worker</span></div>
+            <div class="act note"><span class="icon">·</span>BlackBox emitted <code>{"kind":"rejected-implementation-defect"}</code> — retry path (not AC-ambiguity)</div>
+            <div class="act add"><span class="icon">+</span>label <span class="label-pill retry">retry:black-box:1</span> (budget 2, 1 remaining)</div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">agent:blackbox-validator</span><span class="arrow">→</span><span class="label-pill agent">agent:worker</span> (re-dispatch)</div>
           </div>
         </div>
       </article>
@@ -1882,10 +1892,10 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 38min</span></div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+2h 38min · on_result</span></div>
           <div class="actions">
-            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">validator</span><span class="arrow">→</span><span class="label-pill agent human">agent:human-review</span></div>
-            <div class="act note"><span class="icon">·</span>留 <span class="label-pill retry">retry:black-box:1</span>(歷史紀錄,Supervision event log 可查)</div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill agent validator">agent:blackbox-validator</span><span class="arrow">→</span><span class="label-pill agent human">agent:human-review</span></div>
+            <div class="act note"><span class="icon">·</span>retain <span class="label-pill retry">retry:black-box:1</span> for audit trail; posts "ready for merge" comment</div>
           </div>
         </div>
       </article>
@@ -1901,10 +1911,10 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch</span><span class="app-tag">SCRIPT</span><span class="ts">T+2h 55min</span><span class="trigger cron">cron</span></div>
+          <div class="msg-head"><span class="name">sweet-home</span><span class="app-tag">RUNTIME</span><span class="ts">T+2h 55min · next poll</span><span class="trigger cron">cron</span></div>
           <div class="actions">
-            <div class="act flip"><span class="icon">↻</span>#7 → <span class="label-pill delivered">delivered</span></div>
-            <div class="act add"><span class="icon">🔓</span>release lock</div>
+            <div class="act flip"><span class="icon">↻</span>#7 <span class="label-pill delivered">status:validated</span><span class="arrow">→</span><span class="label-pill delivered">status:delivered</span></div>
+            <div class="act note"><span class="icon">·</span>decrement in_flight — slot freed</div>
           </div>
         </div>
       </article>
@@ -1944,11 +1954,11 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
       <article class="msg">
         <div class="avatar dispatch">D</div>
         <div class="msg-content">
-          <div class="msg-head"><span class="name">Dispatch + Worker(condensed)</span><span class="app-tag">SCRIPT</span><span class="ts">T+3h 5min ~ T+4h 30min</span></div>
-          <div class="msg-title">#8(List/Item CRUD)、#9(Mobile UI)依序 happy path 完成</div>
+          <div class="msg-head"><span class="name">sweet-home + Worker (condensed)</span><span class="app-tag">RUNTIME</span><span class="ts">T+3h 5min ~ T+4h 30min</span></div>
+          <div class="msg-title">#8 (List/Item CRUD), #9 (Mobile UI) complete in sequence</div>
           <div class="actions">
-            <div class="act add"><span class="icon">+</span>#8 → PR #14 → pipeline ✅ → liyo merge → delivered</div>
-            <div class="act add"><span class="icon">+</span>#9 → PR #15 → pipeline ✅(BlackBox 模擬 iOS Safari / Android Chrome viewport)→ liyo merge → delivered</div>
+            <div class="act add"><span class="icon">+</span>#8 → Worker delivers → PR #14 → WhiteBox + BlackBox approve → liyo merge → status:delivered</div>
+            <div class="act add"><span class="icon">+</span>#9 → Worker delivers → PR #15 → BlackBox simulates iOS Safari / Android Chrome viewport → approve → liyo merge → status:delivered</div>
           </div>
         </div>
       </article>
@@ -1962,13 +1972,13 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
 
       <div class="phase-chain">
         <strong>鏈路:</strong>
-        #9 (Mobile UI) 最後 deliver
+        #9 (Mobile UI) final deliver
         <span class="step-arrow">→</span>
-        全 6 WPs <span class="state">status:delivered</span>
+        all 6 WPs <span class="state">status:delivered</span>
         <span class="step-arrow">→</span>
-        Spec #1 <strong>stays status:confirmed</strong>(per ADR-0013:source-of-truth = main + <code>.rlm/facts/</code>,Spec 不會走到 delivered)
+        Spec #1 <strong>stays status:confirmed</strong> (per ADR-0013: source-of-truth = main + <code>.rlm/facts/</code>; Spec never goes to delivered)
         <span class="step-arrow">→</span>
-        <span class="agent">Hermes</span> 通知 Discord + 建議下一步:設 <span class="skill">production-monitor</span> 開始 dogfood
+        sweet-home calls <span class="cli">rlm enqueue-message</span> → <span class="agent">hermes-agent</span> daemon posts notification to Discord + suggests next steps: set <span class="skill">production-monitor</span> to dogfood
       </div>
 
       <article class="msg">
@@ -2043,6 +2053,183 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
 
       </div><!-- /scenario-content todolist-build -->
 
+
+      <!-- =================================================================
+           SCENARIO 3: dogfood-2026-05-12
+           ================================================================= -->
+      <div class="scenario-content" data-scenario="dogfood-2026-05-12" hidden>
+
+      <div class="divider infra">
+        <div class="line"></div>
+        <div class="label">Dogfood — 2026-05-12 Mac Run</div>
+        <div class="line"></div>
+      </div>
+
+      <div class="phase-chain">
+        <strong>Repo:</strong> <code>liyoclaw1242/todo-20260512</code>
+        <span class="step-arrow">·</span>
+        Issue #1: <code>[WP] Add GET /todos endpoint returning {todos:[]}</code>
+        <span class="step-arrow">·</span>
+        <strong>Path B</strong> (worker → whitebox → blackbox) confirmed working end-to-end on Mac
+        <span class="step-arrow">·</span>
+        ADR-0014 validated
+      </div>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body"><p><strong>This is the actual 2026-05-12 Mac dogfood run.</strong> A single WP was created manually and pushed through the full sweet-home pipeline. Results below are real execution data.</p></div>
+        </div>
+      </article>
+
+      <!-- ============== WORKER ============== -->
+      <div class="divider delivery">
+        <div class="line"></div>
+        <div class="label">Worker</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar worker">W</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">Worker</span><span class="app-tag">APP</span>
+            <span class="skill-tag worker">tdd-loop</span>
+            <span class="ts">110s · $0.33</span>
+            <span class="trigger cron">cron</span>
+          </div>
+          <div class="msg-title">Issue #1: [WP] Add GET /todos endpoint returning {todos:[]}</div>
+          <div class="actions">
+            <div class="act add"><span class="icon">+</span>commit <code>e3b376b</code>: <em>[ac1] add GET /todos endpoint returning empty array</em></div>
+            <div class="act note"><span class="icon">·</span>RGR loop completed, AC satisfied</div>
+          </div>
+          <div class="att gh-pr">
+            <div class="att-source"><span class="src-icon">🔀</span>Worker output</div>
+            <div class="att-body">
+              <pre>{"kind": "delivered", "branch": "spawn-1-...", "fact_commits": ["e3b376b"]}</pre>
+            </div>
+            <div class="att-meta"><span>&#10003; $0.33</span><span>&#10003; 110s</span><span>&#10003; commit e3b376b</span></div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">&#10003;</span><span class="count">delivered</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== WHITEBOX ============== -->
+      <div class="divider design">
+        <div class="line"></div>
+        <div class="label">WhiteBox Validator</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar whitebox">V</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">WhiteBoxValidator</span><span class="app-tag">APP</span>
+            <span class="ts">101s · $0.27</span>
+          </div>
+          <div class="msg-title">Code review pass</div>
+          <div class="att file">
+            <div class="att-source"><span class="src-icon">&#10003;</span>WhiteBox verdict</div>
+            <div class="att-body">
+              <pre>{"kind": "approved"}</pre>
+              <p>Note: URL exact-match behaviour flagged (out of scope for this WP — v1 known edge case).</p>
+            </div>
+            <div class="att-meta"><span>&#10003; $0.27</span><span>&#10003; 101s</span><span>&#10003; approved</span></div>
+          </div>
+          <div class="reactions">
+            <span class="reaction"><span class="emoji">&#10003;</span><span class="count">whitebox approved</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== BLACKBOX ============== -->
+      <div class="divider retry">
+        <div class="line"></div>
+        <div class="label">BlackBox Validator — known limitation</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar blackbox">V</div>
+        <div class="msg-content">
+          <div class="msg-head">
+            <span class="name">BlackBoxValidator</span><span class="app-tag">APP</span>
+            <span class="ts">101s · $0.27</span>
+          </div>
+          <div class="msg-title">Rejected — no sandbox server running (v1 known limitation)</div>
+          <div class="att warn">
+            <div class="att-source"><span class="src-icon">&#9888;</span>BlackBox verdict</div>
+            <div class="att-body">
+              <pre>{"kind": "rejected-implementation-defect"}</pre>
+              <p>Root cause: no sandbox server running during BlackBox execution. BlackBox tried to hit the endpoint but got connection refused.</p>
+              <p><strong>v1 known limitation §9(d)</strong>: auto-start server pre-blackbox not yet implemented. Phase 2 fix item: sweet-home <code>pre_blackbox</code> hook to start server.</p>
+            </div>
+            <div class="att-meta"><span>&#9888; $0.27</span><span>&#9888; 101s</span><span>&#9888; rejected (no sandbox)</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="avatar system">ℹ</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">System note</span></div>
+          <div class="msg-body">
+            <p><strong>PR #2 merged manually</strong> after WhiteBox approval. BlackBox rejection treated as non-blocking given known §9(d) limitation. Human acted as override gate.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- ============== BUGS OBSERVED ============== -->
+      <div class="divider retry">
+        <div class="line"></div>
+        <div class="label">Bugs Observed</div>
+        <div class="line"></div>
+      </div>
+
+      <article class="msg">
+        <div class="avatar arbiter">A</div>
+        <div class="msg-content">
+          <div class="msg-head"><span class="name">Bugs / Phase 2 Fix Items</span><span class="app-tag">LOG</span></div>
+          <div class="msg-body">
+            <ul>
+              <li><strong>Bug 1:</strong> <code>on_no_structured_output</code> atomic label removal fails when <code>agent:hermes-intake</code> label does not exist on the issue — throws instead of no-op. Phase 2 fix: guard label removal with existence check.</li>
+              <li><strong>Bug 2:</strong> <code>quarantine failed: 'human-review' not found</code> — non-blocking; quarantine handler tries to remove a label that was already removed. Phase 2 fix: same existence guard pattern.</li>
+              <li><strong>Bug 3:</strong> BlackBox false negative — no sandbox server running. Phase 2 fix: add <code>pre_blackbox</code> hook in sweet-home workflow to auto-start server before BlackBox dispatch.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <div class="final-card">
+        <h2>&#128202; Dogfood Results — 2026-05-12</h2>
+        <h3>GitHub</h3>
+        <ul>
+          <li>Repo: <code>liyoclaw1242/todo-20260512</code></li>
+          <li>Issue #1: <code>[WP] Add GET /todos endpoint returning {todos:[]}</code></li>
+          <li>PR #2: merged manually after WhiteBox approval</li>
+          <li>Commit: <code>e3b376b</code> — <em>[ac1] add GET /todos endpoint returning empty array</em></li>
+        </ul>
+        <h3>Cost &amp; Time</h3>
+        <ul>
+          <li>Worker: $0.33, 110s</li>
+          <li>WhiteBox: $0.27, 101s — <span class="label-pill confirmed">approved</span></li>
+          <li>BlackBox: $0.27, 101s — <span class="label-pill cancelled">rejected (no sandbox)</span></li>
+          <li><strong>Total: ~$0.87, ~15 min end-to-end</strong></li>
+        </ul>
+        <h3>Conclusion</h3>
+        <ul>
+          <li>Path B confirmed working end-to-end on Mac.</li>
+          <li>ADR-0014 validated.</li>
+          <li>Three Phase 2 fix items identified (non-blocking for v1 sign-off).</li>
+        </ul>
+      </div>
+
+      </div><!-- /scenario-content dogfood-2026-05-12 -->
+
     </div><!-- /messages -->
 
   </main>
@@ -2057,6 +2244,10 @@ Render                    Oregon    yes         $7/mo Postgres    ★★★
     'todolist-build': {
       name: 'todolist-build',
       topic: '情境:從 0 開始 — liyo 跟室友的共享家事 todo App。對話跑在 <code>#product</code> thread「household-todo」'
+    },
+    'dogfood-2026-05-12': {
+      name: 'dogfood-2026-05-12',
+      topic: 'Actual dogfood run — 2026-05-12 Mac · <code>liyoclaw1242/todo-20260512</code> · Issue #1 · Path B end-to-end · ADR-0014 validated · ~$0.87 · ~15 min'
     }
   };
 
