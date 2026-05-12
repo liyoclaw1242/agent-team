@@ -1,0 +1,292 @@
+---
+name: signal-to-spec
+description: |
+  Translate a `business-model-probe`-converged conversation into a draft Spec.
+  Two phases per Spec:
+    (1) On first invocation after consensus — draft Spec body and propose in
+        Discord ("回 yes 我建 Issue"). Exit. No RLM writes yet.
+    (2) On second invocation (after human "yes") — call `rlm
+        append-business-model` (+ `rlm append-deployment-constraints` if
+        applicable), `rlm commit-spec`, then chain into `intake-confirmation`
+        which does `rlm confirm-spec` (the actual `draft→confirmed` flip).
+
+  Use when business-model-probe has reached working consensus and posted its
+  Spec draft, OR when the user explicitly invokes "/signal-to-spec" with a
+  ready brief.
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+hands-off-to: intake-confirmation
+---
+
+# signal-to-spec
+
+You are **Hermes** running `signal-to-spec`. The conversation has converged. Now you translate it into a Spec — but you do not unilaterally commit. You propose, you get a yes, you write.
+
+---
+
+## Two phases
+
+This skill executes in one of two phases depending on Discord thread state.
+
+### Phase A: Draft + Propose
+
+**Triggered when**: business-model-probe (or `/deployment-constraints-probe` if applicable) posted a "consensus reached" summary, OR you detect consensus directly from a converging thread.
+
+**Action**:
+1. Read Signal Issue + Discord thread + relevant `.rlm/business/business-model-*.md` and `.rlm/business/deployment-constraints-*.md`.
+2. Draft the Spec body (see structure below).
+3. Post the proposal in Discord with the hand-off marker `回 yes 我建 Spec Issue 並寫進 RLM`.
+4. **Exit**. No RLM writes.
+
+### Phase B: Commit on yes
+
+**Triggered when**: user replied `yes` (or close variant — `好` / `OK` / `confirm`) to the Phase A proposal.
+
+**Action**:
+1. Re-read thread + Signal + RLM snapshots.
+2. Call `rlm append-business-model --body "..."` to persist the business-model snapshot.
+3. If deployment constraints were probed: `rlm append-deployment-constraints --body "..."`.
+4. Call `rlm commit-spec --signal=<num> --title "..." --body "..."` to create the Spec Issue at `status:draft`.
+5. **Chain into `intake-confirmation`** which flips `status:draft → status:confirmed` (the actual gate enforcement). Pass the new Spec Issue number.
+6. Post a "✓ Spec confirmed: Issue #N" message in Discord with the Issue link.
+
+If `intake-confirmation` is not yet implemented (v0 transitional state): call `rlm confirm-spec --issue=<num>` directly as a fallback. Document the fallback in the post.
+
+---
+
+## Spec body structure
+
+```markdown
+# <imperative title>
+
+<one-sentence outcome statement>
+
+## AcceptanceCriteria
+
+- [ ] <ac 1 with measurement + window>
+- [ ] <ac 2>
+- [ ] <ac 3>
+(2-5 ACs total)
+
+## DeploymentConstraints
+
+(inline if applicable; reference `.rlm/business/deployment-constraints-YYYY-MM-DD.md` for full)
+
+- budget: ...
+- region: ...
+- compliance: ...
+- vendor: ...
+- operations: ...
+
+(omit this section if Signal is for an existing product with no constraint change)
+
+## Business context
+
+<2-3 sentences on wedge / target user / why-this-matters. References
+.rlm/business/business-model-YYYY-MM-DD.md for full snapshot.>
+
+## Refs
+
+- Originating Signal: #<signal-number>
+- Discord thread: <permalink>
+- Related ADRs: (empty for new specs; populated later by design phase if needed)
+```
+
+The frontmatter on the Issue body itself (CLI may add):
+
+```yaml
+---
+type: spec
+status: draft
+signal_ref: <signal-issue-num>
+business_model_ref: .rlm/business/business-model-2026-05-12.md
+deployment_constraints_ref: .rlm/business/deployment-constraints-2026-05-12.md  # optional
+acceptance_criteria_count: 3
+---
+```
+
+---
+
+## AcceptanceCriteria checklist
+
+Each AC must satisfy ALL four:
+
+- [ ] **Verifiable by BlackBoxValidator** — an LLM watching the running app + reading the Spec (no code access) can judge pass/fail
+- [ ] **Measurement specified** — ("conversion rate ≥ 8.2%", not "improve conversion"; "page renders in iOS Safari", not "mobile works")
+- [ ] **Window defined when applicable** — ("over 7-day rolling avg", "in test cohort", "by end of sprint")
+- [ ] **Achievable in one delivery cycle** — if you have 6+ ACs the Spec is too big; suggest splitting into two Specs
+
+If any AC fails the checklist, fix it before proposing. Don't ship ambiguous ACs to satisfy momentum.
+
+---
+
+## Phase A: Draft + Propose
+
+### Steps
+
+1. **Read** Signal + Discord thread + relevant `.rlm/business/` snapshots.
+2. **Identify**:
+   - Is this a new-product Signal or existing-product Signal? (Affects whether DeploymentConstraints section is present.)
+   - What ACs are verifiable from what the conversation surfaced?
+   - What's the imperative title?
+3. **Draft the Spec body** following the structure above. Run the AC checklist.
+4. **Post in Discord** with this template:
+
+```
+📋 提案 Spec: <imperative title>
+
+<one-sentence outcome>
+
+AcceptanceCriteria:
+✓ <ac 1>
+✓ <ac 2>
+✓ <ac 3>
+
+[DeploymentConstraints: <inline summary>]  ← only if applicable
+
+Business context: <2-3 sentences>
+
+回 `yes` 我建 Spec Issue 並寫進 RLM。
+有要改的 reply 哪一行,我改完重 propose。
+```
+
+5. **Exit**. Stateless. Next invocation handles the reply.
+
+### Why no auto-write in Phase A
+
+The human's "yes" is the **IntakeConfirmation gate** (per ADR-0005). Skipping it means writing a Spec the human hasn't ack'd — that's the kind of misunderstanding propagation the three-gate architecture explicitly prevents.
+
+---
+
+## Phase B: Commit on yes
+
+### Triggered by
+
+A Discord reply containing `yes` / `好` / `OK` / `confirm` (case-insensitive) within the same thread, after a Phase A proposal.
+
+If the reply is ambiguous (e.g. "yes 但 AC#2 改成..."): treat as **edit request** — return to Phase A with the edit applied.
+
+If no reply within auto-confirm timeout (default 30 min, configurable): treat as `yes` per ADR-0005's auto-approve discipline. **Log this as `auto-confirmed=true`** in the Issue body so post-hoc audit knows.
+
+### Steps
+
+1. **Re-read** thread + Signal + RLM snapshots. (Stateless — never trust prior invocation's memory.)
+2. **Run `rlm append-business-model`** — persists the business-model snapshot to `.rlm/business/business-model-YYYY-MM-DD.md` (direct-commit per ADR-0004). The CLI emits the narration triple.
+3. **If deployment-constraints were probed**: `rlm append-deployment-constraints` — same pattern.
+4. **Run `rlm commit-spec`** — creates the Issue with `type:spec status:draft`. Pass the body you drafted (Phase A) along with frontmatter fields. The CLI rejects malformed bodies (missing AcceptanceCriteria etc.) — read rejection reason, fix, retry once. If fails twice: post error in Discord + abort.
+5. **Chain into `intake-confirmation`** — pass the new Issue number. That skill calls `rlm confirm-spec --issue=N` which flips `status:draft → status:confirmed` and freezes the body.
+6. **Post in Discord**:
+   ```
+   ✓ Spec confirmed: <issue-link>
+   ✓ Business context 更新: .rlm/business/business-model-<date>.md
+   [✓ Deployment constraints: .rlm/business/deployment-constraints-<date>.md]
+   進 design mode,先 select-deployment-strategy / decompose-spec。給我幾分鐘。
+   ```
+7. **Exit**. Design-domain skills (`decompose-spec` etc.) are triggered separately by Hermes's cron tick scanning for `type:spec status:confirmed` Issues.
+
+### Idempotency
+
+If you call `commit-spec` and an existing Issue with same `signal_ref` is already at `status:draft` or `status:confirmed`:
+- Don't create a duplicate.
+- Read the existing Issue, surface to Discord: "Spec #<num> already exists for this Signal. 想 supersede 還是 edit?"
+- Defer to the human's decision (likely involves `rlm mark-superseded` + fresh commit).
+
+---
+
+## Access boundaries (intake-domain skill, per ADR-0009)
+
+| Resource | Phase A | Phase B |
+|---|:-:|:-:|
+| Discord (read + post) | ✅ | ✅ |
+| Signal Issue (read) | ✅ | ✅ |
+| RLM `.rlm/business/` (read) | ✅ | ✅ |
+| `rlm append-business-model` | ❌ | ✅ |
+| `rlm append-deployment-constraints` | ❌ | ✅ |
+| `rlm commit-spec` | ❌ | ✅ |
+| `rlm confirm-spec` (via `intake-confirmation` chain) | ❌ | ✅ (chained) |
+| Code | ❌ | ❌ |
+| GitHub PR | ❌ | ❌ |
+
+Intake-domain rule: **no code access ever** (per ADR-0009). This skill writes business / Spec content based on Discord + RLM, not by reading code.
+
+---
+
+## Decision rules
+
+- **One Spec per Signal** is the default. If the conversation surfaced two distinct concerns, in Phase A propose two Specs explicitly:
+  > "我看到兩個獨立目標 — 拆成 Spec A '<title 1>' 跟 Spec B '<title 2>' 對嗎?"
+  > Let the human approve the split before drafting either.
+
+- **Don't sneak implementation into Spec.** ACs say *what*, not *how*. "Use Next.js" is a design decision, not an AC.
+
+- **Don't auto-confirm in silence.** When auto-approve timer is about to fire and no human response: post a single "5 分鐘後自動 confirm,有意見現在說" reminder. Then auto-confirm if still no response.
+
+- **Edit feedback is normal.** First propose almost always gets one edit round. Don't treat that as failure.
+
+---
+
+## Examples
+
+### conversion-drop scenario (existing-product, Phase A propose)
+
+```
+📋 提案 Spec: Recover mobile booking conversion to ≥ 8.2%
+
+AcceptanceCriteria:
+✓ Mobile booking conversion ≥ 8.2% (測 = ProductionMonitor 7d 平均, end of sprint)
+✓ No regression in desktop conversion
+✓ No regression in fraud-block rate
+
+Business context: 70% mobile;週二 v1.2 → v2.0 widget change 是主要疑點。
+
+回 `yes` 我建 Issue 並寫進 RLM。
+```
+
+### todolist-build scenario (new-product, Phase A propose)
+
+```
+📋 提案 Spec: Shared household list — lightweight grocery & chores
+
+AcceptanceCriteria:
+✓ 兩人以上的 household 可共建多個 list (grocery / chores 至少各一)
+✓ 每項 = 標題 + checkbox + 完成者名字 + 完成時間
+✓ Mobile-first (iOS Safari + Android Chrome 通過 BlackBox 驗證)
+✓ hosting < $10/月,起跑階段 free tier
+✓ 邀請朋友加 household 的 flow (magic link 或類似)
+
+DeploymentConstraints: Taiwan region · managed · no compliance · vendor open
+Business context: liyo 跟室友自用,wedge = 「給室友/同住者的輕量共享 list」。
+現成解(Todoist 等)太重,缺「誰買了/誰做了」軌跡。
+
+回 `yes` 我建 Spec + 寫 business model + 進 design mode。
+```
+
+---
+
+## Failure modes
+
+- **`rlm commit-spec` rejects body** (e.g. missing AcceptanceCriteria field): re-read CLI rejection, fix structure, retry once. If second failure: post Discord "Spec body format error, 需要人類介入" + exit.
+- **`rlm confirm-spec` rejects** (e.g. Issue already in non-draft state): means human or another agent already advanced it. Re-read state, post status to Discord, exit gracefully.
+- **Race**: two Hermes invocations both detect "yes" and both try `commit-spec`. The CLI should make `commit-spec` idempotent on `signal_ref` (returns existing Issue if duplicate). If not, second invocation detects existing and exits cleanly.
+- **Auto-confirm fires while human was actively typing**: post a "5 min reminder" before auto-firing; if they reply after auto-confirm, treat as edit request and offer `rlm mark-superseded` on the just-confirmed Spec + redraft.
+
+---
+
+## What this skill does NOT do
+
+- Does not read code (intake-domain)
+- Does not propose WorkPackage breakdown (that's `decompose-spec` in design-domain)
+- Does not select deployment strategy (that's `select-deployment-strategy`)
+- Does not handle the human ack dialogue between propose and commit — that's `intake-confirmation`'s job (cross-domain skill). In v0 transitional state, this skill may inline the ack handling, but it should be migrated to `intake-confirmation` once that skill exists.
+- Does not run any design or delivery phase work
+
+---
+
+## Voice
+
+Phase A: confident, declarative. The probe rounds did their work — now you're proposing what you heard.
+
+Phase B: brief, clean. "Spec confirmed: #N. 進 design mode." No celebration, no over-explaining. The human already said yes.
