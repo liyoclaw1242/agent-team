@@ -237,7 +237,7 @@
 
 | 區塊 | 條目數 | 已動工 |
 |---|---|---|
-| A. 實作前置(pre-v1) | 6 | 3.3(A4 / A5 / A6 已定 + A3 33% — intake 4/12 skill 已寫) |
+| A. 實作前置(pre-v1) | 6 | 3.75(A4 / A5 / A6 已定 + A3 75% — intake 4 + design 5 / 12 skill 已寫,剩 cross 3) |
 | B. 結構缺口(pre-v2) | 7 | 0 |
 | C. v2 能力 | 5 | 0 |
 | D. polish | 3 | 0 |
@@ -250,12 +250,21 @@
 - **A4 Supervision event log backend**:**Redis(熱資料) + JSONL append-only file(durable archive)**。每個 event 同時寫 Redis stream(供 Arbiter / Supervision 快讀)和 `.local/events.jsonl`(供 audit / replay)。Schema 遵 ADR-0012 event spec。
 - **A5 Global Worker lock**:**Redis key + TTL**(`SETNX rlm:worker:lock <dispatch_id>` + `EXPIRE`)。TTL 待 Worker iteration 上限定下後決定(估 30 min)。
 - **A6 Discord bot 部署**:已部署(user-managed,跑 hermes-agent daemon),不擋 v1 開發。
-- **未定**:A2 CI fact-commit check、A3 Skill 名稱清單剩 8/12(動工時逐一補)。
+- **未定**:A2 CI fact-commit check、A3 Skill 名稱清單剩 3/12(cross-domain:intake-confirmation / design-approval / design-dialogue)。
 - **A3 已寫**(`.claude/skills/<name>/SKILL.md`,Claude Agent SDK 格式):
-  - `business-model-probe`(358 行)— 改編自 gstack/office-hours,6 forcing questions + anti-sycophancy + pushback patterns,適配 Discord stateless 流 + 雙模式(new-product / existing-product Signal)
+
+  **Intake (4)** — 改編自 gstack/office-hours
+  - `business-model-probe`(358 行)— 6 forcing questions + anti-sycophancy + pushback patterns,適配 Discord stateless 流 + 雙模式(new-product / existing-product Signal)
   - `deployment-constraints-probe`(176 行)— 5 dim 封閉題 + 過去 snapshot re-use 啟發
   - `production-monitor`(187 行)— cron poll providers + threshold crossing → Signal Issue + Discord 通知
   - `signal-to-spec`(292 行)— 兩階段(draft+propose,然後 yes 後 commit + 串 `intake-confirmation`)
+
+  **Design (5)** — 改編自 [mattpocock/skills/engineering](https://github.com/mattpocock/skills/tree/main/skills/engineering)
+  - `compute-impact-scope`(276 行)— Module/Seam/Adapter 詞彙、deletion test、one-vs-two-adapter heuristic;產 `impact_scope` YAML field
+  - `decompose-spec`(264 行)— tracer-bullet vertical slices、AFK/HITL、quiz before approve、dependency-order publish;Hermes 最重的 design skill
+  - `select-deployment-strategy`(191 行)— ≥3 候選 + 強制 trade-off matrix + 「what would change my mind」+ 串 `draft-adr`
+  - `draft-adr`(273 行)— 三條件 gate(hard-to-reverse + surprising + real trade-off)+ 拒絕邏輯 + 用 `rlm propose-adr` PR-routed
+  - `draft-contract`(319 行)— API/event/schema/integration 四型契約,frontmatter + invariants + 版本策略
 
 ### 結構性改動(2026-05-12)
 
