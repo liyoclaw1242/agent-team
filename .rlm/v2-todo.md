@@ -237,7 +237,7 @@
 
 | 區塊 | 條目數 | 已動工 |
 |---|---|---|
-| A. 實作前置(pre-v1) | 6 | 4.75(A1 contract 已寫 + A4 / A5 / A6 已定 + A3 75% — intake 4 + design 5 / 12 skill 已寫) |
+| A. 實作前置(pre-v1) | 6 | 5(A1 contract + scaffold,A3 100% 12/12 skill,A4 / A5 / A6 已定) |
 | B. 結構缺口(pre-v2) | 7 | 0 |
 | C. v2 能力 | 5 | 0 |
 | D. polish | 3 | 0 |
@@ -250,7 +250,7 @@
 - **A4 Supervision event log backend**:**Redis(熱資料) + JSONL append-only file(durable archive)**。每個 event 同時寫 Redis stream(供 Arbiter / Supervision 快讀)和 `.local/events.jsonl`(供 audit / replay)。Schema 遵 ADR-0012 event spec。
 - **A5 Global Worker lock**:**Redis key + TTL**(`SETNX rlm:worker:lock <dispatch_id>` + `EXPIRE`)。TTL 待 Worker iteration 上限定下後決定(估 30 min)。
 - **A6 Discord bot 部署**:已部署(user-managed,跑 hermes-agent daemon),不擋 v1 開發。
-- **未定**:A2 CI fact-commit check 細節(check name 暫定 `rlm/fact-commit-required`,定義在 `.rlm/contracts/rlm-cli.md` open questions 第 4 項)、A3 Skill 名稱清單剩 3/12(cross-domain:intake-confirmation / design-approval / design-dialogue)。
+- **未定**:A2 CI fact-commit check 細節(check name 暫定 `rlm/fact-commit-required`,定義在 `.rlm/contracts/rlm-cli.md` open questions 第 4 項)。
 - **A1 rlm CLI 規格已釘 + scaffold 已建**:
   - **契約**:`.rlm/contracts/rlm-cli.md`(1126 行)—— 鎖定 17 個 subcommand 的 invocation surface、frontmatter / Issue body schemas、caller-identity 機制(`RLM_AGENT_ROLE` env var)、triple emission(Redis stream + JSONL dual-sink)、error model(8 個 stable exit codes)、idempotency keys。
   - **scaffold**:`tools/rlm/`(2749 行 / 45 檔,uv-managed Python)。foundation 完整可跑:errors / discover / identity / frontmatter / triples / idempotency / adapters(gh, git, redis_log)/ routing(pr, commit, issue)/ cli。17 subcommand 已註冊到 Click(`rlm --help` 看得到全部),body 是 `NotImplementedError` 指向契約對應 section。35 個 pytest 全綠 + ruff clean。
@@ -269,6 +269,11 @@
   - `select-deployment-strategy`(191 行)— ≥3 候選 + 強制 trade-off matrix + 「what would change my mind」+ 串 `draft-adr`
   - `draft-adr`(273 行)— 三條件 gate(hard-to-reverse + surprising + real trade-off)+ 拒絕邏輯 + 用 `rlm propose-adr` PR-routed
   - `draft-contract`(319 行)— API/event/schema/integration 四型契約,frontmatter + invariants + 版本策略
+
+  **Cross-domain (3)** — 從 ADR-0005 / ADR-0008 / ADR-0013 推
+  - `intake-confirmation`(208 行)— 第一個 human gate:接 Spec proposal 的 yes/edit/no/timeout,串 `rlm append-business-model` + `commit-spec` + `confirm-spec` 或回 `signal-to-spec` 重 draft;含 5-min warning 機制
+  - `design-approval`(268 行)— 最關鍵 gate:parse `approve N / hold N / approve all / discuss`,topological 順序 call `rlm approve-workpackage`,cascade-block 處理(ADR 未 merged 連帶下游)+ 5-min warning
+  - `design-dialogue`(226 行)— Posting protocol:design-domain skill 中段問人類時用,gstack `/plan-ceo-review` 風 decision brief(recommendation + change-my-mind + 30-min auto-decide);fire-and-forget,caller skill 自己 stateless resume
 
 ### 結構性改動(2026-05-12)
 
