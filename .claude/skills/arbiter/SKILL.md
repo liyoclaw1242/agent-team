@@ -220,3 +220,87 @@ Your verdict comment is the actual output. The label flip is execution. Order: c
 - Does not chain into more Arbiter calls (no recursion; humans are the buck-stop)
 - Does not enforce the global Worker lock (Dispatch owns)
 - Does not auto-merge PR (humans only)
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `arbiter` role under sweet-home's workflow engine
+(see `D:/darfts/agent-team.workflow.yaml`, `on_result.arbiter.*`). The
+runtime parses the **last assistant message** as JSON to post the verdict
+comment, route the WP back to the chosen retry stage / escalate to humans /
+cancel. Your final response **must end with** a JSON object matching one
+of the `kind` variants below.
+
+The JSON may optionally be wrapped in a fenced <code>```json … ```</code>
+block. The JSON object **must be the last syntactic element** in your reply.
+
+Under the v1 workflow integration you do **NOT** flip labels directly —
+emit the JSON, the workflow does the side effects (`agent:arbiter` →
+`agent:worker` / `agent:validator` / `agent:blackbox-validator` /
+`agent:human-help`).
+
+If you yourself crash without JSON, sweet-home's `on_no_structured_output`
+will... also route to Arbiter — which is you, again. To avoid that
+re-entry loop, the runtime's degrade fallback marks the issue with
+`<!-- last-degrade-role: arbiter -->`; on the next dispatch tick, Arbiter
+itself sees this marker and **must** emit `kind: escalate` (humans handle
+meta-recovery, per ADR-0017).
+
+### Kinds emitted by this role
+
+#### `retry` — bounce back to the failed stage
+```json
+{
+  "kind": "retry",
+  "decision": "retry",
+  "failed_stage": "white-box|black-box|worker",
+  "retry_stage": "worker|white-box|black-box",
+  "reasoning": "<one-paragraph rationale citing triple IDs / commit shas / log evidence>",
+  "new_retry_counts": {
+    "worker": 0,
+    "white_box": 1,
+    "black_box": 0
+  }
+}
+```
+`retry_stage` is which agent to route back to (usually the same as
+`failed_stage` for transient failures; can be different — e.g. BlackBox
+returned `implementation-defect` → `retry_stage: worker`).
+`new_retry_counts` carries the incremented counter for whichever stage
+just consumed a retry; the workflow writes these as
+`<!-- retry-<stage>: N -->` body markers.
+
+Workflow does: posts `__shared.arbiter_verdict_comment`, removes
+`agent:arbiter`, adds the corresponding `agent:*` label, sets the retry
+counter markers.
+
+Budget caps (ADR-0006): white-box ≤ 3, black-box ≤ 2, worker ≤ 3.
+**Do not emit `retry` if the relevant counter is at cap** — emit
+`escalate` instead.
+
+#### `escalate` — route to humans via Discord
+```json
+{
+  "kind": "escalate",
+  "decision": "escalate",
+  "failed_stage": "white-box|black-box|worker",
+  "reasoning": "<one-paragraph rationale — retry budget exhausted, stuck loop, novel failure mode, etc.>"
+}
+```
+Workflow does: posts the verdict comment, calls `rlm enqueue-message
+--kind=retry-exhausted`, flips to `agent:human-help`, transitions to
+`status:blocked`.
+
+#### `cancel` — terminal, WP unrecoverable
+```json
+{
+  "kind": "cancel",
+  "decision": "cancel",
+  "failed_stage": "worker|...",
+  "reasoning": "<why this WP cannot be recovered from this cycle — e.g. impact_scope references files that no longer exist on main; Spec genuinely superseded in conflicting way per ADR-0013>"
+}
+```
+Workflow does: posts the verdict comment, transitions to
+`status:cancelled` (terminal). Parent Spec stays active; a new WP can be
+re-decomposed by Hermes if work is still desired.

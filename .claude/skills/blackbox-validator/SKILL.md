@@ -198,3 +198,80 @@ Test-engineer voice. Lead with the verdict (PASS/FAIL/classification). Each fail
 - Does not run white-box review (`code-review` / `stress-test` under WhiteBoxValidator)
 - Does not flip Issue labels (Dispatch reads verdict and acts)
 - Does not auto-route to Intake on `ac-ambiguity` — that's Dispatch's job (per ADR-0014)
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `blackbox-validator` role under sweet-home's workflow
+engine (see `D:/darfts/agent-team.workflow.yaml`,
+`on_result.blackbox-validator.*`). The runtime parses the **last assistant
+message** as JSON to post the verdict comment, transition status, and
+either close the validation cycle (`approved` → `status:validated` awaiting
+human merge) or route to Arbiter (`rejected-*`).
+
+Your final response **must end with** a JSON object matching one of the
+`kind` variants below. The JSON may optionally be wrapped in a fenced
+<code>```json … ```</code> block. The JSON object **must be the last
+syntactic element** in your reply.
+
+Under the v1 workflow integration you do **NOT** flip labels or post the
+verdict comment directly — emit the JSON, the workflow does the side
+effects.
+
+If you crash mid-task (no JSON), the runtime's `on_no_structured_output`
+fallback routes to Arbiter.
+
+### Kinds emitted by this role
+
+#### `approved` — every AC verified against the sandbox app
+```json
+{
+  "kind": "approved",
+  "verdict": "approved",
+  "method": "e2e-browser-test|api-contract-test|both",
+  "failure_classification": null,
+  "evidence": [
+    {"type": "screenshot", "path": "/tmp/ac1-final.png"},
+    {"type": "http-call", "request": "POST /api/foo", "status": 201}
+  ],
+  "summary": "All 3 ACs verified: AC#1 via e2e (signup flow); AC#2 via api-contract (auth); AC#3 via e2e (mobile)."
+}
+```
+Workflow does: posts `__shared.blackbox_verdict_comment`, removes
+`agent:blackbox-validator`, transitions `status:delivered →
+status:validated`. Then posts a follow-up "PR ready for human merge"
+comment. The PR is now eligible for `rlm mark-delivered` after human
+clicks Merge.
+
+#### `rejected-implementation-defect` — AC was verifiable, code doesn't satisfy it
+```json
+{
+  "kind": "rejected-implementation-defect",
+  "verdict": "rejected",
+  "method": "e2e-browser-test",
+  "failure_classification": "implementation-defect",
+  "evidence": [
+    {"type": "screenshot", "path": "/tmp/ac2-fail.png"},
+    {"type": "http-call", "request": "POST /api/invite (no auth)", "status": 200, "expected_status": 401}
+  ],
+  "summary": "AC#2 expects 401 without auth; sandbox returns 200. Inferred missing middleware on /api/invite/*."
+}
+```
+Workflow does: posts the verdict comment, flips `agent:blackbox-validator →
+agent:arbiter`. Arbiter increments `retry:black-box:N` and routes back to
+`agent:worker` if budget remains.
+
+#### `rejected-ac-ambiguity` — AC itself is unverifiable as written
+```json
+{
+  "kind": "rejected-ac-ambiguity",
+  "verdict": "rejected",
+  "method": "api-contract-test",
+  "failure_classification": "ac-ambiguity",
+  "evidence": [],
+  "summary": "AC#5 says 'API should be fast'. No threshold, no measurement window. No probe can verify; recommend Spec refinement via business-model-probe."
+}
+```
+Workflow does: same — flips to `agent:arbiter`. Arbiter escalates this
+class to Hermes (Spec needs refinement, not Worker retry).

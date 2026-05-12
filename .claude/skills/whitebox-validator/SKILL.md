@@ -196,3 +196,65 @@ Anti-pattern: "I noticed that this could potentially have an issue with…" → 
 - Does not run lint/typecheck/unit tests (Stage 1, automated)
 - Does not flip labels (Dispatch does that after reading verdict)
 - Does not run Arbiter logic on its own failure (Dispatch invokes Arbiter on post-condition fail)
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `whitebox-validator` role under sweet-home's workflow
+engine (see `D:/darfts/agent-team.workflow.yaml`,
+`on_result.whitebox-validator.*`). The runtime parses the **last assistant
+message** as JSON to post the verdict comment and flip the label to either
+`agent:blackbox-validator` (approved) or `agent:arbiter` (rejected). Your
+final response **must end with** a JSON object matching one of the `kind`
+variants below.
+
+The JSON may optionally be wrapped in a fenced <code>```json … ```</code>
+block. The JSON object **must be the last syntactic element** in your reply.
+
+Under the v1 workflow integration you do **NOT** flip labels or post
+comments directly — emit the JSON, the workflow does the side effects.
+You may still leave inline review comments on the PR via `gh pr review`
+during your investigation; those are evidence, not the verdict.
+
+If you crash mid-task (no JSON), the runtime's `on_no_structured_output`
+fallback routes to Arbiter.
+
+### Kinds emitted by this role
+
+#### `approved` — diff passes white-box review + (where applicable) stress test
+```json
+{
+  "kind": "approved",
+  "verdict": "approved",
+  "sub_skills": ["code-review", "stress-test"],
+  "findings": [
+    {"severity": "note", "message": "Minor: could simplify the helper at <path>:<line>; not blocking."}
+  ],
+  "summary": "Code review + stress test green. No blocking issues."
+}
+```
+`sub_skills` lists which sub-skills you composed (the orchestrator decides
+whether stress-test was applicable per WP scope). `findings` carry over from
+the sub-skills' structured returns; `severity` is one of
+`note|minor|major|blocking`. An `approved` verdict means NO `blocking`
+findings.
+
+Workflow does: posts `__shared.whitebox_verdict_comment`, flips
+`agent:validator → agent:blackbox-validator`. Status stays `delivered`
+(BlackBox is the second gate).
+
+#### `rejected` — at least one blocking finding
+```json
+{
+  "kind": "rejected",
+  "verdict": "rejected",
+  "sub_skills": ["code-review"],
+  "findings": [
+    {"severity": "blocking", "message": "<path>:<line>: Worker's <op> lacks the AC#3 boundary check; integration test green but the implementation diverges from AC text."}
+  ],
+  "summary": "Implementation does not satisfy AC#3 as written. Recommend retry."
+}
+```
+Workflow does: posts the same verdict comment, flips `agent:validator →
+agent:arbiter` (Arbiter manages retry budget).

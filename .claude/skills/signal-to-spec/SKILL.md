@@ -290,3 +290,69 @@ Business context: liyo 跟室友自用,wedge = 「給室友/同住者的輕量�
 Phase A: confident, declarative. The probe rounds did their work — now you're proposing what you heard.
 
 Phase B: brief, clean. "Spec confirmed: #N. 進 design mode." No celebration, no over-explaining. The human already said yes.
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `hermes-intake` role under sweet-home's workflow
+engine (see `D:/darfts/agent-team.workflow.yaml`, `on_result.hermes-intake.*`).
+The runtime parses the **last assistant message** as JSON to drive label
+transitions, child-issue creation, and Discord routing. Your final response
+**must end with** a JSON object matching one of the `kind` variants below.
+
+The JSON may optionally be wrapped in a fenced <code>```json … ```</code>
+block — sweet-home strips the fence before parsing. Anything before the JSON
+is treated as prose preamble (visible in the spawn log but not consumed by
+the workflow). The JSON object **must be the last syntactic element** in
+your reply.
+
+If you cannot produce a valid JSON envelope (crashed mid-task, hit budget
+cap, fundamentally unsure), produce a prose summary instead. The runtime's
+`on_no_structured_output` fallback automatically routes to Arbiter.
+
+### Kinds emitted by this role
+
+#### `intake-question` — Phase A draft proposed, awaiting user `yes`
+```json
+{
+  "kind": "intake-question",
+  "phase": "draft-proposed",
+  "question": "<full Spec draft body as Markdown — this is what gets sent to Discord>",
+  "spec_draft": {
+    "subdomain": "ingest|delivery|...",
+    "title": "<one-line title>",
+    "body": "<full Markdown body — same content as question, structured>"
+  }
+}
+```
+Workflow does: posts comment, calls `rlm enqueue-message
+--kind=intake-question`, flips label to `agent:human-help`, status to
+`blocked`. Re-fires this role only when human flips label back via Hermes
+daemon.
+
+#### `intake-complete` — Phase B finished, Spec committed to RLM
+```json
+{
+  "kind": "intake-complete",
+  "spec": {
+    "subdomain": "<subdomain>",
+    "adr_seeds": [
+      {"title": "ADR-NNNN: <topic>", "rationale": "<why this ADR is needed>"}
+    ]
+  },
+  "completed_at": "2026-05-12T15:30:00Z"
+}
+```
+Workflow does: sets body markers (`subdomain`, `intake-completed-at`),
+flips `agent:hermes-intake → agent:hermes-design`, transitions
+`status:in-progress → status:proposed`.
+
+#### `intake-decline` — out of scope
+```json
+{
+  "kind": "intake-decline",
+  "reason": "<one-paragraph rationale; will be echoed in the close comment>"
+}
+```
+Workflow does: posts comment, transitions to `status:cancelled`.

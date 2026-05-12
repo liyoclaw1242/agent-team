@@ -262,3 +262,84 @@ Each is demoable. Worker can ship WP1 alone and you can verify it. The "WebSocke
 Builder talking to builder. Lead with the slice list (numbered, terse). Save reasoning for when the user pushes back. The quiz is a real conversation — direct, opinionated, willing to defend a split or merge with a one-line reason.
 
 Avoid "comprehensive", "robust", "scalable" — describe what each slice *does*, not what it *enables hypothetically*.
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `hermes-design` role under sweet-home's workflow
+engine (see `D:/darfts/agent-team.workflow.yaml`, `on_result.hermes-design.*`).
+The runtime parses the **last assistant message** as JSON to drive child-
+issue creation, label transitions, and Discord routing. Your final response
+**must end with** a JSON object matching one of the `kind` variants below.
+
+The JSON may optionally be wrapped in a fenced <code>```json … ```</code>
+block — sweet-home strips the fence before parsing. The JSON object **must
+be the last syntactic element** in your reply.
+
+If you cannot produce a valid JSON envelope, produce a prose summary
+instead — the runtime's `on_no_structured_output` fallback routes to
+Arbiter.
+
+### Kinds emitted by this role
+
+#### `decomposed` — Spec split into N WorkPackages
+```json
+{
+  "kind": "decomposed",
+  "workpackages": [
+    {
+      "title": "<one-line WP title — used in Issue title>",
+      "subdomain": "<subdomain from parent Spec>",
+      "acceptance_criteria": "- AC#1: ...\n- AC#2: ...",
+      "impact_scope": {
+        "kind": "scaffold|feature|migration|refactor",
+        "files": ["src/path/one.ts", "src/path/two.ts"]
+      },
+      "adrs": ["ADR-0014", "ADR-0017"],
+      "deps_issues": [42, 43]
+    }
+  ]
+}
+```
+Workflow does: for each `wp`, runs `create_issue` with labels
+`["kind:workpackage", "status:proposed", "agent:hermes-design",
+"parent-spec:#<num>"]` and Body rendered from `__shared.wp_body`. Posts
+summary comment listing created issues, transitions parent Spec
+`status:in-progress → status:approved`, adds `awaiting-wp-completion`
+label.
+
+Notes:
+- `deps_issues`: list of **already-known** issue numbers this WP blocks on.
+  Leave `[]` for the FIRST WP in a chain (no priors). For later WPs, you
+  must know the issue numbers of priors — but they may not exist yet
+  (they're created in the same `for_each` loop). Workaround for v1:
+  decompose serially in order, and use the v1 convention `deps_issues:
+  []` for ALL WPs; the user wires `<!-- deps: #N #M -->` markers manually
+  by editing later WP bodies. Auto-resolution via `lookup_iter_result_number`
+  is a Phase 2 item.
+- `impact_scope.kind`: drives which Worker sub-skill is composed (e.g.
+  `scaffold` → `scaffold-nextjs` / `scaffold-cloudflare-worker` / etc.).
+  See `tdd-loop` SKILL.md for the dispatch table.
+
+#### `clarification-needed` — design hit an ambiguity, ask user
+```json
+{
+  "kind": "clarification-needed",
+  "question": "<Markdown question to relay to Discord>"
+}
+```
+Workflow does: posts comment, calls `rlm enqueue-message
+--kind=design-question`, flips to `agent:human-help` + `status:blocked`.
+Re-fires this role when human responds via Hermes daemon.
+
+#### `design-decline` — Spec cannot be decomposed in current shape
+```json
+{
+  "kind": "design-decline",
+  "reason": "<one-paragraph rationale>"
+}
+```
+Workflow does: posts comment, transitions to `status:cancelled`. The
+parent Spec stays open for human triage; a follow-up Spec may supersede
+per ADR-0013.

@@ -1,0 +1,643 @@
+# agent-team.workflow.yaml — v1 draft
+#
+# Drives the agent-team delivery pipeline via agent-sweet-home's workflow
+# engine. Spawns claude -p per role, applies label transitions + child-
+# issue creation declaratively.
+#
+# Companion docs:
+#   .rlm/CONTEXT-MAP.md            — system overview
+#   .rlm/adr/0014-...md            — DeliveryOrchestrator (this file is its
+#                                    config; the runtime is sweet-home)
+#   .rlm/contracts/rlm-cli.md      — `rlm` subcommand contract
+#   .claude/skills/<name>/SKILL.md — per-role system prompts (resolved
+#                                    relative to this YAML's directory)
+#
+# v1 simplifications (deliberate, called out so reviewers don't mistake them
+# for missing features):
+#   1. Global serialize: max_in_flight: 1 — Worker AND Validators block each
+#      other. Phase 2 patches sweet-home for per-role semaphores.
+#   2. No automatic WP dep wiring — hermes-design's structured output may
+#      include explicit `<!-- deps: #N #M -->` markers in WP bodies; the
+#      unblock_pass picks them up. Auto-resolution via for_each iter
+#      result-number lookup is Phase 2.
+#   3. Post-conditions trust the agent's JSON: Worker says `kind: delivered`
+#      with a `pr_url`, we trust it. Validators are the real verification.
+#   4. Arbiter reads prior agent's output via `gh issue view --comments`
+#      because every agent's on_result handler echoes its structured JSON
+#      as a comment (paper trail). Sweet-home patch to inject prior output
+#      into the prompt header is Phase 2.
+
+version: 1
+
+# -----------------------------------------------------------------------------
+# Entry — single-repo poll mode for the dogfood phase.
+# -----------------------------------------------------------------------------
+entry:
+  modes: [poll]
+  poll:
+    interval_sec: 30
+    max_in_flight: 1
+    # v1: hardcode the agent-team repo + local clone. Phase 2 reads from
+    # sweet-home's repo registry (`agent-sweet-home registry list --json`).
+    repo_source:
+      command: 'echo ''[{"repo":"liyoclaw1242/agent-team","path":"D:/darfts"}]'''
+    issue_source:
+      command: |
+        gh issue list --repo {repo} --state open
+          --json number,title,body,labels,state --limit 200
+
+# -----------------------------------------------------------------------------
+# Shared templates — Jinja fragments referenced via `body_template: __shared.<name>`.
+# Keep these LOAD-bearing prose blocks here so we don't duplicate phrasing
+# across action handlers.
+# -----------------------------------------------------------------------------
+shared_templates:
+  wp_body: |
+    ## WorkPackage
+
+    **Parent Spec**: #{{ issue.number }}
+    **Subdomain**: {{ wp.subdomain | default('unspecified') }}
+
+    ## Acceptance Criteria
+    {{ wp.acceptance_criteria }}
+
+    ## Impact Scope
+    ```yaml
+    {{ wp.impact_scope | tojson(indent=2) }}
+    ```
+
+    ## ADRs Referenced
+    {% for adr in wp.adrs | default([]) %}- {{ adr }}
+    {% endfor %}
+
+    {% if wp.deps_issues | default([]) | length > 0 -%}
+    <!-- deps: {% for d in wp.deps_issues %}#{{ d }} {% endfor %} -->
+    {%- endif %}
+
+  worker_summary_comment: |
+    **Worker delivered.** PR {{ out.pr_url }} open.
+
+    Branch: `{{ out.branch }}`
+    Fact commits: {{ out.fact_commits | length }}
+    {% for c in out.fact_commits %}- `{{ c.sha }}` {{ c.message_subject }}
+    {% endfor %}
+
+    Verify: `{{ out.full_suite_verify }}`
+
+    🤖 worker (web-stack profile)
+
+  whitebox_verdict_comment: |
+    **WhiteBoxValidator verdict: {{ out.verdict }}**
+
+    Sub-skills run: {{ out.sub_skills | join(', ') }}
+    Findings: {{ out.findings | length }}
+    {% for f in out.findings %}- **{{ f.severity }}**: {{ f.message }}
+    {% endfor %}
+
+    {{ out.summary | default('') }}
+
+    🤖 whitebox-validator
+
+  blackbox_verdict_comment: |
+    **BlackBoxValidator verdict: {{ out.verdict }}**
+
+    Method: {{ out.method }}
+    {% if out.failure_classification -%}
+    Classification: `{{ out.failure_classification }}`
+    {%- endif %}
+    Evidence: {{ out.evidence | length }} items
+
+    {{ out.summary | default('') }}
+
+    🤖 blackbox-validator
+
+  arbiter_verdict_comment: |
+    **Arbiter decision: {{ out.decision }}**
+
+    Failed stage: {{ out.failed_stage }}
+    Why: {{ out.reasoning }}
+
+    🤖 arbiter
+
+  degrade_comment: |
+    ⚠️ Spawn `{{ spawn.role }}` finished without parseable structured output.
+
+    End reason: `{{ spawn.end_reason }}`
+    Cost: ${{ '%.4f' | format(spawn.cost_usd) }}
+    Duration: {{ '%.1f' | format(spawn.duration_ms / 1000) }}s
+
+    Last assistant text (truncated):
+    ```
+    {{ spawn.last_assistant_text | default('(none)') | truncate(length=2000, end='…') }}
+    ```
+
+    Escalating to `agent:arbiter` for human-or-recovery decision.
+
+# -----------------------------------------------------------------------------
+# Roles — one per agent class. system_prompt_file paths are relative to
+# THIS YAML's directory (D:/darfts/agent-team.workflow.yaml → D:/darfts/).
+# add_dirs values support `{repo_path}` substitution at spawn time.
+# -----------------------------------------------------------------------------
+roles:
+  # Hermes intake — converts business signals into draft Specs.
+  # v1: points at signal-to-spec as the orchestrator; sub-skills accessible
+  # via add_dirs. Phase 2 may introduce a dedicated hermes-intake/SKILL.md
+  # that explicitly chooses between probes.
+  hermes-intake:
+    system_prompt_file: .claude/skills/signal-to-spec/SKILL.md
+    add_dirs:
+      - "{repo_path}/.claude/skills/business-model-probe"
+      - "{repo_path}/.claude/skills/deployment-constraints-probe"
+      - "{repo_path}/.claude/skills/production-monitor"
+      - "{repo_path}/.claude/skills/intake-confirmation"
+      - "{repo_path}/.rlm"
+    allowed_tools: ["Read", "Glob", "Grep", "Bash(gh *)", "Bash(rlm *)"]
+    disallowed_tools: ["Edit", "Write"]
+    budget_usd: 1.5
+    model: claude-sonnet-4-6
+    needs_worktree: false
+
+  # Hermes design — decomposes approved Specs into WorkPackages.
+  hermes-design:
+    system_prompt_file: .claude/skills/decompose-spec/SKILL.md
+    add_dirs:
+      - "{repo_path}/.claude/skills/compute-impact-scope"
+      - "{repo_path}/.claude/skills/select-deployment-strategy"
+      - "{repo_path}/.claude/skills/draft-adr"
+      - "{repo_path}/.claude/skills/draft-contract"
+      - "{repo_path}/.claude/skills/design-dialogue"
+      - "{repo_path}/.claude/skills/design-approval"
+      - "{repo_path}/.rlm"
+    allowed_tools: ["Read", "Glob", "Grep", "Bash(gh *)", "Bash(rlm *)"]
+    disallowed_tools: ["Edit", "Write"]
+    budget_usd: 2.5
+    model: claude-sonnet-4-6
+    needs_worktree: false
+
+  # Worker — writes code. Always TDD. tdd-loop's stack-detection dispatches
+  # to the right TDD sub-skill (vitest / xunit / gotest / playwright).
+  worker:
+    system_prompt_file: .claude/skills/tdd-loop/SKILL.md
+    add_dirs:
+      - "{repo_path}/.claude/skills/vitest-test-first"
+      - "{repo_path}/.claude/skills/xunit-test-first"
+      - "{repo_path}/.claude/skills/gotest-table-driven"
+      - "{repo_path}/.claude/skills/playwright-test-first"
+      - "{repo_path}/.claude/skills/error-handling-go"
+      - "{repo_path}/.claude/skills/scaffold-nextjs"
+      - "{repo_path}/.claude/skills/scaffold-cloudflare-worker"
+      - "{repo_path}/.claude/skills/scaffold-aspnet-minimal"
+      - "{repo_path}/.claude/skills/scaffold-go-http"
+      - "{repo_path}/.rlm"
+    allowed_tools:
+      - "Read"
+      - "Edit"
+      - "Write"
+      - "Glob"
+      - "Grep"
+      - "Bash(git *)"
+      - "Bash(gh *)"
+      - "Bash(pnpm *)"
+      - "Bash(npm *)"
+      - "Bash(pnpx *)"
+      - "Bash(npx *)"
+      - "Bash(dotnet *)"
+      - "Bash(go *)"
+      - "Bash(node *)"
+      - "Bash(wrangler *)"
+      - "Bash(rlm *)"
+    disallowed_tools: []
+    budget_usd: 5.0
+    model: claude-sonnet-4-6
+    needs_worktree: true
+
+  # WhiteBox validator — reads PR diff, runs static/dynamic checks via
+  # code-review + stress-test sub-skills.
+  whitebox-validator:
+    system_prompt_file: .claude/skills/whitebox-validator/SKILL.md
+    add_dirs:
+      - "{repo_path}/.claude/skills/code-review"
+      - "{repo_path}/.claude/skills/stress-test"
+      - "{repo_path}/.rlm"
+    allowed_tools: ["Read", "Glob", "Grep", "Bash(git *)", "Bash(gh *)", "Bash(rlm *)"]
+    disallowed_tools: ["Edit", "Write"]
+    budget_usd: 2.0
+    model: claude-sonnet-4-6
+    needs_worktree: false
+
+  # BlackBox validator — sandbox-deployed app via Playwright + curl/api probes.
+  blackbox-validator:
+    system_prompt_file: .claude/skills/blackbox-validator/SKILL.md
+    add_dirs:
+      - "{repo_path}/.claude/skills/e2e-browser-test"
+      - "{repo_path}/.claude/skills/api-contract-test"
+      - "{repo_path}/.rlm"
+    allowed_tools: ["Read", "Bash(gh *)", "Bash(curl *)", "Bash(npx playwright *)", "Bash(rlm *)"]
+    disallowed_tools: ["Edit", "Write"]
+    budget_usd: 2.5
+    model: claude-sonnet-4-6
+    needs_worktree: false
+
+  # Arbiter — recovery agent. Reads previous agent's output via gh comments.
+  arbiter:
+    system_prompt_file: .claude/skills/arbiter/SKILL.md
+    add_dirs:
+      - "{repo_path}/.rlm"
+    allowed_tools: ["Read", "Bash(gh *)", "Bash(git log*)", "Bash(rlm *)"]
+    disallowed_tools: ["Edit", "Write"]
+    budget_usd: 1.0
+    model: claude-sonnet-4-6
+    needs_worktree: false
+
+# -----------------------------------------------------------------------------
+# Dispatch — first match wins. Order matters: terminal/cancel checks first,
+# then agent: routing in flow order.
+# -----------------------------------------------------------------------------
+dispatch:
+  rules:
+    # ---- Terminal / inert states ----
+    - when: { issue_state: closed }
+      then: { directive: no_action, reason: "closed" }
+
+    - when: { has_label: "status:cancelled" }
+      then: { directive: no_action, reason: "cancelled" }
+
+    - when: { has_label: "status:done" }
+      then: { directive: no_action, reason: "done" }
+
+    - when: { has_label: "human-review" }
+      then: { directive: no_action, reason: "awaiting human review" }
+
+    - when: { has_label: "agent:human-help" }
+      then: { directive: no_action, reason: "blocked on Discord/human" }
+
+    # ---- Recovery path (highest priority among active routing) ----
+    - when: { has_label: "agent:arbiter" }
+      then: { directive: spawn_fresh, role: arbiter }
+
+    # ---- Hermes intake: new Specs / business signals ----
+    - when:
+        all:
+          - has_label: "kind:spec"
+          - has_label: "agent:hermes-intake"
+          - has_label: "status:proposed"
+      then: { directive: spawn_fresh, role: hermes-intake }
+
+    # ---- Hermes design: approved Specs awaiting decomposition ----
+    - when:
+        all:
+          - has_label: "kind:spec"
+          - has_label: "agent:hermes-design"
+          - any:
+              - has_label: "status:proposed"
+              - has_label: "status:approved"
+      then: { directive: spawn_fresh, role: hermes-design }
+
+    # ---- Worker delivery cycle ----
+    - when:
+        all:
+          - has_label: "kind:workpackage"
+          - has_label: "agent:worker"
+          - has_label: "status:approved"
+      then: { directive: spawn_fresh, role: worker }
+
+    # ---- WhiteBox validation ----
+    - when:
+        all:
+          - has_label: "kind:workpackage"
+          - has_label: "agent:validator"
+          - has_label: "status:delivered"
+      then: { directive: spawn_fresh, role: whitebox-validator }
+
+    # ---- BlackBox validation ----
+    - when:
+        all:
+          - has_label: "kind:workpackage"
+          - has_label: "agent:blackbox-validator"
+          - has_label: "status:delivered"
+      then: { directive: spawn_fresh, role: blackbox-validator }
+
+    # ---- BlackBox approved → status:validated, awaiting human merge ----
+    - when:
+        all:
+          - has_label: "kind:workpackage"
+          - has_label: "status:validated"
+      then: { directive: no_action, reason: "awaiting human merge" }
+
+    # No rule matched → implicit no_action.
+
+# -----------------------------------------------------------------------------
+# Pre-spawn — runs after dispatch picks `spawn_fresh`, before claude starts.
+# Idempotent claim: transition status to in-progress so subsequent ticks
+# don't re-dispatch while we're mid-flight.
+# -----------------------------------------------------------------------------
+pre_spawn:
+  # Worker idempotency: claim by flipping status:approved → status:in-progress
+  # BEFORE claude spawns. If the spawn crashes mid-flight, status stays
+  # in-progress + no on_result fires → on_no_structured_output routes to
+  # arbiter. Either way we don't double-dispatch.
+  - if: { role: worker }
+    do:
+      - transition_status: { from: approved, to: in-progress }
+
+  # Hermes design idempotency: same pattern but from `proposed` → `in-progress`
+  - if: { role: hermes-design }
+    do:
+      - transition_status: { to: in-progress }
+
+  # Hermes intake idempotency
+  - if: { role: hermes-intake }
+    do:
+      - transition_status: { to: in-progress }
+
+  # Validators: don't claim; they're idempotent re-reads and short.
+  # Arbiter: same — runs fast, label flip is its output.
+
+# -----------------------------------------------------------------------------
+# On-result — branches on (role, out.kind). Each agent's structured JSON
+# `kind` field selects the handler. Side effects (labels, comments, child
+# issues) live here, NOT inside skill prompts.
+# -----------------------------------------------------------------------------
+on_result:
+  # =============================================================
+  # Hermes intake
+  # =============================================================
+
+  # Intake needs more info from the user — push question to Hermes daemon.
+  - role: hermes-intake
+    when: { kind: intake-question }
+    steps:
+      - comment: |
+          🗨️ Intake needs more info — relaying to Discord.
+
+          ```
+          {{ out.question | truncate(length=1500, end='…') }}
+          ```
+      - run_command:
+          argv: ["rlm", "enqueue-message",
+                 "--kind=intake-question",
+                 "--parent-issue={{ issue.number }}",
+                 "--body", "{{ out.question }}"]
+          bind_exit: enqueue_exit
+      - if: "enqueue_exit != '0'"
+        steps:
+          - comment: "⚠️ rlm enqueue-message failed; manual Discord poke needed."
+      - remove_labels: ["agent:hermes-intake"]
+      - add_labels: ["agent:human-help"]
+      - transition_status: { to: blocked }
+
+  # Intake produced a draft Spec — keep this issue as the Spec, transition
+  # to design phase.
+  - role: hermes-intake
+    when: { kind: intake-complete }
+    steps:
+      - comment: |
+          ✅ Intake complete. Draft Spec attached.
+
+          Subdomain: {{ out.spec.subdomain }}
+          ADR seeds: {{ out.spec.adr_seeds | length }} suggested
+
+          Transitioning to `agent:hermes-design` for decomposition.
+      - set_body_marker:
+          subdomain: "{{ out.spec.subdomain }}"
+          intake-completed-at: "{{ out.completed_at }}"
+      - remove_labels: ["agent:hermes-intake"]
+      - add_labels: ["agent:hermes-design"]
+      - transition_status: { from: in-progress, to: proposed }
+
+  # Intake declined — out of scope.
+  - role: hermes-intake
+    when: { kind: intake-decline }
+    steps:
+      - comment: |
+          ❌ Intake declined: {{ out.reason }}
+      - remove_labels: ["agent:hermes-intake"]
+      - transition_status: { to: cancelled }
+
+  # =============================================================
+  # Hermes design
+  # =============================================================
+
+  # Decomposed — create N WorkPackage child issues.
+  - role: hermes-design
+    when: { kind: decomposed }
+    steps:
+      - for_each: "out.workpackages"
+        as: wp
+        steps:
+          - create_issue:
+              title: "[WP] {{ wp.title }}"
+              body_template: __shared.wp_body
+              labels:
+                - "kind:workpackage"
+                - "status:proposed"
+                - "agent:hermes-design"
+                - "parent-spec:{{ issue.number }}"
+              deps: "{{ wp.deps_issues | default([]) }}"
+            bind: created_wp
+      - comment: |
+          🧩 Decomposed into {{ out.workpackages | length }} WorkPackage(s):
+          {% for r in _last_iter_results %}- #{{ r.number }}: {{ r.title }}
+          {% endfor %}
+      - remove_labels: ["agent:hermes-design"]
+      - transition_status: { from: in-progress, to: approved }
+      - add_labels: ["awaiting-wp-completion"]
+
+  # Design needs clarification — re-route via design-dialogue back to user.
+  - role: hermes-design
+    when: { kind: clarification-needed }
+    steps:
+      - comment: |
+          🗨️ Design needs clarification — relaying to Discord.
+
+          ```
+          {{ out.question | truncate(length=1500, end='…') }}
+          ```
+      - run_command:
+          argv: ["rlm", "enqueue-message",
+                 "--kind=design-question",
+                 "--parent-issue={{ issue.number }}",
+                 "--body", "{{ out.question }}"]
+      - remove_labels: ["agent:hermes-design"]
+      - add_labels: ["agent:human-help"]
+      - transition_status: { to: blocked }
+
+  - role: hermes-design
+    when: { kind: design-decline }
+    steps:
+      - comment: |
+          ❌ Design declined: {{ out.reason }}
+      - remove_labels: ["agent:hermes-design"]
+      - transition_status: { to: cancelled }
+
+  # =============================================================
+  # Worker
+  # =============================================================
+
+  # Worker delivered — PR opened, fact commits in, summary comment posted.
+  - role: worker
+    when: { kind: delivered }
+    steps:
+      - comment:
+          template: __shared.worker_summary_comment
+      - remove_labels: ["agent:worker"]
+      - add_labels: ["agent:validator"]
+      - transition_status: { from: in-progress, to: delivered }
+      - push_branch_and_pr:
+          branch: "{{ out.branch }}"
+          base: main
+          title: "WP #{{ issue.number }}: {{ issue.title | truncate(length=60, end='…') }}"
+          body_template: __shared.worker_summary_comment
+          closes_issue: false   # leave open until BlackBox validates
+
+  # Worker self-declined per ADR-0016.
+  - role: worker
+    when: { kind: self-declined }
+    steps:
+      - comment: |
+          ⛔ Worker self-decline: {{ out.reason }}
+
+          Refer to ADR-0016 §self-decline. Hermes can re-decompose against
+          current Spec state if work is still desired.
+      - remove_labels: ["agent:worker"]
+      - transition_status: { to: cancelled }
+
+  # =============================================================
+  # WhiteBox validator
+  # =============================================================
+
+  - role: whitebox-validator
+    when: { kind: approved }
+    steps:
+      - comment:
+          template: __shared.whitebox_verdict_comment
+      - remove_labels: ["agent:validator"]
+      - add_labels: ["agent:blackbox-validator"]
+      # status stays `delivered` — BlackBox is the second gate.
+
+  - role: whitebox-validator
+    when: { kind: rejected }
+    steps:
+      - comment:
+          template: __shared.whitebox_verdict_comment
+      - remove_labels: ["agent:validator"]
+      - add_labels: ["agent:arbiter"]
+      # Arbiter decides retry / escalate / cancel.
+
+  # =============================================================
+  # BlackBox validator
+  # =============================================================
+
+  - role: blackbox-validator
+    when: { kind: approved }
+    steps:
+      - comment:
+          template: __shared.blackbox_verdict_comment
+      - remove_labels: ["agent:blackbox-validator"]
+      - transition_status: { from: delivered, to: validated }
+      - comment: |
+          ✅ All validators passed. PR is ready for human merge.
+          Mark `status:done` after merge via `rlm mark-delivered`.
+
+  # Implementation defect — bounce back to Worker for fix.
+  - role: blackbox-validator
+    when: { kind: rejected-implementation-defect }
+    steps:
+      - comment:
+          template: __shared.blackbox_verdict_comment
+      - remove_labels: ["agent:blackbox-validator"]
+      - add_labels: ["agent:arbiter"]   # Arbiter manages retry budget bump
+
+  # AC ambiguity — bounce back to Hermes design (Spec needs refinement).
+  - role: blackbox-validator
+    when: { kind: rejected-ac-ambiguity }
+    steps:
+      - comment:
+          template: __shared.blackbox_verdict_comment
+      - remove_labels: ["agent:blackbox-validator"]
+      - add_labels: ["agent:arbiter"]
+
+  # =============================================================
+  # Arbiter
+  # =============================================================
+
+  - role: arbiter
+    when: { kind: retry }
+    steps:
+      - comment:
+          template: __shared.arbiter_verdict_comment
+      - remove_labels: ["agent:arbiter"]
+      # Branch on out.retry_stage to route back to the right agent.
+      # `add_labels` is a flat list per the schema; if/elif gates the
+      # appropriate stage label.
+      - if: "out.retry_stage == 'worker'"
+        steps:
+          - add_labels: ["agent:worker"]
+        elif:
+          - elif: "out.retry_stage == 'white-box'"
+            steps:
+              - add_labels: ["agent:validator"]
+          - elif: "out.retry_stage == 'black-box'"
+            steps:
+              - add_labels: ["agent:blackbox-validator"]
+      # Retry counter bump — Arbiter computes the new N in its output.
+      - set_body_marker:
+          retry-white-box: "{{ out.new_retry_counts.white_box | default('0') }}"
+          retry-black-box: "{{ out.new_retry_counts.black_box | default('0') }}"
+          retry-worker: "{{ out.new_retry_counts.worker | default('0') }}"
+
+  - role: arbiter
+    when: { kind: escalate }
+    steps:
+      - comment:
+          template: __shared.arbiter_verdict_comment
+      - run_command:
+          argv: ["rlm", "enqueue-message",
+                 "--kind=retry-exhausted",
+                 "--parent-issue={{ issue.number }}",
+                 "--body", "{{ out.reasoning }}"]
+      - remove_labels: ["agent:arbiter"]
+      - add_labels: ["agent:human-help"]
+      - transition_status: { to: blocked }
+
+  - role: arbiter
+    when: { kind: cancel }
+    steps:
+      - comment:
+          template: __shared.arbiter_verdict_comment
+      - remove_labels: ["agent:arbiter"]
+      - transition_status: { to: cancelled }
+
+# -----------------------------------------------------------------------------
+# Degrade fallback — fires when ANY spawn finishes without parseable JSON.
+# Default behavior: post a transparent failure comment and route to Arbiter.
+# Arbiter is responsible for deciding whether to retry the agent or escalate.
+# -----------------------------------------------------------------------------
+on_no_structured_output:
+  steps:
+    - comment:
+        template: __shared.degrade_comment
+    - remove_labels:
+        - "agent:hermes-intake"
+        - "agent:hermes-design"
+        - "agent:worker"
+        - "agent:validator"
+        - "agent:blackbox-validator"
+    - add_labels: ["agent:arbiter"]
+    - set_body_marker:
+        last-degrade-role: "{{ spawn.role }}"
+        last-degrade-end-reason: "{{ spawn.end_reason }}"
+
+# -----------------------------------------------------------------------------
+# Unblock pass — promotes status:blocked → status:approved when listed
+# dep issues are all closed. Picks up `<!-- deps: #N #M -->` markers from
+# issue body (parsed by sweet-home's runtime).
+# -----------------------------------------------------------------------------
+unblock_pass:
+  enabled: true
+  on_unblock:
+    - comment: |
+        🔓 Dependencies satisfied — promoting to `status:approved` for next
+        dispatch tick.
+    - remove_labels: ["status:blocked"]
+    - add_labels: ["status:approved"]

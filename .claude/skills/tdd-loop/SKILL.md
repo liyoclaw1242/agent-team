@@ -247,3 +247,74 @@ If any of these is missing when you exit, Dispatch's post-condition check fails 
 - Does not modify the WP body (immutable post-approval per ADR-0013)
 - Does not retry itself on test failure — that's Arbiter's job (ADR-0017)
 - Does not run validators or simulate them — Dispatch chains them in
+
+---
+
+## Output contract — final assistant message JSON envelope
+
+This skill runs as the `worker` role under sweet-home's workflow engine
+(see `D:/darfts/agent-team.workflow.yaml`, `on_result.worker.*`). The
+runtime parses the **last assistant message** as JSON to drive PR creation,
+summary comments, and the label transition to `agent:validator`. Your
+final response **must end with** a JSON object matching one of the `kind`
+variants below.
+
+The JSON may optionally be wrapped in a fenced <code>```json … ```</code>
+block — sweet-home strips the fence before parsing. The JSON object **must
+be the last syntactic element** in your reply.
+
+**Critical**: under the v1 workflow integration you do **NOT**:
+- Push the branch (`git push -u origin ...`) — workflow's `push_branch_and_pr` does it
+- Open the PR (`gh pr create ...`) — same
+- Post the summary comment on the WP Issue — workflow's `comment` action does it
+- Flip the `agent:worker → agent:validator` label — workflow does it
+
+You DO commit fact commits inside the worktree (`git add` + `git commit`
+on the carved `BRANCH:` named in the prompt header). Workflow will push
+that branch as part of `push_branch_and_pr`.
+
+If you crash mid-task (no JSON), the runtime's `on_no_structured_output`
+fallback routes to Arbiter automatically.
+
+### Kinds emitted by this role
+
+#### `delivered` — all ACs green, fact commits in the worktree
+```json
+{
+  "kind": "delivered",
+  "branch": "<the BRANCH name from the prompt header — usually spawn-<issue>-<ts>>",
+  "fact_commits": [
+    {"sha": "abc1234", "message_subject": "[ac1] one-line subject"},
+    {"sha": "def5678", "message_subject": "[ac2] one-line subject"}
+  ],
+  "ac_results": [
+    {
+      "ac_id": "AC#1",
+      "test_files": ["src/server/actions/invite.test.ts"],
+      "impl_files": ["src/server/actions/invite.ts"],
+      "test_shape": "integration|table-driven|http-integration|golden|fuzz|e2e-single-actor|webapp-factory-integration|theory-inline-data|cancellation|unit",
+      "verify_command": "pnpm vitest run src/server/actions/invite.test.ts"
+    }
+  ],
+  "full_suite_verify": "pnpm verify"
+}
+```
+Workflow does: posts `__shared.worker_summary_comment` rendered from this
+data, flips `agent:worker → agent:validator`, transitions
+`status:in-progress → status:delivered`, then runs `push_branch_and_pr`
+to push `branch` + open PR `WP #<num>: <title>` against `main`.
+
+#### `self-declined` — Worker can't proceed (per ADR-0016)
+```json
+{
+  "kind": "self-declined",
+  "reason": "<which ADR-0016 §self-decline trigger fired + one-paragraph context>"
+}
+```
+Triggers (verbatim from ADR-0016): impact_scope files don't exist on main;
+AC requires capabilities outside Worker's tools; AC conflicts with cited
+ADR; Spec superseded mid-cycle in conflicting way.
+
+Workflow does: posts decline comment, transitions to `status:cancelled`.
+Do **not** open a PR, push commits, or modify labels yourself in this
+case — emit the JSON and exit.
