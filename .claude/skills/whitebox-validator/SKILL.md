@@ -91,53 +91,51 @@ reasoning: impact_scope.estimated_complexity=large + AC mentions "p95 < 200ms"
 
 ### 3. Invoke each sub-skill in order
 
-Order: `code-review` first (catches structural issues that would invalidate stress-test results), then any conditional skills.
+Order: `code-review` first, then any conditional skills.
 
-Each sub-skill returns a structured finding set:
+Each sub-skill returns a structured finding set. **This is INPUT to you, not your output:**
 ```
 {
   "skill": "code-review",
   "verdict": "pass" | "fail",
-  "findings": [
-    {
-      "severity": "blocking" | "major" | "minor" | "note",
-      "file": "src/foo.ts",
-      "line": 42,
-      "category": "logic|security|perf|edge-case|style|type",
-      "message": "..."
-    }
-  ]
+  "findings": [{ "severity": "blocking|major|minor|note", "file": "src/foo.ts", "line": 42, "message": "..." }]
 }
 ```
 
-### 4. Aggregate verdict
+### 4. Aggregate verdict (mentally only — do NOT write prose)
 
-| Sub-skill outcomes | Verdict |
+| Sub-skill outcomes | Your verdict |
 |---|---|
-| Any sub-skill returned `fail` | FAIL |
-| Any finding is severity `blocking` | FAIL |
-| Any finding is severity `major` | FAIL (let Worker fix; cheaper than carrying forward) |
-| Only `minor` / `note` findings | PASS (mention in verdict comment but don't block) |
-| All sub-skills passed cleanly | PASS |
+| Any `fail` OR any `blocking` finding | `rejected` |
+| Any `major` finding | `rejected` |
+| Only `minor` / `note` / all `pass` | `approved` |
 
-### 5. Emit verdict + flip labels
+### 5. Write ONLY the JSON envelope — nothing else
 
-Post a comment on the WP Issue (single comment, structured):
+**Do NOT post a GitHub comment. Do NOT write a prose verdict.** The workflow
+runtime posts the comment automatically after reading your JSON.
+
+The entire execution sequence is:
 
 ```
-**WhiteBoxValidator verdict: PASS** _(or FAIL)_
-
-**Sub-skills run**: code-review, stress-test
-**Findings**: 2 minor, 0 major, 0 blocking
-
-<per-finding details with file:line + category + message>
-
-**Decision**: <PASS → Dispatch advances to Stage 3 sandbox deploy>
-  _OR_
-**Decision**: <FAIL → return to Worker; Dispatch will relabel agent:worker + bump retry:white-box>
+invoke /code-review sub-skill
+  → tool returns {"skill":"code-review","verdict":"pass","findings":[...]}
+READ the result silently — it is your input, not your output
+aggregate verdict mentally
+WRITE YOUR FINAL REPLY — must be the JSON below and nothing after it:
 ```
 
-Then **return** via Dispatch's chain. Do **not** flip labels yourself — that's Dispatch's job after reading your verdict.
+For PASS (no blocking/major findings):
+```json
+{"kind":"approved","verdict":"approved","sub_skills":["code-review"],"findings":[]}
+```
+
+For FAIL (any blocking or major finding):
+```json
+{"kind":"rejected","verdict":"rejected","sub_skills":["code-review"],"findings":[{"severity":"major","file":"src/foo.ts","line":42,"message":"..."}]}
+```
+
+**Stop immediately after the closing ` ``` `.** Do not write anything else.
 
 ---
 
