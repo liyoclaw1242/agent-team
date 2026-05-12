@@ -2,13 +2,23 @@
 name: signal-to-spec
 description: |
   Translate a `business-model-probe`-converged conversation into a draft Spec.
-  Two phases per Spec:
-    (1) On first invocation after consensus — draft Spec body and propose in
-        Discord ("回 yes 我建 Issue"). Exit. No RLM writes yet.
-    (2) On second invocation (after human "yes") — call `rlm
-        append-business-model` (+ `rlm append-deployment-constraints` if
-        applicable), `rlm commit-spec`, then chain into `intake-confirmation`
-        which does `rlm confirm-spec` (the actual `draft→confirmed` flip).
+  Three phases, split across two runtimes:
+
+  DAEMON CONTEXT (no issue yet — you are running inside Hermes daemon):
+    Phase A  — Draft Spec, propose in Discord. Exit.
+    Phase A.5 — User replied "yes" → call `gh issue create` with labels
+                `kind:spec,agent:hermes-intake,status:proposed` in the
+                target repo (read from ~/.hermes/agent-team.env). Post
+                issue link to Discord. Exit. sweet-home picks up the issue
+                on its next poll (≤30s).
+
+  SWEET-HOME CONTEXT (issue already exists — sweet-home dispatched you):
+    Phase B  — Read issue context. Write RLM snapshots
+                (`rlm append-business-model`, etc.). Update issue body with
+                full Spec. Emit `{"kind":"intake-complete"}` JSON envelope.
+
+  Detect context: sweet-home prepends `ISSUE: #N` / `REPO: org/name` lines
+  before this prompt. Daemon invocation has no such header.
 
   Use when business-model-probe has reached working consensus and posted its
   Spec draft, OR when the user explicitly invokes "/signal-to-spec" with a
@@ -27,33 +37,90 @@ You are **Hermes** running `signal-to-spec`. The conversation has converged. Now
 
 ---
 
-## Two phases
+## Runtime detection — read this first
 
-This skill executes in one of two phases depending on Discord thread state.
+At the very start, determine which context you are in:
 
-### Phase A: Draft + Propose
+```
+DAEMON context  → no "ISSUE:" line in your context header
+sweet-home context → sweet-home prepends "ISSUE: #N" and "REPO: org/name"
+                     before this skill content
+```
 
-**Triggered when**: business-model-probe (or `/deployment-constraints-probe` if applicable) posted a "consensus reached" summary, OR you detect consensus directly from a converging thread.
+- **Daemon context**: run Phase A or Phase A.5 (see below).
+- **sweet-home context**: skip to Phase B.
+
+---
+
+## Three phases
+
+### Phase A: Draft + Propose  *(daemon context)*
+
+**Triggered when**: business-model-probe posted a "consensus reached" summary, OR you detect consensus directly from a converging thread.
 
 **Action**:
-1. Read Signal Issue + Discord thread + relevant `.rlm/business/business-model-*.md` and `.rlm/business/deployment-constraints-*.md`.
+1. Read Signal Issue + Discord thread + relevant `.rlm/business/` snapshots.
 2. Draft the Spec body (see structure below).
-3. Post the proposal in Discord with the hand-off marker `回 yes 我建 Spec Issue 並寫進 RLM`.
-4. **Exit**. No RLM writes.
+3. Post the proposal in Discord with the hand-off marker `回 yes 我建 Spec Issue`.
+4. **Exit**. No GitHub writes, no RLM writes.
 
-### Phase B: Commit on yes
+---
 
-**Triggered when**: user replied `yes` (or close variant — `好` / `OK` / `confirm`) to the Phase A proposal.
+### Phase A.5: Create GitHub Issue  *(daemon context, on user "yes")*
+
+**Triggered when**: user replied `yes` (or `好` / `OK` / `confirm`) to the Phase A proposal.
 
 **Action**:
-1. Re-read thread + Signal + RLM snapshots.
-2. Call `rlm append-business-model --body "..."` to persist the business-model snapshot.
-3. If deployment constraints were probed: `rlm append-deployment-constraints --body "..."`.
-4. Call `rlm commit-spec --signal=<num> --title "..." --body "..."` to create the Spec Issue at `status:draft`.
-5. **Chain into `intake-confirmation`** which flips `status:draft → status:confirmed` (the actual gate enforcement). Pass the new Spec Issue number.
-6. Post a "✓ Spec confirmed: Issue #N" message in Discord with the Issue link.
+1. Source the target repo config:
+   ```bash
+   source ~/.hermes/agent-team.env
+   # provides: AGENT_TEAM_REPO, AGENT_TEAM_LOCAL_PATH, AGENT_TEAM_DIR
+   ```
+2. Create the GitHub Issue with the correct labels:
+   ```bash
+   ISSUE_URL=$(gh issue create \
+     --repo "$AGENT_TEAM_REPO" \
+     --title "<imperative title from Phase A>" \
+     --body "<full Spec body from Phase A — see structure below>" \
+     --label "kind:spec,agent:hermes-intake,status:proposed")
+   echo "$ISSUE_URL"
+   ```
+3. Extract the issue number from the URL (`echo "$ISSUE_URL" | grep -oE '[0-9]+$'`).
+4. Post in Discord:
+   ```
+   ✓ Spec Issue #N 建立: <issue-link>
+   sweet-home 會在 30 秒內接手，進行 RLM 寫入與確認。
+   ```
+5. **Exit**. sweet-home's next poll detects `kind:spec + agent:hermes-intake + status:proposed` and dispatches Phase B.
 
-If `intake-confirmation` is not yet implemented (v0 transitional state): call `rlm confirm-spec --issue=<num>` directly as a fallback. Document the fallback in the post.
+**Idempotency**: Before creating, check if an issue already exists:
+```bash
+gh issue list --repo "$AGENT_TEAM_REPO" \
+  --label "kind:spec,agent:hermes-intake" \
+  --state open --json number,title \
+  --jq '.[] | select(.title == "<title>")'
+```
+If found, post the existing issue link in Discord instead of creating a duplicate.
+
+**If `~/.hermes/agent-team.env` is missing**: post in Discord:
+```
+⚠️ ~/.hermes/agent-team.env not found. Run:
+./init-target-repo.sh --repo ORG/NAME --path /abs/path
+in the agent-team directory, then retry.
+```
+
+---
+
+### Phase B: RLM Commit  *(sweet-home context)*
+
+**Triggered when**: sweet-home dispatched this role for an existing `kind:spec + agent:hermes-intake + status:proposed` issue (issue context in header).
+
+**Action**:
+1. Re-read the issue body (the Spec draft created in Phase A.5) + Discord thread + RLM snapshots. (Stateless — never trust prior invocation's memory.)
+2. Call `rlm append-business-model --body "..."` — persists business-model snapshot to `.rlm/business/business-model-YYYY-MM-DD.md`.
+3. If deployment constraints were probed: `rlm append-deployment-constraints --body "..."`.
+4. Update the existing issue body with the full canonical Spec (via `gh issue edit --body "..."`) to include the RLM file references in the frontmatter.
+5. Emit `{"kind": "intake-complete", ...}` JSON envelope (see Output contract below). sweet-home will flip labels to `agent:hermes-design` and chain into decompose-spec.
 
 ---
 
@@ -198,17 +265,20 @@ If you call `commit-spec` and an existing Issue with same `signal_ref` is alread
 
 ## Access boundaries (intake-domain skill, per ADR-0009)
 
-| Resource | Phase A | Phase B |
-|---|:-:|:-:|
-| Discord (read + post) | ✅ | ✅ |
-| Signal Issue (read) | ✅ | ✅ |
-| RLM `.rlm/business/` (read) | ✅ | ✅ |
-| `rlm append-business-model` | ❌ | ✅ |
-| `rlm append-deployment-constraints` | ❌ | ✅ |
-| `rlm commit-spec` | ❌ | ✅ |
-| `rlm confirm-spec` (via `intake-confirmation` chain) | ❌ | ✅ (chained) |
-| Code | ❌ | ❌ |
-| GitHub PR | ❌ | ❌ |
+| Resource | Phase A | Phase A.5 | Phase B |
+|---|:-:|:-:|:-:|
+| Discord (read + post) | ✅ | ✅ | ❌ |
+| Signal Issue (read) | ✅ | ✅ | ✅ |
+| RLM `.rlm/business/` (read) | ✅ | ✅ | ✅ |
+| `~/.hermes/agent-team.env` (read) | ❌ | ✅ | ❌ |
+| `gh issue create` (target repo) | ❌ | ✅ | ❌ |
+| `gh issue edit` (update body) | ❌ | ❌ | ✅ |
+| `rlm append-business-model` | ❌ | ❌ | ✅ |
+| `rlm append-deployment-constraints` | ❌ | ❌ | ✅ |
+| `rlm commit-spec` | ❌ | ❌ | ❌ (issue already exists) |
+| `rlm confirm-spec` (via `intake-confirmation`) | ❌ | ❌ | ✅ (chained) |
+| Code | ❌ | ❌ | ❌ |
+| GitHub PR | ❌ | ❌ | ❌ |
 
 Intake-domain rule: **no code access ever** (per ADR-0009). This skill writes business / Spec content based on Discord + RLM, not by reading code.
 
@@ -296,7 +366,7 @@ Phase B: brief, clean. "Spec confirmed: #N. 進 design mode." No celebration, no
 ## Output contract — final assistant message JSON envelope
 
 This skill runs as the `hermes-intake` role under sweet-home's workflow
-engine (see `D:/darfts/agent-team.workflow.yaml`, `on_result.hermes-intake.*`).
+engine (see `agent-team/agent-team.workflow.yaml`, `on_result.hermes-intake.*`).
 The runtime parses the **last assistant message** as JSON to drive label
 transitions, child-issue creation, and Discord routing. Your final response
 **must end with** a JSON object matching one of the `kind` variants below.
