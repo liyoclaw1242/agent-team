@@ -37,14 +37,31 @@ entry:
   poll:
     interval_sec: 30
     max_in_flight: 1
-    # v1: hardcode the agent-team repo + local clone. Phase 2 reads from
-    # sweet-home's repo registry (`agent-sweet-home registry list --json`).
+    # v1: hardcode the agent-team repo + local clone via a sibling JSON
+    # file. Phase 2 reads from sweet-home's repo registry.
+    #
+    # IMPORTANT — two YAML gotchas discovered during dogfood:
+    #
+    #   (a) `repo_source.command` must NOT contain literal `{` `}`. The
+    #       runtime's `render_template` treats every `{...}` as a template
+    #       variable placeholder and errors when the contents aren't a
+    #       known variable name (the entry-mode source commands recognize
+    #       only `{repo}` and `{issue_number}`). Inlining JSON via `echo`
+    #       triggers this because JSON itself uses braces. Source from a
+    #       file instead — `cat <file>.json` has no curly braces in the
+    #       command itself.
+    #
+    #   (b) `issue_source.command` must be a SINGLE physical line. The
+    #       runtime executes via `sh -c "<rendered>"`; YAML's `|` block
+    #       scalar preserves newlines which `sh` interprets as statement
+    #       separators, so a multi-line `gh issue list --repo {repo} \n
+    #       --json ...` runs the first line as one command and treats the
+    #       continuation as a separate command (typically "--json: command
+    #       not found"). Use `>` (folded) or inline the whole command.
     repo_source:
-      command: 'echo ''[{"repo":"liyoclaw1242/agent-team","path":"D:/darfts"}]'''
+      command: "cat /d/darfts/.workflow-repos.json"
     issue_source:
-      command: |
-        gh issue list --repo {repo} --state open
-          --json number,title,body,labels,state --limit 200
+      command: "gh issue list --repo {repo} --state open --json number,title,body,labels,state --limit 200"
 
 # -----------------------------------------------------------------------------
 # Shared templates — Jinja fragments referenced via `body_template: __shared.<name>`.
