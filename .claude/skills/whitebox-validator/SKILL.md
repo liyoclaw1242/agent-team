@@ -201,8 +201,18 @@ Anti-pattern: "I noticed that this could potentially have an issue with…" → 
 
 ## Output contract — final assistant message JSON envelope
 
+> ⚠️ **CRITICAL — READ BEFORE FINISHING**
+>
+> Sub-skill outputs (`code-review`, `stress-test`) are **inputs to you**, not
+> your output. After every sub-skill completes, you **must write your own
+> final reply** containing the `{"kind": "approved" / "rejected"}` JSON below.
+> If your last message is the sub-skill's JSON (e.g. `{"skill":"code-review",...}`),
+> the runtime cannot parse your verdict and routes to Arbiter.
+> **Always end with your own JSON envelope — never let a sub-skill's output
+> be your final message.**
+
 This skill runs as the `whitebox-validator` role under sweet-home's workflow
-engine (see `D:/darfts/agent-team.workflow.yaml`,
+engine (see `agent-team/agent-team.workflow.yaml`,
 `on_result.whitebox-validator.*`). The runtime parses the **last assistant
 message** as JSON to post the verdict comment and flip the label to either
 `agent:blackbox-validator` (approved) or `agent:arbiter` (rejected). Your
