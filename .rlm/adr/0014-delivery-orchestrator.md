@@ -104,7 +104,7 @@ Notably:
 
 ### What changed
 
-The original ADR specified DeliveryOrchestrator as **a cron-triggered Python orchestration script** that, within one cron tick, holds the global Worker lock and chains `claude -p` invocations sequentially (Worker → Validators → Arbiter as needed). Under Path B, that script is **replaced wholesale** by [agent-sweet-home](https://github.com/liyoclaw1242/agent-sweet-home)'s declarative workflow engine, configured by `D:/darfts/agent-team.workflow.yaml`.
+The original ADR specified DeliveryOrchestrator as **a cron-triggered Python orchestration script** that, within one cron tick, holds the global Worker lock and chains `claude -p` invocations sequentially (Worker → Validators → Arbiter as needed). Under Path B, that script is **replaced wholesale** by [agent-sweet-home](https://github.com/liyoclaw1242/agent-sweet-home)'s declarative workflow engine, configured by `agent-team/agent-team.workflow.yaml`.
 
 The orchestration **responsibilities** specified in the original ADR are preserved — they're just executed by sweet-home's runtime instead of bespoke Python. The mapping:
 
@@ -153,9 +153,51 @@ The original ADR's access table for DeliveryOrchestrator (Code R: ❌, Code W: �
 
 ### See
 
-- `D:/darfts/agent-team.workflow.yaml` — full v1 dispatcher configuration; ~530 lines
-- `D:/agent-sweet-home/WORKFLOW.md` — schema reference (some sections outdated; Phase 1.5 status table predates runtime completion — runtime is actually implemented; verified by `cargo test` and our smoke test)
-- `D:/agent-sweet-home/src-tauri/src/workflow/` — Rust source for the runtime
+- `agent-team/agent-team.workflow.yaml` — full v1 dispatcher configuration; ~530 lines
+- `agent-sweet-home/src-tauri/src/workflow/` — Rust source for the runtime
 - ADR-0008 amendment (same date) — Hermes split into daemon + workflow-spawned skills
 - ADR-0011 amendment (same date) — events store now sweet-home SQLite
 - ADR-0017 (unchanged) — Arbiter contract still applies, just runs as a workflow role
+
+---
+
+## Dogfood validation — 2026-05-12 (Mac, end-to-end happy path)
+
+**Verdict: Path B confirmed working end-to-end on Mac.**
+
+Test repo: `liyoclaw1242/todo-20260512`, WP Issue #1 — `[WP] Add GET /todos endpoint returning {todos: []}`.
+
+### Observed sequence
+
+| Stage | Outcome | Cost | Duration | Notes |
+|---|---|---|---|---|
+| Worker | ✅ delivered | $0.33 | ~110s | Branch `spawn-1-1778577551`, commit `e3b376b` `[ac1] add GET /todos endpoint returning empty array`. RGR cycle: failing test → green → fact commit → JSON envelope emitted. |
+| WhiteBox | ✅ approved | $0.27 | ~101s | `code-review` sub-skill. One note (url exact-match `/todos?foo` → 404) flagged as out-of-scope for this WP. |
+| BlackBox | ⚠️ rejected (v1 known limit) | $0.27 | ~101s | `api-contract-test`. Rejected because no sandbox server running on localhost. v1 BlackBox does not auto-start the server before probing. |
+| PR #2 | ✅ merged manually | — | — | Merged after WhiteBox approval per §9(d) workaround. Commit `ed4b06bd`. |
+
+**Total cost: ~$0.87. Total wallclock: ~15 min** (including Rust incremental recompile).
+
+### Bugs observed during Mac run
+
+| # | Symptom | Root cause | Status |
+|---|---|---|---|
+| 1 | `on_result.whitebox-validator.approved` dispatch error: `agent:hermes-intake` not found | `on_no_structured_output.remove_labels` tries to remove all `agent:*` labels atomically; fires as a fallback even after a successful `on_result` handler when the quarantine path is triggered | Known v1 limitation — does not block happy path; `on_result` transitions still applied correctly |
+| 2 | `quarantine failed: 'human-review' not found` | quarantine tries to add `human-review` label which doesn't exist on the repo | Non-blocking; quarantine path is the error-degrade path, not the happy path |
+| 3 | BlackBox `rejected-implementation-defect` (false negative) | v1 BlackBox SKILL.md expects a running sandbox server at localhost; no server auto-started | Documented in §9(d). Phase 2 fix: add `run_command: [...]` pre-blackbox step to start the server, or deploy to preview URL |
+| 4 | BlackBox first attempt hit `on_no_structured_output` before a successful second attempt | Prose-before-fence parsing issue intermittent | `strip_json_fence` patch (`dd5407f`) mostly resolves this; occasional miss still occurs |
+
+### What this validates
+
+- **Worker → WhiteBox full cycle works.** The declarative label state machine advances correctly through the happy path without human intervention.
+- **JSON envelope discipline works.** Worker emitted the exact `{kind: "delivered", branch: "...", fact_commits: [...]}` shape; `on_result.worker.delivered` parsed and acted on it correctly.
+- **Worktree isolation works.** Sweet-home carved `spawn-1-1778577551`, Worker committed inside it, PR was opened against `main`, worktree was torn down.
+- **`strip_json_fence` patch is effective.** Worker output (prose + fence) was parsed correctly on this run.
+- **Mac `claude` shim works without `CLAUDE_BINARY` override.** No Windows-specific workaround needed.
+
+### Phase 2 items surfaced by this run
+
+1. **BlackBox sandbox auto-start** — add a `pre_spawn` `run_command` step for `whitebox-validator → blackbox-validator` transition that starts `pnpm dev` (or `wrangler dev`) in the worktree and writes the localhost URL to the issue body for BlackBox to read.
+2. **`on_no_structured_output` atomic label removal** — replace the 5-label atomic `gh issue edit` with individual `--remove-label` calls (or filter to only labels currently present on the issue).
+3. **`mark-delivered` auto-wiring** — GitHub Actions webhook on PR merge to call `rlm mark-delivered <wp-num>` automatically.
+4. **Next milestone: connect Hermes** — wire the full signal → spec → WP → dispatch → deliver cycle so intake flows from Discord rather than manually-created issues.

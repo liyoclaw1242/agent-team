@@ -75,7 +75,7 @@ This is a real reduction in enforcement strength vs the original ADR. We accept 
 
 ### See
 
-- `D:/agent-sweet-home/src-tauri/src/one_shot.rs` — `one_shot_log_lines` table schema
-- `D:/agent-sweet-home/README.md` — `GET /one-shot/{id}/log?since=<seq>&limit=<n>` HTTP endpoint
+- `agent-sweet-home/src-tauri/src/one_shot.rs` — `one_shot_log_lines` table schema
+- `agent-sweet-home/README.md` — `GET /one-shot/{id}/log?since=<seq>&limit=<n>` HTTP endpoint
 - ADR-0014 amendment (same date) — workflow runtime adoption
 - ADR-0012 (unchanged) — Supervision purity invariant

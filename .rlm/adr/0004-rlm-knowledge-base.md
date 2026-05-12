@@ -15,8 +15,8 @@ Lifecycle flows via `status:` labels (`draft → confirmed / approved → in_pro
 **Knowledge documents (no lifecycle — stored as markdown in repo):**
 
 ```
-D:\darfts\
-├── .rlm\                     RLM root (knowledge base; CLI reads/writes here)
+agent-team/
+├── .rlm/                     RLM root (knowledge base; CLI reads/writes here)
 │   ├── CONTEXT-MAP.md
 │   ├── bc\{bc}\CONTEXT.md
 │   ├── adr\                  decisions

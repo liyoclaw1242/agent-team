@@ -59,7 +59,7 @@ entry:
     #       continuation as a separate command (typically "--json: command
     #       not found"). Use `>` (folded) or inline the whole command.
     repo_source:
-      command: "cat /d/darfts/.workflow-repos.json"
+      command: "cat /Users/liyoclaw/Projects/agent-team/.workflow-repos.json"
     issue_source:
       command: "gh issue list --repo {repo} --state open --json number,title,body,labels,state --limit 200"
 
@@ -152,7 +152,7 @@ shared_templates:
 
 # -----------------------------------------------------------------------------
 # Roles — one per agent class. system_prompt_file paths are relative to
-# THIS YAML's directory (D:/darfts/agent-team.workflow.yaml → D:/darfts/).
+# THIS YAML's directory (/Users/liyoclaw/Projects/agent-team/agent-team.workflow.yaml → /Users/liyoclaw/Projects/agent-team/).
 # add_dirs values support `{repo_path}` substitution at spawn time.
 # -----------------------------------------------------------------------------
 roles:
@@ -459,6 +459,15 @@ on_result:
       - remove_labels: ["agent:hermes-design"]
       - transition_status: { from: in-progress, to: approved }
       - add_labels: ["awaiting-wp-completion"]
+      - run_command:
+          argv: ["rlm", "enqueue-message",
+                 "--kind=design-approval-needed",
+                 "--parent-issue={{ issue.number }}",
+                 "--body", "{{ _last_iter_results | length }} WP(s) ready for approval on Spec #{{ issue.number }}. Reply 'approve all' or 'approve N' in Discord."]
+          bind_exit: enqueue_exit
+      - if: "enqueue_exit != '0'"
+        steps:
+          - comment: "⚠️ rlm enqueue-message (design-approval-needed) failed; manual Discord poke needed."
 
   # Design needs clarification — re-route via design-dialogue back to user.
   - role: hermes-design

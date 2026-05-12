@@ -99,7 +99,7 @@ The original ADR placed **all** Hermes responsibilities (Discord I/O **+** every
    - Drain the outbound queue (per ADR-0015 — `outbound:*`-labelled comments + `type:supervision-alert` issues) and post to Discord.
    - Flip `agent:hermes-intake` / `agent:hermes-design` / `agent:human-help` labels per Discord-side state transitions (user said "yes" → flip blocked → proposed; user typed a new question → keep on human-help; etc.).
 
-2. **Hermes intake & design SKILLS (new home)** — every Hermes skill listed in the v1 outline (`business-model-probe`, `signal-to-spec`, `decompose-spec`, `compute-impact-scope`, `select-deployment-strategy`, `draft-adr`, `draft-contract`, `intake-confirmation`, `design-approval`, `design-dialogue`) is now spawned by **agent-sweet-home's workflow engine** as the `hermes-intake` and `hermes-design` roles defined in `D:/darfts/agent-team.workflow.yaml`. Each invocation is a separate `claude -p` subprocess gated by `agent:hermes-intake` / `agent:hermes-design` labels on the relevant Issue.
+2. **Hermes intake & design SKILLS (new home)** — every Hermes skill listed in the v1 outline (`business-model-probe`, `signal-to-spec`, `decompose-spec`, `compute-impact-scope`, `select-deployment-strategy`, `draft-adr`, `draft-contract`, `intake-confirmation`, `design-approval`, `design-dialogue`) is now spawned by **agent-sweet-home's workflow engine** as the `hermes-intake` and `hermes-design` roles defined in `agent-team/agent-team.workflow.yaml`. Each invocation is a separate `claude -p` subprocess gated by `agent:hermes-intake` / `agent:hermes-design` labels on the relevant Issue.
 
 The two layers communicate **only through GitHub Issue state** (labels + body + comments) — there is no direct Hermes-daemon ↔ workflow IPC. This is deliberate: the daemon-side Discord work and the LLM-side design work proceed at very different cadences and need decoupling.
 
@@ -128,6 +128,6 @@ The two layers communicate **only through GitHub Issue state** (labels + body + 
 
 ### See
 
-- `D:/darfts/agent-team.workflow.yaml` — roles `hermes-intake` and `hermes-design`, their `system_prompt_file` paths, `add_dirs`, `allowed_tools`, and the `on_result.hermes-*.kind:*` handlers
+- `agent-team/agent-team.workflow.yaml` — roles `hermes-intake` and `hermes-design`, their `system_prompt_file` paths, `add_dirs`, `allowed_tools`, and the `on_result.hermes-*.kind:*` handlers
 - ADR-0011 amendment (same date) — events store change
 - ADR-0014 amendment (same date) — DeliveryOrchestrator now = sweet-home workflow runtime
