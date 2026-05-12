@@ -26,9 +26,7 @@ def get_client(url: str | None = None) -> Any | None:
     try:
         import redis as redis_pkg
 
-        client = redis_pkg.Redis.from_url(
-            target, socket_connect_timeout=1, socket_timeout=1
-        )
+        client = redis_pkg.Redis.from_url(target, socket_connect_timeout=1, socket_timeout=1)
         client.ping()
         return client
     except Exception:

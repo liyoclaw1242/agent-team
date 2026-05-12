@@ -35,6 +35,5 @@ def cmd(
 ) -> None:
     """Push branch + open PR + comment on WP Issue. Caller: worker."""
     raise NotImplementedError(
-        "open-pr not yet implemented; "
-        "see .rlm/contracts/rlm-cli.md § Detailed: open-pr"
+        "open-pr not yet implemented; see .rlm/contracts/rlm-cli.md § Detailed: open-pr"
     )

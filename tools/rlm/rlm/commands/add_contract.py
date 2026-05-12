@@ -35,6 +35,5 @@ def cmd(
 ) -> None:
     """Open a PR adding a new contract file. Caller: hermes-design only."""
     raise NotImplementedError(
-        "add-contract not yet implemented; "
-        "see .rlm/contracts/rlm-cli.md § Detailed: add-contract"
+        "add-contract not yet implemented; see .rlm/contracts/rlm-cli.md § Detailed: add-contract"
     )

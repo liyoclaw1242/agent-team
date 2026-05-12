@@ -37,6 +37,5 @@ def cmd(
 ) -> None:
     """Write a new fact file on the current branch (no push). Caller: worker only."""
     raise NotImplementedError(
-        "append-fact not yet implemented; "
-        "see .rlm/contracts/rlm-cli.md § Detailed: append-fact"
+        "append-fact not yet implemented; see .rlm/contracts/rlm-cli.md § Detailed: append-fact"
     )

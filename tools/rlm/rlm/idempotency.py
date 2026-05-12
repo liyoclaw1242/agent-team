@@ -60,9 +60,7 @@ class IdempotencyCache:
             )
             """
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency(created_at_unix)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency(created_at_unix)")
         return conn
 
     @staticmethod
