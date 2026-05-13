@@ -441,6 +441,50 @@
   @media (max-width: 900px) {
     .sidebar { display: none; }
   }
+
+  /* Skills panel — appears after phase dividers */
+  .skill-panel {
+    margin: 0 24px 16px;
+    padding: 10px 14px;
+    background: #1e2128;
+    border: 1px solid #2c2d30;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .skill-panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9a9b9d;
+    margin-bottom: 4px;
+  }
+  .skill-pill {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+  .skill-pill-name {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 11.5px;
+    color: #c39bd3;
+    background: #c39bd322;
+    border: 1px solid #c39bd344;
+    border-radius: 4px;
+    padding: 1px 7px;
+    flex-shrink: 0;
+  }
+  .skill-pill-name.intake { color: #2bac76; background: #2bac7622; border-color: #2bac7644; }
+  .skill-pill-name.delivery { color: #ecb22e; background: #ecb22e22; border-color: #ecb22e44; }
+  .skill-pill-name.validator { color: #36c5f0; background: #36c5f022; border-color: #36c5f044; }
+  .skill-pill-desc {
+    color: #9a9b9d;
+    font-size: 12px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
@@ -609,6 +653,14 @@
         <div class="line"></div>
       </div>
 
+      <div class="skill-panel">
+        <div class="skill-panel-title">&#9889; Phase 1 Skills &#8212; Intake</div>
+        <div class="skill-pill"><span class="skill-pill-name intake">signal-to-spec</span><span class="skill-pill-desc">Discord &#20449;&#34399; &#8594; Spec &#33609;&#31295;&#65307;Phase A &#25552;&#26696; + Phase A.5 &#24314; GitHub Issue</span></div>
+        <div class="skill-pill"><span class="skill-pill-name intake">business-model-probe</span><span class="skill-pill-desc">&#32080;&#27083;&#21270;&#23565;&#35441;&#25317;&#25844;&#21830;&#26989;&#20551;&#35373;&#65288;wedge / &#30446;&#27161;&#29992;&#25143; / &#29694;&#29366;&#65289;</span></div>
+        <div class="skill-pill"><span class="skill-pill-name intake">intake-confirmation</span><span class="skill-pill-desc">&#20154;&#39006;&#30906;&#35469; Spec &#33609;&#31295;&#30340; cross-domain gate</span></div>
+        <div class="skill-pill"><span class="skill-pill-name intake">deployment-constraints-probe</span><span class="skill-pill-desc">&#24478;&#23565;&#35441;&#25552;&#21462;&#37096;&#32626;&#38480;&#21046;&#65288;&#39340;&#31639; / &#22320;&#21312; / vendor&#65289;</span></div>
+      </div>
+
       <div class="phase-chain">
         <strong>&#37390;&#36335;:</strong>
         liyo &#22312; sweet-home Persistent tab &#36664;&#20837; <span class="skill">/signal-to-spec</span>
@@ -736,6 +788,15 @@
         <div class="line"></div>
       </div>
 
+      <div class="skill-panel">
+        <div class="skill-panel-title">&#9889; Phase 2 Skills &#8212; Design</div>
+        <div class="skill-pill"><span class="skill-pill-name">decompose-spec</span><span class="skill-pill-desc">&#25226; Spec &#25320;&#25104;&#22402;&#30452;&#20999;&#29255; WorkPackages&#65292;&#21547; AC &#21644; impact_scope</span></div>
+        <div class="skill-pill"><span class="skill-pill-name">select-deployment-strategy</span><span class="skill-pill-desc">&#36984;&#25321;&#37096;&#32626;&#31574;&#30053;&#65288;&#26412;&#23526;&#39443;: Tauri 2 + SQLite&#65289;</span></div>
+        <div class="skill-pill"><span class="skill-pill-name">compute-impact-scope</span><span class="skill-pill-desc">&#35336;&#31639;&#27599;&#20491; WP &#30340;&#24433;&#38911;&#31684;&#22260;&#21644;&#35199;&#38443;&#24230;</span></div>
+        <div class="skill-pill"><span class="skill-pill-name">design-approval</span><span class="skill-pill-desc">&#20154;&#39006;&#23457;&#26680; WP breakdown &#30340; gate</span></div>
+        <div class="skill-pill"><span class="skill-pill-name">design-dialogue</span><span class="skill-pill-desc">&#35373;&#35336;&#38568;&#27uan;&#38656;&#35201;&#20154;&#24037;&#36664;&#20837;&#26178;&#30340;&#21839;&#31572;&#26083;&#25509;&#21327;&#35758;</span></div>
+      </div>
+
       <div class="phase-chain">
         <strong>&#37390;&#36335;:</strong>
         liyo &#24320;&#26032; Persistent tab &#8594; <span class="skill">/decompose-spec</span>
@@ -847,6 +908,16 @@
         <div class="line"></div>
         <div class="label">Phase 3 &#2014; Delivery: Worker &#8594; WhiteBox &#8594; BlackBox</div>
         <div class="line"></div>
+      </div>
+
+      <div class="skill-panel">
+        <div class="skill-panel-title">&#9889; Phase 3 Skills &#8212; Delivery</div>
+        <div class="skill-pill"><span class="skill-pill-name delivery">tdd-loop</span><span class="skill-pill-desc">Worker &#30340; TDD &#20027;&#24490;&#29615;&#65292;&#20461;&#27979;&#26632;&#24460;&#20998;&#27966;&#23376; skill&#65288;red&#8594;green&#8594;refactor&#65289;</span></div>
+        <div class="skill-pill"><span class="skill-pill-name delivery">vitest-test-first</span><span class="skill-pill-desc">TypeScript / React &#30340; Testing Trophy TDD &#23376; skill</span></div>
+        <div class="skill-pill"><span class="skill-pill-name validator">whitebox-validator</span><span class="skill-pill-desc">&#35501; PR diff&#65292;&#25353; AC &#20570; code review&#65292;&#36664;&#20986; {"kind":"approved/rejected"}</span></div>
+        <div class="skill-pill"><span class="skill-pill-name validator">blackbox-validator</span><span class="skill-pill-desc">&#40657;&#31665;&#39544;&#35388;&#65306;pnpm verify + curl sandbox&#65292;&#19981;&#30475; source code</span></div>
+        <div class="skill-pill"><span class="skill-pill-name validator">api-contract-test</span><span class="skill-pill-desc">HTTP API &#31471;&#23565;&#31471;&#39544;&#35388;&#65288;blackbox &#23376; skill&#65289;</span></div>
+        <div class="skill-pill"><span class="skill-pill-name">arbiter</span><span class="skill-pill-desc">&#20219;&#20309; agent &#22833;&#25215;&#26178;&#30340;&#24674;&#24489; agent&#65306;retry / escalate / cancel</span></div>
       </div>
 
       <div class="phase-chain">
