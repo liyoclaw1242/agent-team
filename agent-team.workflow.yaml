@@ -594,13 +594,17 @@ on_result:
       - if: "out.retry_stage == 'worker'"
         steps:
           - add_labels: ["agent:worker"]
+          # Worker dispatch rule requires status:approved — reset from delivered.
+          - transition_status: { to: approved }
         elif:
           - elif: "out.retry_stage == 'white-box'"
             steps:
               - add_labels: ["agent:validator"]
+              # WhiteBox dispatch rule requires status:delivered — already set.
           - elif: "out.retry_stage == 'black-box'"
             steps:
               - add_labels: ["agent:blackbox-validator"]
+              # BlackBox dispatch rule requires status:delivered — already set.
       # Retry counter bump — Arbiter computes the new N in its output.
       - set_body_marker:
           retry-white-box: "{{ out.new_retry_counts.white_box | default('0') }}"
