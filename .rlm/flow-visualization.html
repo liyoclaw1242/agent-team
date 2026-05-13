@@ -485,6 +485,20 @@
     font-size: 12px;
     line-height: 1.4;
   }
+  .skill-panel-role-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: #616061;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #2c2d30;
+  }
+  .skill-panel-role-header:first-of-type {
+    margin-top: 2px;
+    border-top: none;
+  }
 </style>
 </head>
 <body>
@@ -654,12 +668,13 @@
       </div>
 
       <div class="skill-panel">
-        <div class="skill-panel-title">&#9889; Phase 1 Skills &#8212; Intake</div>
-        <div class="skill-pill"><span class="skill-pill-name intake">signal-to-spec</span><span class="skill-pill-desc">Discord &#20449;&#34399; &#8594; Spec &#33609;&#31295;&#65307;Phase A &#25552;&#26696; + Phase A.5 &#24314; GitHub Issue</span></div>
-        <div class="skill-pill"><span class="skill-pill-name intake">business-model-probe</span><span class="skill-pill-desc">&#32080;&#27083;&#21270;&#23565;&#35441;&#25317;&#25844;&#21830;&#26989;&#20551;&#35373;&#65288;wedge / &#30446;&#27161;&#29992;&#25143; / &#29694;&#29366;&#65289;</span></div>
-        <div class="skill-pill"><span class="skill-pill-name intake">intake-confirmation</span><span class="skill-pill-desc">&#20154;&#39006;&#30906;&#35469; Spec &#33609;&#31295;&#30340; cross-domain gate</span></div>
-        <div class="skill-pill"><span class="skill-pill-name intake">deployment-constraints-probe</span><span class="skill-pill-desc">&#24478;&#23565;&#35441;&#25552;&#21462;&#37096;&#32626;&#38480;&#21046;&#65288;&#39340;&#31639; / &#22320;&#21312; / vendor&#65289;</span></div>
-      </div>
+  <div class="skill-panel-title">⚡ Phase 1 Skills — Intake (hermes-intake role)</div>
+  <div class="skill-pill"><span class="skill-pill-name intake">signal-to-spec</span><span class="skill-pill-desc">主 skill：Discord 信號 → Spec 草稿；Phase A 提案 + Phase A.5 建 GitHub Issue + Phase B RLM 寫入</span></div>
+  <div class="skill-pill"><span class="skill-pill-name intake">business-model-probe</span><span class="skill-pill-desc">結構化對話挖掘商業假設（wedge / 目標用戶 / 現狀 / 競品）</span></div>
+  <div class="skill-pill"><span class="skill-pill-name intake">deployment-constraints-probe</span><span class="skill-pill-desc">從對話提取部署限制（預算 / 地區 / vendor / 合規）</span></div>
+  <div class="skill-pill"><span class="skill-pill-name intake">production-monitor</span><span class="skill-pill-desc">Cron 輪詢外部 metrics，閾值觸發時建 signal Issue</span></div>
+  <div class="skill-pill"><span class="skill-pill-name intake">intake-confirmation</span><span class="skill-pill-desc">跨域 gate：讀取人類 yes/edit/no 回覆，確認後呼叫 rlm confirm-spec</span></div>
+</div>
 
       <div class="phase-chain">
         <strong>&#37390;&#36335;:</strong>
@@ -789,13 +804,15 @@
       </div>
 
       <div class="skill-panel">
-        <div class="skill-panel-title">&#9889; Phase 2 Skills &#8212; Design</div>
-        <div class="skill-pill"><span class="skill-pill-name">decompose-spec</span><span class="skill-pill-desc">&#25226; Spec &#25320;&#25104;&#22402;&#30452;&#20999;&#29255; WorkPackages&#65292;&#21547; AC &#21644; impact_scope</span></div>
-        <div class="skill-pill"><span class="skill-pill-name">select-deployment-strategy</span><span class="skill-pill-desc">&#36984;&#25321;&#37096;&#32626;&#31574;&#30053;&#65288;&#26412;&#23526;&#39443;: Tauri 2 + SQLite&#65289;</span></div>
-        <div class="skill-pill"><span class="skill-pill-name">compute-impact-scope</span><span class="skill-pill-desc">&#35336;&#31639;&#27599;&#20491; WP &#30340;&#24433;&#38911;&#31684;&#22260;&#21644;&#35199;&#38443;&#24230;</span></div>
-        <div class="skill-pill"><span class="skill-pill-name">design-approval</span><span class="skill-pill-desc">&#20154;&#39006;&#23457;&#26680; WP breakdown &#30340; gate</span></div>
-        <div class="skill-pill"><span class="skill-pill-name">design-dialogue</span><span class="skill-pill-desc">&#35373;&#35336;&#38568;&#27uan;&#38656;&#35201;&#20154;&#24037;&#36664;&#20837;&#26178;&#30340;&#21839;&#31572;&#26083;&#25509;&#21327;&#35758;</span></div>
-      </div>
+  <div class="skill-panel-title">⚡ Phase 2 Skills — Design (hermes-design role)</div>
+  <div class="skill-pill"><span class="skill-pill-name">decompose-spec</span><span class="skill-pill-desc">主 skill：把 Spec 拆成垂直切片 WorkPackages，含 AC / impact_scope / deps DAG</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">compute-impact-scope</span><span class="skill-pill-desc">計算每個 WP 的影響範圍（files / 複雜度 / 外部系統）</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">select-deployment-strategy</span><span class="skill-pill-desc">分析限制後選擇部署棧（Vercel / Cloudflare / Tauri / Go…），產出 ADR</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">draft-adr</span><span class="skill-pill-desc">撰寫 ADR（不可逆 + 有背景 + 真正的取捨），開 PR 送審</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">draft-contract</span><span class="skill-pill-desc">WP 引入新公開介面時，建立 .rlm/contracts/ 合約文件</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">design-dialogue</span><span class="skill-pill-desc">設計中途需要人工決策時，發 decision-brief 到 Discord 並等待回覆</span></div>
+  <div class="skill-pill"><span class="skill-pill-name">design-approval</span><span class="skill-pill-desc">跨域 gate：讀取人類 approve/hold 回覆，呼叫 rlm approve-workpackage</span></div>
+</div>
 
       <div class="phase-chain">
         <strong>&#37390;&#36335;:</strong>
@@ -911,14 +928,33 @@
       </div>
 
       <div class="skill-panel">
-        <div class="skill-panel-title">&#9889; Phase 3 Skills &#8212; Delivery</div>
-        <div class="skill-pill"><span class="skill-pill-name delivery">tdd-loop</span><span class="skill-pill-desc">Worker &#30340; TDD &#20027;&#24490;&#29615;&#65292;&#20461;&#27979;&#26632;&#24460;&#20998;&#27966;&#23376; skill&#65288;red&#8594;green&#8594;refactor&#65289;</span></div>
-        <div class="skill-pill"><span class="skill-pill-name delivery">vitest-test-first</span><span class="skill-pill-desc">TypeScript / React &#30340; Testing Trophy TDD &#23376; skill</span></div>
-        <div class="skill-pill"><span class="skill-pill-name validator">whitebox-validator</span><span class="skill-pill-desc">&#35501; PR diff&#65292;&#25353; AC &#20570; code review&#65292;&#36664;&#20986; {"kind":"approved/rejected"}</span></div>
-        <div class="skill-pill"><span class="skill-pill-name validator">blackbox-validator</span><span class="skill-pill-desc">&#40657;&#31665;&#39544;&#35388;&#65306;pnpm verify + curl sandbox&#65292;&#19981;&#30475; source code</span></div>
-        <div class="skill-pill"><span class="skill-pill-name validator">api-contract-test</span><span class="skill-pill-desc">HTTP API &#31471;&#23565;&#31471;&#39544;&#35388;&#65288;blackbox &#23376; skill&#65289;</span></div>
-        <div class="skill-pill"><span class="skill-pill-name">arbiter</span><span class="skill-pill-desc">&#20219;&#20309; agent &#22833;&#25215;&#26178;&#30340;&#24674;&#24489; agent&#65306;retry / escalate / cancel</span></div>
-      </div>
+  <div class="skill-panel-title">⚡ Phase 3 Skills — Delivery</div>
+
+  <div class="skill-panel-role-header">Worker</div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">tdd-loop</span><span class="skill-pill-desc">主 skill：偵測棧後分派 TDD 子 skill，執行 red→green→refactor 循環</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">vitest-test-first</span><span class="skill-pill-desc">TypeScript / React / Next.js — Testing Trophy (Vitest + Testing Library)</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">xunit-test-first</span><span class="skill-pill-desc">C# / .NET — xUnit + WebApplicationFactory + Detroit-style integration tests</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">gotest-table-driven</span><span class="skill-pill-desc">Go — stdlib testing + table-driven + hand-rolled fakes，Detroit school</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">playwright-test-first</span><span class="skill-pill-desc">E2E 瀏覽器測試，Worker RGR 循環中驅動關鍵 user journey</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">error-handling-go</span><span class="skill-pill-desc">Go 錯誤處理規範：%w 包裝 / errors.Is / errors.As，跨 package boundary</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">scaffold-nextjs</span><span class="skill-pill-desc">Next.js 14 App Router + Vercel + Drizzle + shadcn/ui + Vitest 腳手架</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">scaffold-cloudflare-worker</span><span class="skill-pill-desc">Cloudflare Workers + Hono + D1/KV + vitest-pool-workers 腳手架</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">scaffold-aspnet-minimal</span><span class="skill-pill-desc">.NET Minimal API + EF Core + xUnit + WebApplicationFactory 腳手架</span></div>
+  <div class="skill-pill"><span class="skill-pill-name delivery">scaffold-go-http</span><span class="skill-pill-desc">Go HTTP service + chi + slog + table-driven tests 腳手架（Ryer pattern）</span></div>
+
+  <div class="skill-panel-role-header">WhiteBox Validator</div>
+  <div class="skill-pill"><span class="skill-pill-name validator">whitebox-validator</span><span class="skill-pill-desc">主 skill：讀 PR diff，按 AC 做 code review，輸出 {kind:approved/rejected}</span></div>
+  <div class="skill-pill"><span class="skill-pill-name validator">code-review</span><span class="skill-pill-desc">結構化 code review：邏輯 / 型別 / 安全 / 邊界 / 慣例，分 severity</span></div>
+  <div class="skill-pill"><span class="skill-pill-name validator">stress-test</span><span class="skill-pill-desc">效能路徑分析：DB query plan / 熱路徑分配 / N+1 / 並發風險（大型 WP 才啟用）</span></div>
+
+  <div class="skill-panel-role-header">BlackBox Validator</div>
+  <div class="skill-pill"><span class="skill-pill-name validator">blackbox-validator</span><span class="skill-pill-desc">主 skill：黑箱驗證，只看 sandbox app + AC，不看 source code</span></div>
+  <div class="skill-pill"><span class="skill-pill-name validator">api-contract-test</span><span class="skill-pill-desc">HTTP API 端對端驗證：request/response shape / status code / auth</span></div>
+  <div class="skill-pill"><span class="skill-pill-name validator">e2e-browser-test</span><span class="skill-pill-desc">真實瀏覽器自動化：navigate / click / assert，UI flow AC 驗證</span></div>
+
+  <div class="skill-panel-role-header">Arbiter</div>
+  <div class="skill-pill"><span class="skill-pill-name">arbiter</span><span class="skill-pill-desc">任何 agent 失敗的恢復 agent：retry（重送）/ escalate（升級人類）/ cancel</span></div>
+</div>
 
       <div class="phase-chain">
         <strong>&#37390;&#36335;&#26631;&#31614; (WP #8: Scaffold Tauri 2):</strong>
