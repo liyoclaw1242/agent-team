@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V7 — 小型 bug fix 直接派工</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V7 · 快速通道</span>
+  <h1>小型 bug fix / 直接派工</h1>
+  <p class="tagline">issue 範圍小、不影響領域模型，跳過 arch-shape 直接派 executor。是合法的「快速通道」，但路由規則必須嚴謹，誤判會繞過 RLM 校準。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">issue 明確小範圍，無領域語意改動</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">executor (僅一個 spawn)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">跳過 Stage 5 (arch-shape 分解)，直接進 Stage 7</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p><code>project-rlm/</code> 已存在，業務代碼運作中。新進場的 issue 看起來不像「商業需求」，而是<strong>不影響領域模型</strong>的小型修改：</p>
+
+<ul class="tight">
+  <li>typo / log 訊息修正</li>
+  <li>視覺微調 (顏色、間距、文案)</li>
+  <li>缺漏的 null 檢查 / try-catch</li>
+  <li>明顯錯誤的條件邏輯 (off-by-one, 反向比較)</li>
+  <li>升級單一 dependency 版本 (修 CVE)</li>
+  <li>補測試覆蓋現有功能</li>
+</ul>
+
+<p>這些修改特徵：<strong>不引入新概念、不改變 entity 結構、不影響 user flow</strong>。</p>
+
+<h2>觸發條件 (路由判準)</h2>
+
+<p>workflow dispatcher 用一組保守判準辨識 V7。所有條件都要成立才走快速通道：</p>
+
+<table class="compact">
+  <thead>
+    <tr><th>檢查</th><th>必須是</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>issue body 是否有 <code>intake-kind: business</code>？</td><td>否</td></tr>
+    <tr><td>issue body 是否有 <code>intake-kind: bugfix</code> 或 <code>chore</code>？</td><td>是</td></tr>
+    <tr><td>是否引用 RLM context / story slug？</td><td>否</td></tr>
+    <tr><td>是否提到「新增」「設計」「重構」？</td><td>否</td></tr>
+    <tr><td>預期改動規模 (issue body 標 <code>scope</code>)？</td><td>≤ 1 file 或 ≤ 50 行</td></tr>
+    <tr><td>是否影響 schema / migration？</td><td>否</td></tr>
+  </tbody>
+</table>
+
+<p>任一條 fail → 不走 V7，落到主流程或 V8 (arch-judgment)。</p>
+
+<div class="callout callout-danger">
+  ❌ <strong>誤判風險</strong>　路由規則的<strong>預設行為應該是「走主流程」</strong>。V7 是優化，不是常規路徑。一個「typo 修正」的 issue 如果其實隱含 i18n 重構，繞過 arch-shape 就會錯失機會。<strong>有疑慮就走全流程</strong>。
+</div>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">issue 進場 (明確小範圍)</span>
+    <span class="badge github">issue #N</span>
+  </div>
+  <p>例：</p>
+  <pre>title: 修正登入頁面誤字「請輸入帳棕」應為「請輸入帳號」
+body:
+  &lt;!-- intake-kind: bugfix --&gt;
+  &lt;!-- scope: 1-file --&gt;
+
+  位置：src/pages/login.tsx 第 42 行
+  目前顯示「請輸入帳棕」應為「請輸入帳號」</pre>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">workflow 路由判定 V7</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>所有 V7 判準都成立</div>
+  <p>跳過 arch-shape，直接派 executor。</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:executor</span> <span class="gh-state">status:ready</span> <span class="gh-state">flow:fast-track</span></p>
+  <p><code>flow:fast-track</code> label 用來事後審計 — 知道哪些 PR 走了快速通道。</p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">executor 直接實作</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>沒有 RLM-grounded spec，但 issue body 本身包含足夠資訊 (檔案路徑 / 行號 / 預期結果)。executor 仍跑 sanity check：</p>
+  <div class="action action-executor">
+    <div class="action-label">V7 額外檢查</div>
+    <ul class="tight">
+      <li>實作改動是否真的限在宣稱的範圍？(實際 diff vs scope label)</li>
+      <li>有沒有「順手」想加的東西？(規則：不加)</li>
+      <li>修改是否引入新概念 / 新術語？(若是，立刻 escalate 為 V5 pushback，要求走主流程)</li>
+    </ul>
+  </div>
+  <p style="margin-top: 8px">這層自我約束很重要 — 「我來修 typo」不該變成「順便重構這整個 component」。</p>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">PR + review + merge</span>
+    <span class="badge github">PR</span>
+  </div>
+  <p>標準 PR 流程，但 review 重點不同：</p>
+  <ul class="tight">
+    <li>確認改動仍在宣稱的 scope</li>
+    <li>沒有偷渡領域邏輯改動</li>
+    <li>不需驗證對齊 RLM (沒有 spec → 沒有對齊對象)</li>
+  </ul>
+  <p style="margin-top: 8px">merged → issue 關閉。沒有 cascade unlock (因為沒有子任務)。</p>
+</div>
+
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>executor 發現 issue 比想像中複雜 (typo 其實牽涉 i18n)</td>
+      <td>scope 超過 V7 判準</td>
+      <td>executor 在 PR 開前發 escalate-to-main-flow comment → workflow 改派 arch-shape</td>
+    </tr>
+    <tr>
+      <td>使用者把商業需求標成 bugfix 想走快車道</td>
+      <td>繞過 arch-shape 校準</td>
+      <td>executor 看 issue body 發現有領域語意 → 同上 escalate</td>
+    </tr>
+    <tr>
+      <td>實作中發現需要改 schema 或 migration</td>
+      <td>違反 V7 判準</td>
+      <td>立刻 escalate；schema 變動絕對不該走 V7</td>
+    </tr>
+    <tr>
+      <td>多個 V7 改同一個 file 但意圖衝突</td>
+      <td>合併衝突 / 邏輯衝突</td>
+      <td>workflow 不允許同 file 並行 V7；後到的等前者 merge</td>
+    </tr>
+    <tr>
+      <td>累積很多 V7 之後才發現底層需要重構</td>
+      <td>tech debt</td>
+      <td>定期由人類審計 <code>flow:fast-track</code> PR，找重構機會 (不是 V7 的責任)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>V7 不接主流程 — 它是<strong>獨立完成</strong>的迷你迴圈。完成後沒有 cascade、沒有 parent issue 收尾、沒有 RLM 變更。</p>
+
+<p>但 V7 的<strong>升級路徑</strong>很重要：任何時候 executor 發現 scope 超出 V7 判準，必須立刻 escalate，回到主流程或 V5 pushback。這是防止 V7 被濫用的關鍵閥門。</p>
+
+<h2>為何這樣設計 (與為何要小心)</h2>
+
+<div class="callout callout-rationale">
+  <strong>不是所有改動都需要全流程</strong>　堅持每個 typo 都走 RLM 校準 + arch-shape 分解 + 子任務切分是<strong>過度結構化</strong>，會讓系統實際上不可用。V7 承認「有些事就是改一行就好」，但用嚴格判準把快車道限縮在最安全的場景。
+</div>
+
+<p>權衡的兩面：</p>
+
+<ul class="tight">
+  <li><strong>效率收益</strong>：小修不用走完整流程，能快速回應 typo / 視覺問題 / 緊急 hotfix</li>
+  <li><strong>校準損失</strong>：跳過 arch-shape = 跳過 RLM 對齊檢查；長期累積會讓 RLM 與代碼漂移</li>
+</ul>
+
+<p>因此設計上的紀律：</p>
+
+<ul class="tight">
+  <li><strong>路由規則保守</strong>：所有判準都要成立才走 V7；任一不成立 → 主流程</li>
+  <li><strong>executor 自查</strong>：實作中發現超出 scope 必須 escalate</li>
+  <li><strong>事後審計</strong>：<code>flow:fast-track</code> label 讓快車道 PR 可批次審視</li>
+  <li><strong>定期回顧</strong>：V7 占比應該 ≤ 30%；超過代表路由太鬆或主流程太重</li>
+</ul>
+
+<h2>什麼時候<strong>不該</strong>用 V7</h2>
+
+<ul class="tight">
+  <li>任何引入新術語 / 新概念的修改</li>
+  <li>schema / migration 改動</li>
+  <li>跨多個 file 的「同一改動」(可能該拆，或可能該走主流程)</li>
+  <li>UI 設計重構 (即使「只改 CSS」)</li>
+  <li>性能優化 (背後常常牽涉演算法選擇 = ADR 級)</li>
+  <li>安全性修正 (應該走 security review，不只 fix 一行)</li>
+</ul>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v5-mode-c-pushback.html">
+    <strong>V5 · Mode C pushback</strong>
+    <span>executor 發現 V7 應該升級時走 V5 退回</span>
+  </a>
+  <a href="v1-rlm-exists.html">
+    <strong>V1 · RLM 已存在</strong>
+    <span>scope 超出 V7 後落回 V1 主流程</span>
+  </a>
+  <a href="v8-arch-judgment.html">
+    <strong>V8 · arch-judgment</strong>
+    <span>路由判準模糊時 (e.g. 看起來是 typo 但又像新需求) 由 V8 兜底分類</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V7 是「實用主義妥協」。它的設計不是為了優雅，而是為了讓系統在小型修改場景下不顯得官僚。代價是路由判準的紀律必須非常嚴格。
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V5 — executor 反推 (Mode C pushback)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V5 · 反推迴圈</span>
+  <h1>executor 反推 (Mode C pushback)</h1>
+  <p class="tagline">executor 認為 spec 無法執行時，不硬做，而是留 pushback comment 退回 arch-shape — 但有 round counter，3 round 卡關就升級人工。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">executor 收到子 issue 後判定 spec 矛盾 / 不可達 / 違反 RLM</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">executor · arch-shape · 視情況人工</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">主流程 Stage 7 退回 Stage 5；最多 3 輪</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>已進入主流程 Stage 7 (executor 拾起子 issue 開始實作)。executor 在開工前或途中發現問題：</p>
+
+<ul class="tight">
+  <li><strong>spec 內部矛盾</strong>：要求 「同步回應」+「等待外部 webhook」</li>
+  <li><strong>acceptance criteria 不可達</strong>：要求「100ms 內完成」但需要的查詢本身就 200ms</li>
+  <li><strong>deps 缺失或衝突</strong>：依賴的子任務尚未存在 / 被誤標為已完成</li>
+  <li><strong>違反 RLM 約束</strong>：spec 要求改某個 entity，但 RLM 標明該 entity immutable</li>
+  <li><strong>spec 引用不存在的 RLM slug</strong>：context 或 story 找不到</li>
+</ul>
+
+<h2>觸發條件</h2>
+
+<p>executor 在 spawn 開始時做 sanity check。任何一條 fail 就觸發 pushback：</p>
+
+<pre>1. 子 issue 的 RLM slugs 是否都能解析？
+2. acceptance_criteria 是否內部一致？
+3. deps 列出的 PR 是否真的都已 merged？
+4. spec 是否與 RLM context / story 對齊？
+5. 我能想出至少一個能滿足 acceptance criteria 的實作？
+   (這條是最後 — 試著實作，發現做不到才退回)
+
+任一 fail → 進入 Mode C pushback</pre>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">executor 識別問題</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>spawn 開始後，executor 先讀 spec 跑 sanity check。</p>
+  <div class="action action-executor">
+    <div class="action-label">範例：spec 矛盾</div>
+    <pre>子 issue #X spec：
+"處理付款 webhook，必須在 50ms 內回應 Stripe，
+ 並在回應前完成發票寄送 (含 PDF 附件)"
+
+executor 判定：
+- PDF 生成 + email 發送 ≥ 1 秒
+- 不可能在 50ms 內完成這些步驟
+- 結論：spec 內部矛盾，無法執行</pre>
+  </div>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">executor 留 pushback comment</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>executor 不是抱怨 — 而是留結構化的 pushback，幫 arch-shape 修正。</p>
+  <pre>&lt;!-- mode-c-pushback --&gt;
+problem: spec 內部矛盾
+detail: |
+  spec 要求 "50ms 內回應 + 完成發票寄送"。
+  發票流程包含 PDF 生成 (~500ms) 和 SMTP 發送 (~1-3s)。
+  這些操作不可能塞進 50ms 視窗。
+
+suggestions:
+  - 拆兩個子任務：(a) webhook 同步 ack (b) 發票非同步處理
+  - 或：放寬時間限制至 5s，但需要評估 Stripe retry 行為
+  - 或：發票寄送降級為 fire-and-forget queue 任務
+
+referenced_rlm:
+  - payments.webhook-receiver (story)
+  - billing.invoice-issuance (story)
+
+executor_status: declined</pre>
+  <p style="margin-top: 8px">executor 結束 spawn，<strong>不開 PR</strong>，標 <span class="gh-state">mode-c-rounds:1</span>。</p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">workflow 派 arch-shape 重審</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>子 issue 標 <code>mode-c-rounds:N</code> + 有 <code>mode-c-pushback</code> comment</div>
+  <p>workflow 把這個子 issue 退回 arch-shape，附上 executor 的 pushback comment 內容。</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:arch-shape</span> + <span class="gh-state">mode-c-rounds:1</span> 保留</p>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 修正 spec</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>arch-shape 讀 pushback，三種可能動作：</p>
+  <div class="action action-arch">
+    <div class="action-label">動作選擇</div>
+    <ul class="tight">
+      <li><strong>修正 spec</strong>：直接改子 issue body，採納 executor 的建議 (e.g. 拆成兩個 sub-issue)</li>
+      <li><strong>補充資訊</strong>：原本 spec 寫得不夠，補 acceptance criteria / RLM 引用</li>
+      <li><strong>升級 ADR (V4)</strong>：發現背後是設計選擇，需要人類決定 → 走 V4</li>
+      <li><strong>反駁 executor</strong>：認為 pushback 不成立，留 comment 解釋並重派</li>
+    </ul>
+  </div>
+  <p style="margin-top: 8px">修正完，標移除 <code>agent:arch-shape</code>，加 <span class="gh-state">status:ready</span>，重派 executor。</p>
+</div>
+
+<div class="stage" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">第二輪 executor</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>新的 executor spawn 拿到修正後的 spec，重新 sanity check：</p>
+  <ul class="tight">
+    <li>✅ 通過 → 開始實作 → 主流程 Stage 7 繼續</li>
+    <li>❌ 仍有問題 → 第二次 pushback → <span class="gh-state">mode-c-rounds:2</span></li>
+  </ul>
+</div>
+
+</div>
+
+<h2>Round counter 升級邏輯</h2>
+
+<div class="branches">
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">1</span>
+      <strong>Round 1 → 2</strong>
+    </div>
+    <p>第一次 pushback 是常態 — spec 第一版常常不完整。arch-shape 修正後通常能通。</p>
+    <p style="margin-top: 6px"><strong>典型原因</strong>：spec 模糊、缺 acceptance criteria。</p>
+  </div>
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">2</span>
+      <strong>Round 2 → 3</strong>
+    </div>
+    <p>第二次仍卡 = spec 修正方向錯了，或者問題其實是設計選擇。</p>
+    <p style="margin-top: 6px"><strong>典型原因</strong>：背後其實需要 ADR (V4)，arch-shape 應升級而不是繼續硬切。</p>
+  </div>
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">3</span>
+      <strong>Round 3 → human-review</strong>
+    </div>
+    <p>第三次仍卡 = LLM 之間互相說不通了。系統強制升級 — 標 <span class="gh-state">human-review</span>，停止自動 dispatch。</p>
+    <p style="margin-top: 6px"><strong>典型原因</strong>：根本性的問題，不是 spec 措辭問題。</p>
+  </div>
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">⚠</span>
+      <strong>為何停在 3</strong>
+    </div>
+    <p>避免無限拉鋸 — LLM 反覆改 spec 不會收斂時繼續砸 token 是浪費。3 是經驗值，可調但不該調太高。</p>
+  </div>
+
+</div>
+
+<div class="callout callout-danger">
+  ❌ <strong>不該繞過的反模式</strong>　executor 看到難 spec 時 <em>硬實作</em> 是最壞的選擇 — 產出對不上 acceptance criteria 的 PR，下游 review 還要花更多時間 debug。「pushback 是負責任的行為」這個紀律要寫進 executor 的 prompt 並在 review 時強化。
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>executor 過度敏感，動不動就 pushback</td>
+      <td>系統一直卡在 round 1-2</td>
+      <td>review pushback comments 找 pattern；可能是 spec template 缺欄位</td>
+    </tr>
+    <tr>
+      <td>arch-shape 反駁 executor 但執理不通</td>
+      <td>第二次 spawn 又會 pushback</td>
+      <td>round counter 自動處理 — 兩輪後升級 V8 (arch-judgment)</td>
+    </tr>
+    <tr>
+      <td>pushback 內容空洞，只說「做不到」</td>
+      <td>arch-shape 無法修正</td>
+      <td>pushback comment 必須符合 schema (problem / detail / suggestions)，否則退回 executor 重寫</td>
+    </tr>
+    <tr>
+      <td>同一個 spec 被多個 executor 拒</td>
+      <td>spec 真的有問題</td>
+      <td>不是輪數的問題；arch-shape 應主動升級 ADR 或諮詢 advisor</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>Round 1-2 解決後，子 issue 重新進入 Stage 7 (executor 實作)；後續主流程不變。</p>
+
+<p>Round 3 升級 <span class="gh-state">human-review</span> 後，整個系統暫停處理該 issue (但其他無關的子任務繼續並行)。人類介入後三種出路：</p>
+
+<ul class="tight">
+  <li>人類直接改子 issue body 解決 → 重置 round counter → 重派 executor</li>
+  <li>人類拆 issue 為更小範圍 → 原 issue 關閉，新 issue 進入主流程</li>
+  <li>人類認定該需求暫時不做 → 關閉子 issue，arch-shape 收尾時會發現缺塊，可能升級 V4 ADR</li>
+</ul>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>「拒絕」是基礎能力</strong>　executor 必須有「不執行」的選項，否則它會在 spec 不可能達成時硬寫一個對不上的實作。pushback + round counter 把這個能力結構化 — executor 不是抱怨，是用既定 schema 反推。
+</div>
+
+<p>round counter 的設計理念：</p>
+
+<ul class="tight">
+  <li><strong>有限重試</strong>：機率上 LLM 第一次失誤可以修，但連續 3 次說不通就是設計問題不是表達問題</li>
+  <li><strong>清晰升級路徑</strong>：每個 round 都是嘗試把 spec 修對，第 3 round 就轉責給人類</li>
+  <li><strong>避免無限循環</strong>：兩個 stateless LLM 來回改，沒有外力介入永遠不會收斂</li>
+  <li><strong>留下審查痕跡</strong>：每輪 pushback 都是 GitHub comment，事後可以審 spec 為什麼這麼難寫</li>
+</ul>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v4-adr-gate.html">
+    <strong>V4 · ADR 人工 gate</strong>
+    <span>多次 pushback 常常是因為背後是 ADR 級的設計問題</span>
+  </a>
+  <a href="v6-rlm-drift.html">
+    <strong>V6 · RLM 與現實不符</strong>
+    <span>pushback 原因若是 RLM 失準，應走 V6 而非繼續修 spec</span>
+  </a>
+  <a href="v8-arch-judgment.html">
+    <strong>V8 · arch-judgment</strong>
+    <span>round 2 後升級 arch-judgment 是常見做法</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V5 是 executor 自治的核心 — 不執行的能力 = 系統自我糾錯的能力。pushback 頻率太高 = 上游分解品質有問題；太低 = executor 太順從可能在亂寫。
+</footer>
+
+</div>
+</body>
+</html>

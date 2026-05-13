@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Sweet Home — 軟體工程孿生</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+/* ── Design tokens (agent-sweet-home DESIGN.md) ──────────────────────── */
+:root {
+  --surface-0:  #0C1014;
+  --surface-1:  #141921;
+  --surface-2:  #1D2430;
+  --border-lo:  #2A3340;
+  --border-hi:  #3D4A5C;
+  --text-1:     #E8EAED;
+  --text-2:     #A7B0BC;
+  --text-3:     #6B7785;
+
+  --status-running:  #F5A524;
+  --status-healthy:  #3FB950;
+  --status-failed:   #F85149;
+  --status-frozen:   #7C8AA0;
+
+  --accent:     #5BC0EB;  /* harbor cyan — twin / observation layer */
+
+  --role-rlm:       #F4C430;
+  --role-arch:      #5B8DEF;
+  --role-advisor:   #4CAF80;
+  --role-executor:  #FF8A65;
+  --role-arbiter:   #F85149;
+
+  --font-sans: 'IBM Plex Sans Condensed', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--surface-0);
+  color: var(--text-1);
+  line-height: 1.6;
+  padding: 48px 20px 100px;
+  font-size: 14px;
+}
+
+.container { max-width: 1020px; margin: 0 auto; }
+
+/* ── Typography ───────────────────────────────────────────────────────── */
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+h2 {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-3);
+  margin: 56px 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-lo);
+}
+h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+p  { color: var(--text-2); font-size: 13px; line-height: 1.65; }
+
+code, .mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border: 1px solid var(--border-lo);
+  border-radius: 2px;
+  color: var(--text-2);
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout helpers ───────────────────────────────────────────────────── */
+.row  { display: flex; gap: 16px; }
+.col  { flex: 1; min-width: 0; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+/* ── Badges ───────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 7px; border-radius: 2px; border: 1px solid;
+  white-space: nowrap;
+}
+.badge-rlm      { color: var(--role-rlm);      border-color: rgba(244,196,48,.4);  background: rgba(244,196,48,.07); }
+.badge-arch     { color: var(--role-arch);     border-color: rgba(91,141,239,.4);  background: rgba(91,141,239,.07); }
+.badge-advisor  { color: var(--role-advisor);  border-color: rgba(76,175,128,.4);  background: rgba(76,175,128,.07); }
+.badge-executor { color: var(--role-executor); border-color: rgba(255,138,101,.4); background: rgba(255,138,101,.07); }
+.badge-twin     { color: var(--accent);        border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
+.badge-github   { color: #6cb6ff;              border-color: rgba(108,182,255,.4); background: rgba(108,182,255,.07); }
+.badge-warn     { color: var(--status-running);border-color: rgba(245,165,36,.4);  background: rgba(245,165,36,.07); }
+.badge-ok       { color: var(--status-healthy);border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
+.badge-dim      { color: var(--text-3);        border-color: var(--border-lo);     background: transparent; }
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero {
+  padding: 32px 0 48px;
+  border-bottom: 1px solid var(--border-lo);
+  margin-bottom: 8px;
+}
+.hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--accent);
+  margin-bottom: 14px;
+}
+.tagline {
+  font-size: 15px; color: var(--text-2);
+  margin-top: 10px; max-width: 560px;
+  line-height: 1.55;
+}
+
+/* ── Twin concept split ───────────────────────────────────────────────── */
+.twin-split {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  gap: 0;
+  align-items: stretch;
+  margin-top: 32px;
+  border: 1px solid var(--border-lo);
+}
+.twin-pane {
+  padding: 24px 22px;
+  background: var(--surface-1);
+}
+.twin-pane.is-twin { background: rgba(91,192,235,.04); border-left: 2px solid var(--accent); }
+.twin-pane-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-3); margin-bottom: 8px;
+}
+.twin-pane.is-twin .twin-pane-label { color: var(--accent); }
+.twin-pane h3 { font-size: 16px; margin-bottom: 10px; }
+.twin-pane p  { font-size: 12px; }
+.twin-arrow {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border-left: 1px solid var(--border-lo); border-right: 1px solid var(--border-lo);
+  color: var(--text-3); font-size: 16px;
+}
+
+/* ── Role cards ───────────────────────────────────────────────────────── */
+.role-card {
+  padding: 16px; background: var(--surface-1);
+  border: 1px solid var(--border-lo);
+}
+.role-card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.role-card-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.role-card.rlm      .role-card-name { color: var(--role-rlm); }
+.role-card.arch     .role-card-name { color: var(--role-arch); }
+.role-card.advisor  .role-card-name { color: var(--role-advisor); }
+.role-card.executor .role-card-name { color: var(--role-executor); }
+
+/* ── Signal table ─────────────────────────────────────────────────────── */
+.signal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.signal-table th {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-3); text-align: left;
+  padding: 8px 14px; border-bottom: 1px solid var(--border-lo);
+  background: var(--surface-2);
+}
+.signal-table td {
+  padding: 9px 14px; border-bottom: 1px solid var(--border-lo);
+  vertical-align: top; color: var(--text-2);
+}
+.signal-table tr:last-child td { border-bottom: none; }
+.signal-table tr:hover td { background: var(--surface-2); }
+.signal-table .key {
+  font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+  white-space: nowrap;
+}
+.signal-table .vis-ok   { color: var(--status-healthy); font-weight: 600; }
+.signal-table .vis-part { color: var(--status-running); font-weight: 600; }
+.signal-table .vis-dark { color: var(--text-3); }
+
+/* ── Coverage indicator ───────────────────────────────────────────────── */
+.cov { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
+.cov::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cov-ok   { color: var(--status-healthy); }
+.cov-ok::before   { background: var(--status-healthy); }
+.cov-part { color: var(--status-running); }
+.cov-part::before { background: var(--status-running); }
+.cov-dark { color: var(--text-3); }
+.cov-dark::before { background: var(--border-hi); }
+
+/* ── Timeline ─────────────────────────────────────────────────────────── */
+.timeline { position: relative; padding-left: 36px; }
+.timeline::before {
+  content: ''; position: absolute; left: 11px; top: 10px; bottom: 10px;
+  width: 1px; background: var(--border-lo);
+}
+
+.stage {
+  position: relative; margin-bottom: 20px;
+}
+.stage-dot {
+  position: absolute; left: -36px; top: 16px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--border-hi);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  color: var(--text-3); z-index: 1;
+}
+
+.stage-inner {
+  background: var(--surface-1); border: 1px solid var(--border-lo);
+  overflow: hidden;
+}
+.stage-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border-lo);
+  flex-wrap: wrap;
+}
+.stage-title { font-size: 14px; font-weight: 600; flex: 1; }
+.stage-body { padding: 14px 16px; }
+.stage-body p { margin-bottom: 8px; }
+.stage-body p:last-child { margin-bottom: 0; }
+
+/* Twin observation strip */
+.twin-strip {
+  border-top: 1px solid rgba(91,192,235,.2);
+  background: rgba(91,192,235,.04);
+  padding: 12px 16px;
+}
+.twin-strip-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--accent); margin-bottom: 7px;
+}
+.twin-strip ul { padding-left: 16px; margin: 0; }
+.twin-strip li { font-size: 12px; color: var(--text-2); margin-bottom: 3px; line-height: 1.5; }
+.twin-strip li:last-child { margin-bottom: 0; }
+.twin-strip .dark { color: var(--text-3); font-style: italic; }
+
+/* ── Action blocks ────────────────────────────────────────────────────── */
+.action-block {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-left: 2px solid var(--border-hi);
+  font-size: 12px; color: var(--text-2);
+}
+.action-block.rlm      { border-left-color: var(--role-rlm); }
+.action-block.arch     { border-left-color: var(--role-arch); }
+.action-block.executor { border-left-color: var(--role-executor); }
+.action-block.twin     { border-left-color: var(--accent); }
+.action-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-3); margin-bottom: 5px;
+}
+.action-block ul { padding-left: 16px; margin-top: 4px; }
+.action-block li { margin-bottom: 3px; }
+
+/* ── Gate banner ──────────────────────────────────────────────────────── */
+.gate-banner {
+  margin: 12px 0 12px 0;
+  padding: 12px 16px;
+  background: rgba(245,165,36,.06);
+  border: 1px solid rgba(245,165,36,.3);
+  font-size: 12px; color: var(--text-2);
+}
+.gate-banner strong { color: var(--status-running); }
+
+/* ── Loop banner ──────────────────────────────────────────────────────── */
+.loop-banner {
+  margin: 8px 0 16px;
+  padding: 12px 16px;
+  background: rgba(91,141,239,.06);
+  border: 1px solid rgba(91,141,239,.25);
+  text-align: center; font-size: 12px; color: var(--text-2);
+}
+
+/* ── Label pill (GitHub state) ────────────────────────────────────────── */
+.gh {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 10px;
+  padding: 1px 7px;
+  background: var(--surface-2); border: 1px solid var(--border-hi);
+  color: var(--text-2); border-radius: 2px;
+  margin: 1px 2px; white-space: nowrap;
+}
+
+/* ── Coverage map ─────────────────────────────────────────────────────── */
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border-lo);
+  border: 1px solid var(--border-lo);
+}
+.cov-cell {
+  background: var(--surface-1);
+  padding: 14px 16px;
+}
+.cov-cell-title {
+  font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--text-1);
+}
+.cov-cell-desc {
+  font-size: 11px; color: var(--text-3); line-height: 1.5;
+}
+
+/* ── Variants ─────────────────────────────────────────────────────────── */
+.variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.variant-card {
+  background: var(--surface-1); border: 1px solid var(--border-lo);
+  padding: 18px 18px 14px; font-size: 12px;
+}
+.variant-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.variant-title { font-size: 13px; font-weight: 600; }
+.variant-when { font-size: 11px; color: var(--text-3); margin-bottom: 10px; }
+.variant-when::before { content: '觸發：'; font-weight: 600; color: var(--text-2); }
+.variant-flow { color: var(--text-2); line-height: 1.6; }
+.variant-twin {
+  margin-top: 10px; padding: 8px 10px;
+  background: rgba(91,192,235,.05); border-left: 2px solid var(--accent);
+  font-size: 11px; color: var(--text-3);
+}
+.variant-twin::before {
+  content: '孿生可見 ▸ ';
+  font-family: var(--font-mono); font-weight: 600;
+  font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent);
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+.footer {
+  margin-top: 72px; padding: 28px 0;
+  border-top: 1px solid var(--border-lo);
+  font-size: 11px; color: var(--text-3);
+}
+.footer-axioms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.axiom { padding: 14px 14px 12px; background: var(--surface-1); border: 1px solid var(--border-lo); }
+.axiom-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
+  margin-bottom: 5px;
+}
+.axiom-value { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+@media (max-width: 780px) {
+  body { padding: 28px 14px 72px; }
+  .twin-split { grid-template-columns: 1fr; }
+  .twin-arrow { display: none; }
+  .grid-4, .grid-3, .grid-2, .variant-grid, .coverage-grid { grid-template-columns: 1fr; }
+  .timeline { padding-left: 28px; }
+  .stage-dot { left: -28px; }
+  .footer-axioms { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ================================================================== HERO -->
+<header class="hero">
+  <div class="hero-eyebrow">agent-sweet-home · digital twin</div>
+  <h1>軟體工程孿生</h1>
+  <p class="tagline">
+    一個 AI 代理艦隊在跑業務流程。另一個系統完整地看著它——
+    每一個 dispatch 決策、每一次 tool call、每一分燒掉的錢。
+    這份文件從孿生的視角重述整個流程。
+  </p>
+
+  <div class="twin-split" style="margin-top: 28px;">
+    <div class="twin-pane">
+      <div class="twin-pane-label">執行側</div>
+      <h3>agent-team</h3>
+      <p>
+        四角架構的 AI 代理艦隊，在 GitHub 上以 issue 作為狀態機，
+        用 RLM 作為事實來源，自主完成從商業意圖到可部署代碼的全流程。
+        stateless、event-driven、沒有長駐進程。
+      </p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+        <span class="badge badge-rlm">rlm-modeler</span>
+        <span class="badge badge-arch">arch-shape</span>
+        <span class="badge badge-advisor">advisors</span>
+        <span class="badge badge-executor">implementer</span>
+      </div>
+    </div>
+    <div class="twin-arrow">⇄</div>
+    <div class="twin-pane is-twin">
+      <div class="twin-pane-label">觀測側 · 孿生</div>
+      <h3>agent-sweet-home</h3>
+      <p>
+        Tauri 2 桌面 app。把 GitHub repo、本機 git 狀態、每個
+        agent spawn 的完整執行軌跡（thinking、tool calls、structured output、cost）
+        整合成一個即時觀測工作站。dispatch 決策即時推送；call chain 可逐步展開。
+      </p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+        <span class="badge badge-twin">dispatch log</span>
+        <span class="badge badge-twin">call chain</span>
+        <span class="badge badge-twin">live cost</span>
+        <span class="badge badge-twin">blocking graph</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================= ROLES -->
+<h2>四角色 · 分工</h2>
+<div class="grid-4">
+  <div class="role-card rlm">
+    <div class="role-card-name">rlm-modeler</div>
+    <div class="role-card-desc">唯一 RLM writer。從 intake / 逆向工程 / 執行反饋寫入 project-rlm/。任何模型變動都走這個角色。</div>
+  </div>
+  <div class="role-card arch">
+    <div class="role-card-name">arch-shape</div>
+    <div class="role-card-desc">讀 RLM，把商業意圖分解成帶完整 spec + AC + deps 的 atomic 子任務。召喚 advisor 做現況查詢。</div>
+  </div>
+  <div class="role-card advisor">
+    <div class="role-card-name">advisors</div>
+    <div class="role-card-desc">be / fe / ops / design — read-only。回答現況問題（現有 service？衝突元件？blast radius？）不寫任何狀態。</div>
+  </div>
+  <div class="role-card executor">
+    <div class="role-card-name">implementer</div>
+    <div class="role-card-desc">收 RLM-grounded child issue，按需載入 scenario skills，TDD 產出代碼，開 PR。模式 A/B/C。</div>
+  </div>
+</div>
+
+<!-- =========================================================== SIGNALS -->
+<h2>孿生接收哪些信號</h2>
+<p style="margin-bottom: 14px; font-size: 12px;">
+  孿生的全部知識來自三個來源：SQLite（持久化）、Tauri events（即時推送）、GitHub API（15 分鐘同步）。
+</p>
+<div style="border: 1px solid var(--border-lo); overflow: hidden;">
+<table class="signal-table">
+  <thead>
+    <tr>
+      <th>信號來源</th>
+      <th>內容</th>
+      <th>觸發時機</th>
+      <th>孿生可見度</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="key">dispatch_log</td>
+      <td>每次 issue 被評估的決策：rule index、directive（spawn_fresh / no_action / wait / human_review）、reason、matched_at</td>
+      <td>workflow 引擎每次 poll 到 status:ready issue</td>
+      <td><span class="cov cov-ok">即時可見</span></td>
+    </tr>
+    <tr>
+      <td class="key">one_shot_runs</td>
+      <td>run metadata：role、argv（含 --name 帶 role+issue）、status、cost、started/ended</td>
+      <td>agent spawn 後立刻寫入 + 推送 oneshot:created event</td>
+      <td><span class="cov cov-ok">即時可見</span></td>
+    </tr>
+    <tr>
+      <td class="key">run_events</td>
+      <td>結構化事件序列：thinking / tool_use / tool_result / result，含 input_json / output_json / is_error</td>
+      <td>run 結束後從 stream-json log 解析，lazy-parse on demand</td>
+      <td><span class="cov cov-ok">call chain 可展開</span></td>
+    </tr>
+    <tr>
+      <td class="key">one_shot_log_lines</td>
+      <td>原始 stdout/stderr 逐行，stream-json NDJSON</td>
+      <td>oneshot:line:{id} 事件逐行即時推送</td>
+      <td><span class="cov cov-ok">即時串流</span></td>
+    </tr>
+    <tr>
+      <td class="key">graph_edges</td>
+      <td>issue → issue 「blocked_by」邊（從 &lt;!-- deps: --&gt; 解析）；issue → run「dispatched_to」邊</td>
+      <td>workflow 引擎解析 deps 後寫入</td>
+      <td><span class="cov cov-ok">blocking graph 可視</span></td>
+    </tr>
+    <tr>
+      <td class="key">GitHub API cache</td>
+      <td>issues（title / labels）、PRs（title / draft / merged）</td>
+      <td>fetch_issues / fetch_prs，15 min 自動刷新</td>
+      <td><span class="cov cov-part">15 min 延遲</span></td>
+    </tr>
+    <tr>
+      <td class="key">pre_spawn 結果</td>
+      <td>Abort / Reroute / Continue 決策及原因</td>
+      <td>runtime 執行但<strong>未記錄</strong>到任何持久化表</td>
+      <td><span class="cov cov-dark">暗區 · 不可見</span></td>
+    </tr>
+    <tr>
+      <td class="key">on_result 步驟</td>
+      <td>handler 執行了哪些 steps（CreateIssue / Comment / Label / push_branch_and_pr / run_command）</td>
+      <td>runtime 執行但<strong>未記錄</strong></td>
+      <td><span class="cov cov-dark">暗區 · 不可見</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================= FLOW -->
+<h2>主流程 · 孿生視角 <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-3);">— 11 個階段，每個階段孿生看到什麼</span></h2>
+
+<div class="timeline">
+
+<!-- Stage 0 -->
+<div class="stage">
+  <div class="stage-dot">0</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">起點：空專案</span>
+      <span class="badge badge-github">git state</span>
+    </div>
+    <div class="stage-body">
+      <p>新建 git repo，可能只有空 README 或 <code>.gitignore</code>。沒有 <code>project-rlm/</code>，沒有業務代碼，沒有 GitHub issues。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>HomeView 顯示 repo 基本資訊（本機路徑、default branch、git clean 狀態）</li>
+        <li>Dispatch Log 區塊：無記錄 — "No dispatch decisions recorded yet."</li>
+        <li>Blocking graph：無依賴</li>
+        <li>One-shot sidebar：無 run</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 1 -->
+<div class="stage">
+  <div class="stage-dot">1</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">商模意圖進場</span>
+      <span class="badge badge-github">issue #1 created</span>
+    </div>
+    <div class="stage-body">
+      <p>使用者開了第一個 issue 描述商業需求，body 帶 <code>&lt;!-- intake-kind: business --&gt;</code>，labels 加上 <span class="gh">status:ready</span>。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>HomeView Open Issues 列表出現 #1（15 min 內或手動 Refresh 後）</li>
+        <li>Labels 顯示 <span class="gh">status:ready</span> 顏色徽章</li>
+        <li class="dark">Dispatch 尚未發生，dispatch_log 還沒有記錄</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 2 -->
+<div class="stage">
+  <div class="stage-dot">2</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">workflow 偵測 + 路由決策</span>
+      <span class="badge badge-dim">agent-sweet-home poll</span>
+    </div>
+    <div class="stage-body">
+      <p>workflow runtime 讀 <code>agent-team-v2.workflow.yaml</code>，評估 dispatch rules：</p>
+      <div class="action-block arch">
+        <div class="action-label">規則評估（依序）</div>
+        <ul>
+          <li><code>project-rlm/</code> 不存在 + intake-kind: business → <strong>spawn_fresh</strong> role: rlm-modeler</li>
+          <li>規則命中後寫入 <code>dispatch_log</code>，emit <code>dispatch:logged</code> event</li>
+        </ul>
+      </div>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li><strong>即時</strong>：dispatch:logged event 觸發，HomeView Dispatch Log 新增一行</li>
+        <li>顯示：<span class="badge badge-twin" style="font-size:9px;">spawn</span> #1 · rule 0 · role: rlm-modeler · 時間戳</li>
+        <li>One-shot sidebar 出現新 run（<code>oneshot:created</code> event）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 3 -->
+<div class="stage">
+  <div class="stage-dot">3</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">rlm-modeler bootstrap</span>
+      <span class="badge badge-rlm">rlm-modeler</span>
+    </div>
+    <div class="stage-body">
+      <p>從 business intake 推導出初始 RLM 模型，是唯一 RLM writer 第一次落筆。</p>
+      <div class="action-block rlm">
+        <div class="action-label">執行（透過 rlm CLI）</div>
+        <ul>
+          <li><code>rlm define-brief</code> — 產品 brief</li>
+          <li><code>rlm define-context</code> — 切 bounded contexts</li>
+          <li><code>rlm define-glossary</code> — 領域詞彙</li>
+          <li><code>rlm define-story</code> — 用戶故事</li>
+          <li><code>rlm validate</code> — 強制一致性驗證</li>
+        </ul>
+      </div>
+      <p style="margin-top: 8px">產出 <code>project-rlm/</code> PR 對應 #1，打上 <span class="gh">arch-state:awaiting-bootstrap-merge</span></p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>One-shot chat view：即時串流 thinking blocks（折疊，顯示字元數）</li>
+        <li>Tool call chain 逐步展開：每次 Bash / Read / Write 都可看到 input/output</li>
+        <li>Run header：role badge <span class="badge badge-rlm" style="font-size:9px;">rlm-modeler</span> + issue #1 + 即時燒錢速率</li>
+        <li>Run 完成後：Structured Output 展開 JSON（含 agent 回傳的 kind 欄位）</li>
+        <li class="dark">pre_spawn hook 評估結果不可見（runtime 未記錄）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="gate-banner">
+  ⚠️ <strong>人工 gate</strong> — bootstrap PR 必須人工審查並 merge。這是 RLM 第一次定型，需要人類確認方向。孿生在 HomeView PRs 列表看到這個 PR，但 merge 決策在人類手上。
+</div>
+
+<!-- Stage 4 -->
+<div class="stage">
+  <div class="stage-dot">4</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">PR merged → workflow 重新評估 #1</span>
+      <span class="badge badge-github">PR merged</span>
+    </div>
+    <div class="stage-body">
+      <p>Trigger：PR closed（merged）且 #1 仍 open。</p>
+      <ul style="padding-left: 18px; font-size: 13px; color: var(--text-2);">
+        <li style="margin-bottom: 4px;"><code>project-rlm/</code> 存在 → ✓；有業務代碼 → ✗；有子 issues → ✗</li>
+        <li>→ dispatch rules → <strong>spawn_fresh</strong> role: arch-shape</li>
+      </ul>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>Dispatch Log 新增一行：<span class="badge badge-arch" style="font-size:9px;">arch</span> spawn · #1 · 新 rule index</li>
+        <li>Sidebar One-shot 出現第二個 run，role badge = arch-shape</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 5 -->
+<div class="stage">
+  <div class="stage-dot">5</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">arch-shape 分解子任務</span>
+      <span class="badge badge-arch">arch-shape</span>
+    </div>
+    <div class="stage-body">
+      <p>讀 RLM 完整模型，根據 contexts + stories 切出可獨立執行的子任務，一次性輸出完整依賴圖。</p>
+      <div class="action-block arch">
+        <div class="action-label">產出（atomic）</div>
+        <ul>
+          <li>#2 subdomain: scaffold — <code>deps: []</code></li>
+          <li>#3 subdomain: feature-A — <code>deps: [#2]</code></li>
+          <li>#4 subdomain: feature-B — <code>deps: [#2, #3]</code></li>
+          <li>每個 issue body 帶完整 spec + AC + RLM context slug</li>
+        </ul>
+      </div>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>arch-shape run call chain：可見它用哪些工具讀 RLM（File, Bash）、如何組裝 spec</li>
+        <li>Structured Output JSON 含 arch-shape 產出的子任務清單</li>
+        <li>HomeView Issues：#2–#N 出現在 Open Issues 列表（15 min 後或手動刷新）</li>
+        <li>Blocking graph：deps 關係寫入 graph_edges → 立刻顯示 blocked issues</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 6 -->
+<div class="stage">
+  <div class="stage-dot">6</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">workflow 派發子任務</span>
+      <span class="badge badge-dim">dispatch cascade</span>
+    </div>
+    <div class="stage-body">
+      <p>workflow 根據 deps 計算可執行性，無依賴的子任務可<strong>並行</strong>執行。</p>
+      <ul style="padding-left: 18px; font-size: 13px; color: var(--text-2);">
+        <li style="margin-bottom: 4px;">#2 deps 為空 → <span class="gh">status:ready</span> → spawn executor</li>
+        <li>#3 #4 等待 #2 → <span class="gh">status:blocked</span></li>
+      </ul>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>Dispatch Log 出現多行：每個子 issue 各一條 dispatch 決策</li>
+        <li>#2 → <span class="badge badge-executor" style="font-size:9px;">spawn</span>；#3 #4 → <span class="badge badge-dim" style="font-size:9px;">wait</span>（顯示 reason）</li>
+        <li>Blocking graph 顯示 #3 #4 被 #2 block</li>
+        <li>One-shot sidebar：新增 executor run，role badge = worker</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 7 -->
+<div class="stage">
+  <div class="stage-dot">7</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">implementer 拾取技能 + 實作</span>
+      <span class="badge badge-executor">implementer</span>
+    </div>
+    <div class="stage-body">
+      <p>每個 executor spawn 收到一個 RLM-grounded child issue，按需載入 scenario skills，TDD red-green-refactor。</p>
+      <div class="action-block executor">
+        <div class="action-label">spawn 輸入</div>
+        <ul>
+          <li><code>subdomain</code>、<code>spec</code>（RLM story 衍生）、<code>acceptance_criteria</code>、<code>deps</code></li>
+        </ul>
+      </div>
+      <div class="action-block executor" style="margin-top: 8px;">
+        <div class="action-label">scenario skills（按需）</div>
+        <ul>
+          <li>API endpoint → <code>api-design</code> + <code>tdd</code></li>
+          <li>UI 元件 → <code>frontend-ui</code> + <code>a11y</code></li>
+          <li>schema → <code>migration-safety</code></li>
+        </ul>
+      </div>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li><strong>即時串流</strong>：One-shot chat view 顯示每一個 tool call（Bash, Edit, Read, Write…）</li>
+        <li>Thinking blocks 折疊顯示，字元數可見，展開讀完整推理過程</li>
+        <li>Tool input / output 可展開（TDD 跑了哪些測試？lint 結果如何？）</li>
+        <li>Run header：issue #N badge + worker role + 即時 cost 累積</li>
+        <li class="dark">pre_spawn Abort/Reroute 不可見；on_result steps 不可見</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 8 -->
+<div class="stage">
+  <div class="stage-dot">8</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">PR 開出 → review → merge → issue close</span>
+      <span class="badge badge-github">PR lifecycle</span>
+    </div>
+    <div class="stage-body">
+      <p>implementer 發 PR，另一個 spawn 可進入 review mode。CI 通過 → 合併 → issue 自動關閉。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>Run call chain 底部 result bar：<span class="cov cov-ok" style="font-size:11px;">completed</span> + 總 cost</li>
+        <li>Structured Output 展開：agent 回傳的完整 JSON（PR branch、structured kind、summary）</li>
+        <li>HomeView PRs：新 PR 出現（15 min 或手動刷新）</li>
+        <li class="dark">push_branch_and_pr 是 on_result step，成功/失敗記錄不可見</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 9 -->
+<div class="stage">
+  <div class="stage-dot">9</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">workflow 解鎖下游</span>
+      <span class="badge badge-dim">unblock pass</span>
+    </div>
+    <div class="stage-body">
+      <p>Trigger：issue #2 closed。unblock pass 掃描所有 <span class="gh">status:blocked</span>，重新計算 deps，解鎖就緒的下游。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>Dispatch Log 出現新批次：#3 → <span class="badge badge-executor" style="font-size:9px;">spawn</span>，#4 → <span class="badge badge-dim" style="font-size:9px;">wait</span>（#3 未完成）</li>
+        <li>Blocking graph 自動更新：#3 從 blocked 移除</li>
+        <li class="dark">unblock pass 本身的執行細節不可見（無事件記錄）</li>
+        <li class="dark">on_unblock steps 執行情況不可見</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="loop-banner">
+  🔁 <strong>主迴圈</strong> — Stages 6–9 對每個子任務循環，直到全部 closed
+</div>
+
+<!-- Stage 10 -->
+<div class="stage">
+  <div class="stage-dot">10</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">arch-shape 收尾驗收</span>
+      <span class="badge badge-arch">arch-shape</span>
+    </div>
+    <div class="stage-body">
+      <p>Trigger：最後一個子 issue closed，parent #1 仍 open。arch-shape 確認原始商業意圖是否達成，視情況派 rlm-modeler 補寫模型，最後關閉 #1。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測</div>
+      <ul>
+        <li>arch-shape run call chain：可見它讀了哪些 RLM 文件、哪些 PR diff</li>
+        <li>Dispatch Log 出現 arch-shape 的最後一次 spawn 記錄</li>
+        <li>若需 RLM 更新：rlm-modeler 再次出現在 sidebar，role badge 切回黃色</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stage 11 -->
+<div class="stage">
+  <div class="stage-dot">11</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">商模需求完成</span>
+      <span class="badge badge-ok">done</span>
+      <span class="badge badge-rlm">RLM ✓</span>
+    </div>
+    <div class="stage-body">
+      <p>系統終態：<code>project-rlm/</code> 反映完整領域模型；業務代碼可測試可部署；每個改動可追溯到 RLM story；成本完整記帳。</p>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-strip-label">孿生觀測全貌</div>
+      <ul>
+        <li>Dispatch Log：完整的 N 次評估記錄，涵蓋每個 issue 被派發的決策歷程</li>
+        <li>One-shot sidebar：所有 run 列表，role badge 顯示誰做了什麼，cost 全部加總可見</li>
+        <li>Call chain：每個 agent 的 tool call 序列可回放，thinking 可逐一讀</li>
+        <li>HomeView：Issues 和 PRs 列表回到空白，Blocking graph 清零</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</div><!-- /timeline -->
+
+<!-- ======================================================= COVERAGE MAP -->
+<h2>觀測覆蓋率 · 哪裡有光，哪裡還暗</h2>
+<p style="margin-bottom: 16px; font-size: 12px;">
+  綠色 = 孿生可完整觀測；橙色 = 部分可見；灰色 = 暗區，runtime 執行但不留任何可查詢記錄。
+</p>
+<div class="coverage-grid">
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Dispatch 決策</span></div>
+    <div class="cov-cell-desc">dispatch_log 記錄每次 rule 評估結果：哪條規則、什麼 directive、reason、issue number、時間戳。即時推送到 HomeView。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Spawn 執行</span></div>
+    <div class="cov-cell-desc">one_shot_runs 表：role、prompt、argv、status、cost、duration。sidebar 即時更新，call chain 可展開。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Tool Call 序列</span></div>
+    <div class="cov-cell-desc">run_events 從 stream-json 解析，包含 tool_use / tool_result 配對、is_error、input/output JSON。可展開讀完整 I/O。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Thinking Blocks</span></div>
+    <div class="cov-cell-desc">Extended thinking 的內容完整保留在 run_events，chat view 顯示字元數 + 可折疊展開讀完整推理。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Structured Output</span></div>
+    <div class="cov-cell-desc">result event 的完整 output_json（含 kind + 所有 agent 決策欄位）在 call chain 底部展開顯示。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-ok">Issue Blocking Graph</span></div>
+    <div class="cov-cell-desc">graph_edges 的 blocked_by 關係，HomeView 顯示哪些 issue 被哪些 deps 擋著，即時更新。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-part">Issue / PR 列表</span></div>
+    <div class="cov-cell-desc">GitHub API 快取，15 分鐘自動刷新。Labels 即時顯示（workflow 加的 vs. 人工加的無法區分）。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-part">Cost 歸因</span></div>
+    <div class="cov-cell-desc">每個 run 的 total_cost_usd 可見。但 per-tool-call cost breakdown 不可見，phase 間的成本分配需手動加總。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-part">Agent Role</span></div>
+    <div class="cov-cell-desc">從 dispatch_log.directive_json.role 或 argv --name flag 反推，新舊 run 都可識別。mode 資訊部分可見。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-dark">Pre-Spawn 結果</span></div>
+    <div class="cov-cell-desc">apply_pre_spawn() 的 Abort / Reroute / Continue 結果不記錄。spawn 中止時孿生完全不知道為什麼。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-dark">On-Result Steps</span></div>
+    <div class="cov-cell-desc">handler 執行了哪些 steps（CreateIssue / AddLabels / push_branch_and_pr / run_command）沒有任何記錄。成功失敗都不知道。</div>
+  </div>
+  <div class="cov-cell">
+    <div class="cov-cell-title"><span class="cov cov-dark">Error Quarantine</span></div>
+    <div class="cov-cell-desc">dispatch 或 spawn 出錯後 runtime 加 human-review label，無法區分「設計上的人工審查」和「錯誤後的隔離」。</div>
+  </div>
+</div>
+
+<!-- ======================================================== VARIANTS -->
+<h2>情況變體 <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-3);">— 主流程的常見偏離 · 8 種</span></h2>
+
+<div class="variant-grid">
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-rlm">V1</span>
+      <span class="variant-title">RLM 已存在，新商業需求</span>
+    </div>
+    <div class="variant-when">第二個以後的商業 issue。最常見。</div>
+    <div class="variant-flow">
+      跳過 bootstrap → workflow 偵測 <code>project-rlm/</code> 已存在 → 直接派 arch-shape Stage 5。若新需求引入新 context，arch-shape 發 <code>rlm_changes_needed</code> 先讓 rlm-modeler 擴充模型。
+    </div>
+    <div class="variant-twin">Dispatch Log 第一條即為 arch-shape spawn，role badge 直接跳到藍色。rlm-modeler run 只在有模型更新時出現。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-rlm">V2</span>
+      <span class="variant-title">既有代碼導入</span>
+    </div>
+    <div class="variant-when">repo 已有業務代碼但 project-rlm/ 不存在。</div>
+    <div class="variant-flow">
+      rlm-modeler 進入 <em>reverse-bootstrap</em>：讀代碼結構逆向推導 contexts / stories → PR → 人工確認後進主流程。
+    </div>
+    <div class="variant-twin">Call chain 中可見大量 Read / Bash tool calls（rlm-modeler 在掃代碼結構）。Thinking blocks 顯示它如何從代碼推導 bounded context。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-arch">V3</span>
+      <span class="variant-title">arch-shape 需要 advisor 諮詢</span>
+    </div>
+    <div class="variant-when">arch-shape 不確定現況（"現有類似 service 嗎？"）。</div>
+    <div class="variant-flow">
+      arch-shape 標 <span class="gh">arch-state:awaiting-consultation</span> → workflow 派 advisor（be/fe/ops/design）→ advisor 留結構化 comment → arch-shape 重啟。
+    </div>
+    <div class="variant-twin">Dispatch Log 出現 advisor spawn。Sidebar 顯示 advisor run，role badge = advisor（green）。arch-shape 重啟時出現第二個 arch run。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-arch">V4</span>
+      <span class="variant-title">架構決策需要 ADR</span>
+    </div>
+    <div class="variant-when">arch-shape 遇到架構級選擇。</div>
+    <div class="variant-flow">
+      arch-shape 草擬 ADR → <strong>人工 gate</strong> 選方案 → arch-shape 重啟把 <code>implements-adr</code> 寫入子 issue → Stage 6。ADR 由 rlm-modeler 寫入 <code>project-rlm/decisions/</code>。
+    </div>
+    <div class="variant-twin">arch-shape run 結束但 Dispatch Log 無後續 spawn，說明在等人工決策。ADR merge 後新 arch-shape spawn 出現。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-executor">V5</span>
+      <span class="variant-title">implementer 反推（Mode C）</span>
+    </div>
+    <div class="variant-when">spec 矛盾 / 缺資訊 / 違反 RLM。</div>
+    <div class="variant-flow">
+      executor 留 pushback comment → 標 <span class="gh">mode-c-rounds:1</span> → arch-shape 重新檢視 → 修正 spec → 派回 executor。達到 rounds:3 升級為 human-review。
+    </div>
+    <div class="variant-twin">Dispatch Log 同一 issue 出現多次 spawn 記錄。Call chain 中 structured output 的 kind 欄位為 pushback / mode-c。同一 issue 重複出現的 executor run 可見。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-executor">V6</span>
+      <span class="variant-title">executor 發現 RLM 漂移</span>
+    </div>
+    <div class="variant-when">實作中發現 RLM 與現實領域不符。</div>
+    <div class="variant-flow">
+      executor 不越權 → 在子 issue 留 <code>rlm_changes_needed</code> → workflow 派 rlm-modeler 修正 → RLM PR merge → executor 重啟。
+    </div>
+    <div class="variant-twin">Sidebar 出現 rlm-modeler run（黃色 badge）夾在兩個 executor run 之間。Dispatch Log 顯示完整路徑：executor spawn → wait → rlm-modeler spawn → executor re-spawn。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-executor">V7</span>
+      <span class="variant-title">小型 bug fix 直接派工</span>
+    </div>
+    <div class="variant-when">issue 範圍小、不影響領域模型。</div>
+    <div class="variant-flow">
+      dispatcher 判斷無商業意圖 → 跳過 arch-shape → 直接派 executor → PR → merge。
+    </div>
+    <div class="variant-twin">Dispatch Log 只有一條 executor spawn，無 arch-shape 記錄。整個流程 Dispatch Log 只有一行，call chain 短而直接。</div>
+  </div>
+
+  <div class="variant-card">
+    <div class="variant-head">
+      <span class="badge badge-warn">V8</span>
+      <span class="variant-title">arch-judgment 兜底</span>
+    </div>
+    <div class="variant-when">dispatcher 5 條規則都不命中 / agents 衝突 / malformed intake。</div>
+    <div class="variant-flow">
+      派 arch-judgment（escape-hatch 變體）→ 讀更廣 context → 做<strong>一個</strong>有界決策 → 退出。預期觸發率 1–5%。
+    </div>
+    <div class="variant-twin">Dispatch Log 出現 arch-judgment 的特殊 role badge。Call chain 中可見它讀了 RLM survey + git history + parent thread 等更廣的 context。</div>
+  </div>
+</div>
+
+<!-- ============================================================= FOOTER -->
+<footer class="footer">
+  <div class="footer-axioms">
+    <div class="axiom">
+      <div class="axiom-label">執行側公理</div>
+      <div class="axiom-value">RLM = 事實單一來源 · GitHub = 狀態機 · agents = stateless functions · 沒有長駐進程</div>
+    </div>
+    <div class="axiom">
+      <div class="axiom-label">孿生側公理</div>
+      <div class="axiom-value">SQLite = 觀測記憶 · Tauri events = 即時神經 · call chain = 可回放執行軌跡 · dispatch_log = 決策稽核</div>
+    </div>
+    <div class="axiom">
+      <div class="axiom-label">暗區誠實聲明</div>
+      <div class="axiom-value">pre_spawn outcomes、on_result steps、degrade fallbacks、worktree lifecycle — 孿生目前看不到。這是下一個觀測層的目標。</div>
+    </div>
+  </div>
+  <p style="text-align: center; margin-top: 4px;">
+    agent-sweet-home — dispatch station for one operator · <code>Tauri 2 + React 19 + SQLite</code>
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

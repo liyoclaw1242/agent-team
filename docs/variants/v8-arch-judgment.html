@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V8 — arch-judgment 兜底</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V8 · 兜底</span>
+  <h1>arch-judgment 兜底</h1>
+  <p class="tagline">dispatcher 5 條規則都不命中、agents 之間衝突、malformed intake — 派 arch-judgment 讀更多 context 做<strong>一個</strong>有界決策然後退出。預期 1-5% 觸發。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">dispatcher 規則 1-4 都未命中 → 規則 5 兜底</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">arch-judgment (是 arch-shape 的 escape-hatch 變體，不是第 5 個概念角色)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">預期觸發率</div>
+      <div class="fact-value">1-5%；高於這個值代表上游規則需要調整</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>workflow dispatcher 嘗試對某個 issue / state 套用規則 1-4，但都不命中。系統處於模糊狀態：</p>
+
+<ul class="tight">
+  <li>issue body 結構錯誤、缺 marker、或 intake-kind 不認識</li>
+  <li>多個 agents 留下衝突結論 (e.g. advisor 說 X，arch-shape 已在 spec 寫 Y)</li>
+  <li>parent 已關但 children 仍 open</li>
+  <li>round-3 卡關 (V5 升級點)</li>
+  <li>子 issue 的 deps 指向已關閉但被 reopen 的 issue</li>
+  <li>同一 issue 被多個 agent label 同時指定 (label 衝突)</li>
+  <li>RLM 在處理過程中被外部修改 (非 rlm-modeler 來源)</li>
+</ul>
+
+<h2>觸發條件 (規則 5)</h2>
+
+<p>dispatcher 規則表結構大致如下：</p>
+
+<pre>規則 1: 空 RLM + business intake → rlm-modeler bootstrap
+規則 2: 有 RLM + business intake → arch-shape decomposition (V1)
+規則 3: bugfix/chore + 範圍小 → executor direct (V7)
+規則 4: pushback / consultation / awaiting-* signal → 對應 agent
+規則 5: 以上都不命中 → arch-judgment (V8)</pre>
+
+<p>關鍵設計：規則 5 是<strong>顯式的兜底</strong>，不是「不知道怎麼辦就丟回去」。arch-judgment 收到的不是無腦轉發，而是一個明確標記為「需要更廣判斷」的 case。</p>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">workflow 落到規則 5</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <p>規則 1-4 都不命中，dispatcher 標記 issue：</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:arch-judgment</span> <span class="gh-state">flow:escape-hatch</span></p>
+  <p><code>flow:escape-hatch</code> label 是事後審計用 — 蒐集所有 V8 case 拿來檢視 dispatcher 規則是否需要補強。</p>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">arch-judgment 啟動</span>
+    <span class="badge warn">arch-judgment</span>
+  </div>
+  <p>arch-judgment 與 arch-shape 共用大部分紀律 (RLM-first / stateless / 不寫代碼)，但 prompt budget 較大，被授權讀更廣的 context：</p>
+  <div class="action action-arch">
+    <div class="action-label">擴大讀取範圍</div>
+    <ul class="tight">
+      <li>RLM 完整 survey (不只當前 context)</li>
+      <li>git history (recent 50 commits)</li>
+      <li>parent issue 完整 thread (含所有 comment)</li>
+      <li>相關子 issue 的 comment</li>
+      <li>衝突 agents 的留言原文</li>
+      <li>近期同類 issue 的處理結果 (作為先例)</li>
+    </ul>
+  </div>
+  <p style="margin-top: 8px">這些讀取量在 arch-shape 是不允許的 (token 浪費)，但在 V8 是必要的 — 因為 V8 case 本身就需要更多 context 才能判斷。</p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">做一個有界決策</span>
+    <span class="badge warn">arch-judgment</span>
+  </div>
+  <p>arch-judgment 不<strong>解決</strong>問題，它<strong>路由</strong>問題。決策必須是下列其一：</p>
+  <div class="action action-arch">
+    <div class="action-label">允許的決策類型</div>
+    <ul class="tight">
+      <li><strong>路由到正確 agent</strong>：「這其實是 V3，派 advisor」「這是 V4，需要 ADR」</li>
+      <li><strong>修補 label / 標記</strong>：「補上 <code>intake-kind: business</code>，重新 dispatch」</li>
+      <li><strong>升級 human-review</strong>：「這超出系統能處理的範圍，請人類介入」</li>
+      <li><strong>關閉冗餘 issue</strong>：「這是 #N 的重複 / 過時，關閉」</li>
+      <li><strong>合併或拆分</strong>：「兩個 issue 應該合併」「一個 issue 應該拆成三個」</li>
+      <li><strong>拒絕</strong>：「這個 case 不該被處理」(留 comment 說明)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">寫 reasoning comment 然後退出</span>
+    <span class="badge warn">arch-judgment</span>
+  </div>
+  <p>無論決策是什麼，arch-judgment 都<strong>必須</strong>留下完整 reasoning：</p>
+  <pre>&lt;!-- arch-judgment --&gt;
+case_signature: round-3 escalation, conflicting verdicts
+context_examined:
+  - parent #42 thread (12 comments)
+  - executor pushback at #45, #45 (2 rounds)
+  - advisor-be consultation at #46
+  - RLM survey: payments + billing contexts
+findings:
+  - executor 與 arch-shape 卡在 "同步 vs 非同步" 的選擇
+  - 兩輪 pushback 都圍繞同一 tradeoff
+  - 這是 ADR-worthy 問題，不是 spec 表達問題
+decision: route to V4 (ADR drafting)
+action: |
+  - 移除 mode-c-rounds:N labels
+  - 標 arch-state:awaiting-decision-approval
+  - 重派 arch-shape (with hint: "draft ADR for sync-vs-async")
+exit: routed</pre>
+  <p style="margin-top: 8px">arch-judgment 然後退出 — 它<strong>不執行</strong>後續路由結果 (派 arch-shape 是 workflow 的工作)。</p>
+</div>
+
+<div class="stage" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">workflow 套用 arch-judgment 的決策</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <p>workflow 讀 arch-judgment 的 action 段，照著做：</p>
+  <ul class="tight">
+    <li>flip labels</li>
+    <li>派下一個 agent (如指定)</li>
+    <li>關閉 issue / 開新 issue (如指定)</li>
+  </ul>
+  <p style="margin-top: 8px">arch-judgment 的決策一次性 — 同一 issue 不會在短時間內被 V8 處理兩次 (avoid loop)。</p>
+</div>
+
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>arch-judgment 也判不出來</td>
+      <td>沒有可用決策</td>
+      <td>強制升級 <span class="gh-state">human-review</span>，留下 reasoning 等人類介入</td>
+    </tr>
+    <tr>
+      <td>arch-judgment 路由錯誤，下游又卡住</td>
+      <td>同 issue 再次落到 V8</td>
+      <td>系統限制：同一 issue 24h 內不會 V8 兩次。第二次直接升級 human-review</td>
+    </tr>
+    <tr>
+      <td>V8 觸發率超過 10%</td>
+      <td>dispatcher 規則設計有漏洞</td>
+      <td>批次分析 <code>flow:escape-hatch</code> issue，找出 pattern，新增規則</td>
+    </tr>
+    <tr>
+      <td>arch-judgment 想做的不是路由 (e.g. 想直接寫 RLM)</td>
+      <td>違反角色紀律</td>
+      <td>spawn 強制限制：可用工具不含 Edit/Write 對 RLM；只能輸出 routing decision</td>
+    </tr>
+    <tr>
+      <td>多個 issue 同時觸發 V8 (系統性問題)</td>
+      <td>不是個別 case，是規則漏掉某類場景</td>
+      <td>暫停自動 dispatch，由人類批次處理 + 修規則</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>V8 不接主流程 — 它做出路由決策後，issue 進入決策指定的下一個變體 (V1/V3/V4/V7) 或主流程，或直接到 human-review 終結。</p>
+
+<p>V8 的<strong>事後價值</strong>：每一次 V8 觸發都是 dispatcher 規則的失誤。批次審 V8 case = 找出規則漏洞 = 系統演化。</p>
+
+<h2>為何這樣設計 (V8 的存在意義)</h2>
+
+<div class="callout callout-rationale">
+  <strong>明確的「我不知道怎麼分」</strong>　沒有 V8 的話，模糊 case 會隱身在某個錯誤的規則裡 (例如被誤判為 V7 直派 executor)，造成靜默故障。V8 把<strong>不確定性顯式化</strong> — 讓「不知道怎麼處理」變成可審計的事件。
+</div>
+
+<p>V8 的設計約束：</p>
+
+<ul class="tight">
+  <li><strong>稀少使用</strong>：1-5% 觸發率是設計目標。太高 = 規則太鬆 / 太嚴；太低可能是 V8 觸發條件設計太嚴 (規則應該命中卻沒命中的 case)</li>
+  <li><strong>一個決策</strong>：arch-judgment 不迭代、不嘗試多個方案 — 一次 spawn = 一個決策 = 退出</li>
+  <li><strong>可審計</strong>：所有 V8 case 都帶 <code>flow:escape-hatch</code> label，便於批量分析</li>
+  <li><strong>不執行</strong>：arch-judgment 只決定「該由誰處理」，實際處理交給對應的 agent</li>
+</ul>
+
+<h3>為何不直接派人類</h3>
+
+<p>跳過 arch-judgment 直接 escalate human-review 看似更穩。但實務上：</p>
+
+<ul class="tight">
+  <li>大多數 V8 case 是<strong>路由問題而非決策問題</strong> — 系統能判，只是規則沒涵蓋</li>
+  <li>每個 V8 都打擾人類會讓人類疲乏 (見了狼來了多次後不再認真看)</li>
+  <li>arch-judgment 的 reasoning comment 同時是「給人類的 brief」— 即使最後升級人工，人類也省了重新調查的時間</li>
+</ul>
+
+<h3>為何不是第 5 個概念角色</h3>
+
+<p>arch-judgment 與 arch-shape 共用：</p>
+
+<ul class="tight">
+  <li>同一 RLM 關係 (讀 RLM，不寫)</li>
+  <li>同一輸出形式 (路由決策 / 結構化 comment)</li>
+  <li>同一 stateless 紀律</li>
+</ul>
+
+<p>不同的只是<strong>prompt budget</strong> (允許讀更多)。所以概念上仍是「arch」這個角色，arch-judgment 是 arch-shape 的<strong>變體</strong>，不是新角色。系統角色仍是四個。</p>
+
+<h2>觀察：V8 觸發率作為健康指標</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>觸發率</th><th>診斷</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>&lt; 1%</td><td>規則設計可能太嚴 (該 V8 的 case 沒被識別)；定期抽查 issue 處理是否有誤分</td></tr>
+    <tr><td>1-5%</td><td>健康 — 設計目標範圍內</td></tr>
+    <tr><td>5-15%</td><td>規則覆蓋率不足；批次分析 V8 case 找新規則</td></tr>
+    <tr><td>&gt; 15%</td><td>系統性問題；可能 dispatcher 邏輯需要重寫，或新類型的場景出現</td></tr>
+  </tbody>
+</table>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v1-rlm-exists.html"><strong>V1 · RLM 已存在</strong><span>arch-judgment 最常路由到此</span></a>
+  <a href="v3-advisor-consultation.html"><strong>V3 · advisor 諮詢</strong><span>判定為「需要先了解現況」時路由到此</span></a>
+  <a href="v4-adr-gate.html"><strong>V4 · ADR 人工 gate</strong><span>多次衝突的根本是 ADR 級問題時路由到此</span></a>
+  <a href="v5-mode-c-pushback.html"><strong>V5 · Mode C pushback</strong><span>round-3 升級的常見入口</span></a>
+  <a href="v6-rlm-drift.html"><strong>V6 · RLM drift</strong><span>判定為 RLM 失準時路由到此</span></a>
+</div>
+
+<footer class="footer">
+  V8 是系統的「不確定性管理機制」。它不解決問題，只把問題明確分類；觸發率是 dispatcher 規則品質的直接指標。
+</footer>
+
+</div>
+</body>
+</html>

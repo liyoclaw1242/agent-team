@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V3 — arch-shape 諮詢 advisor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V3 · 諮詢分支</span>
+  <h1>arch-shape 諮詢 advisor</h1>
+  <p class="tagline">分解時遇到「現況是什麼」的問題，arch-shape 暫停並請 advisor (be / fe / ops / design) 給結構化回答，再用結論繼續分解。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">arch-shape 在分解過程中發出 <code>need-consultation</code> 信號</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">arch-shape · advisor (1-N 個 discipline)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">主流程 Stage 5 中段插入 advisor 諮詢迴圈</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>已進入主流程 Stage 5 (arch-shape 分解)。arch-shape 嘗試切子任務時遇到不確定點，這些不確定不是「設計選擇」(那是 V4 ADR)，而是「<strong>現況到底是什麼</strong>」：</p>
+
+<ul class="tight">
+  <li>「我們已經有處理付款的 service 嗎？」(後端現況)</li>
+  <li>「現有的 Form component 支援這種驗證嗎？」(前端現況)</li>
+  <li>「Postgres 加這個欄位的 blast radius？」(維運現況)</li>
+  <li>「這個 UI flow 跟現有設計系統哪些 pattern 衝突？」(設計現況)</li>
+</ul>
+
+<h2>觸發條件</h2>
+
+<p>arch-shape 在處理過程中可以發出 consultation request。當它判斷自己無法只靠 RLM 回答某個問題時：</p>
+
+<pre>arch-shape 在 #N 留 comment：
+&lt;!-- need-consultation --&gt;
+discipline: be          ← 哪個 advisor
+question: 我們是否已有處理 Stripe webhook 的 service？
+        如有，是否能擴充支援 Apple Pay？
+context: 子任務 "信眾付款回呼處理" 的 spec 取決於這個答案
+
+→ workflow 偵測 need-consultation → 派對應的 advisor</pre>
+
+<p>arch-shape 自己標 <span class="gh-state">arch-state:awaiting-consultation</span>，然後退出。它不會卡在那裡等。</p>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 識別不確定點</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>分解過程中，arch-shape 嘗試查 RLM 回答某個問題，但 RLM 不夠 (因為 RLM 描述「應有什麼」，不描述「程式碼裡實際有什麼」)。</p>
+  <div class="action action-arch">
+    <div class="action-label">什麼算「需要諮詢」</div>
+    <ul class="tight">
+      <li>✅ 「現況是什麼」— 該找 advisor</li>
+      <li>✅ 「現有東西能不能擴充支援 X」— 該找 advisor</li>
+      <li>❌ 「我們應該選 A 還是 B」— 那是設計決策，走 V4 ADR</li>
+      <li>❌ 「這個 RLM context 邊界是否合理」— 那是 arch-shape 自己的工作</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 留 consultation request</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>在 #N 留結構化 comment，標 <span class="gh-state">arch-state:awaiting-consultation</span>，然後退出 (stateless)。</p>
+  <div class="action action-arch">
+    <div class="action-label">comment 格式</div>
+    <pre>&lt;!-- need-consultation --&gt;
+discipline: be
+subdomain: payments
+question: |
+  專案是否已有處理 Stripe webhook 的 service？
+  如有，能否擴充支援 Line Pay 的 callback signature？
+why: |
+  子任務 "處理付款回呼" 的 spec 取決於：
+  - 重用現有 webhook receiver 還是新建
+  - 多 provider 的路由策略 (單一 endpoint vs 多 endpoint)
+context: |
+  RLM payments context 描述了業務需求，但沒記錄
+  現有實作。需要 be advisor 確認。</pre>
+  </div>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">workflow 派 advisor</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>parent issue 標 <code>awaiting-consultation</code> + 有 <code>need-consultation</code> comment</div>
+  <p>workflow 開新的 sub-issue 給 advisor (一個 discipline 對一個 sub-issue，同時 fork 多個 advisor 也可以並行)。</p>
+  <pre>新 issue #N+1
+labels: agent:advisor-be, status:ready
+body: parent #N 的 consultation request 全文</pre>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">advisor 執行 RLM-first 調查</span>
+    <span class="badge advisor">advisor-be</span>
+  </div>
+  <p>advisor 是 read-only。它的工作是讀完現況後留結構化建議，不修任何 state。</p>
+  <div class="action action-advisor">
+    <div class="action-label">RLM-first 查詢順序</div>
+    <ul class="tight">
+      <li><code>rlm list-components --context=payments</code> — RLM 是否登錄過 webhook component</li>
+      <li><code>rlm describe-api payments.webhook-receiver</code> — 已建模的 API 形狀</li>
+      <li><strong>fallback</strong>：grep 代碼 (<code>src/payments/webhook</code>, <code>routes/webhook.ts</code>)</li>
+      <li>確認 RLM 與 code 是否一致</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stage" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">advisor 留結構化回答</span>
+    <span class="badge advisor">advisor-be</span>
+  </div>
+  <p>advisor 在自己的 sub-issue (#N+1) 留 comment，回答 arch-shape 的問題：</p>
+  <pre>## advisor-be · consultation 回覆
+
+### 問題 1：是否已有 Stripe webhook service？
+**有**。位於 `src/payments/webhook-receiver.ts`，
+RLM slug `payments.webhook-receiver`。
+目前只處理 Stripe，但設計時就抽象了 provider 接口。
+
+### 問題 2：能否擴充支援 Line Pay？
+**能**。需要的改動：
+- 新增 `LinePayProvider implements PaymentProvider`
+- webhook 路由改為 `/webhook/:provider` 風格
+- 新增 Line Pay signature 驗證 (HMAC-SHA256)
+
+### 風險點
+- Line Pay callback retry 行為與 Stripe 不同
+  (Stripe 24h 內重試，Line Pay 立即 3 次)
+  → idempotency key 處理需重新檢視
+
+### 建議分子任務
+1. provider 抽象化重構 (deps: 無)
+2. Line Pay provider 實作 (deps: 1)
+3. idempotency 統一處理 (deps: 1)</pre>
+  <p style="margin-top: 8px">advisor 關閉自己的 sub-issue (#N+1)，標 <span class="gh-state">status:done</span>。</p>
+</div>
+
+<div class="stage" data-step="6">
+  <div class="stage-header">
+    <span class="stage-title">workflow 重啟 arch-shape</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>consultation sub-issue closed + parent #N 標 <code>awaiting-consultation</code></div>
+  <p>workflow 解除 awaiting 狀態，重派 arch-shape 處理 #N，把 advisor 結論一併傳入 spawn context。</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:arch-shape</span> + 移除 <code>awaiting-consultation</code></p>
+</div>
+
+<div class="stage" data-step="7">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 用結論完成分解</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>arch-shape 收到 advisor 給的具體建議後，產出更精確的子任務：</p>
+  <ul class="tight">
+    <li>#X provider 抽象重構 <code>deps: []</code></li>
+    <li>#Y Line Pay provider <code>deps: [#X]</code></li>
+    <li>#Z idempotency 處理 <code>deps: [#X]</code></li>
+  </ul>
+  <p style="margin-top: 8px">每個子任務的 spec 都引用 advisor comment 連結，executor 之後可追溯。</p>
+</div>
+
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>arch-shape 一次需要多個 discipline 的 advisor</td>
+      <td>需要並行多個諮詢</td>
+      <td>workflow 開多個 sub-issue (parallel)，arch-shape 等所有都 closed 才重啟</td>
+    </tr>
+    <tr>
+      <td>advisor 給的回答含糊或自相矛盾</td>
+      <td>arch-shape 仍然無法分解</td>
+      <td>arch-shape 可發第二輪 consultation；超過 2 輪同一問題 → 升級 V8 (arch-judgment)</td>
+    </tr>
+    <tr>
+      <td>advisor 發現現況本身有問題 (e.g. 代碼與 RLM 不符)</td>
+      <td>應該優先修正 RLM</td>
+      <td>advisor 在 comment 標 <code>rlm_changes_needed</code> → 觸發 V6</td>
+    </tr>
+    <tr>
+      <td>advisor 自己也不確定</td>
+      <td>advisor 不該猜</td>
+      <td>advisor 應坦白「無法判定」並建議升級 (人工 review 或 ADR)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>諮詢循環在主流程 Stage 5 內部 — Stage 5 結束後 (子任務開出來)，後續流程 (Stage 6-11) 完全相同。</p>
+
+<p>從外部看，#N 多花了一些時間 + 多了若干 closed 的 advisor sub-issue 作為審查痕跡，但最終的子任務品質明顯提升。</p>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>分工而非合併</strong>　不讓 arch-shape 自己 grep 代碼是刻意的。arch-shape 的工作是「以 RLM 為基礎切任務」；要 grep 代碼分析現況是 advisor 的工作。讓 arch-shape 跨界做兩件事會稀釋它的紀律 (RLM-first)。
+</div>
+
+<p>把 consultation 做成<strong>獨立 sub-issue</strong>而非「arch-shape 內部呼叫」的好處：</p>
+
+<ul class="tight">
+  <li>每個諮詢都留下可審查的 GitHub 痕跡 (誰問了什麼、advisor 回答了什麼)</li>
+  <li>arch-shape 是 stateless 的，不需要保留 「我之前問過...」的記憶</li>
+  <li>同一個諮詢結論可以被後續的 V1 / V5 重新引用</li>
+  <li>advisor 可以並行處理多個 question，不卡 arch-shape</li>
+</ul>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v4-adr-gate.html">
+    <strong>V4 · ADR 人工 gate</strong>
+    <span>諮詢之後仍是「需要選擇方案」，升級為 ADR</span>
+  </a>
+  <a href="v6-rlm-drift.html">
+    <strong>V6 · RLM 與現實不符</strong>
+    <span>advisor 諮詢時最常觸發的副作用</span>
+  </a>
+  <a href="v8-arch-judgment.html">
+    <strong>V8 · arch-judgment</strong>
+    <span>同一問題反覆諮詢仍無解時的兜底</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V3 是「arch 與 advisor 分工合作」最頻繁的場景。多輪諮詢頻率高 = arch-shape 對 RLM 訊息密度的依賴超過模型實際提供的細節。
+</footer>
+
+</div>
+</body>
+</html>

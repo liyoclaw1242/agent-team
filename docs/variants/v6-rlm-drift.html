@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V6 — RLM 與現實不符</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V6 · 模型校準</span>
+  <h1>executor 發現 RLM 與現實不符</h1>
+  <p class="tagline">executor 實作中發現 RLM 描述的 entity / story 與真實領域有出入。executor 不偷改 RLM (沒寫權)，而是發信號讓 rlm-modeler 修正。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">executor 實作中發現 RLM 不準確 / 缺漏 / 概念混淆</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">executor (發信號) · rlm-modeler (修正) · arch-shape (重評估)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">主流程 Stage 7 暫停 → 修 RLM → 可能重切子任務 → 重啟 Stage 7</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>executor 在 Stage 7 拿到子 issue，spec 看起來合理 (沒觸發 V5 pushback)，開始實作。但深入後發現 RLM 描述與真實領域<strong>有出入</strong>：</p>
+
+<ul class="tight">
+  <li><strong>缺欄位</strong>：RLM 說 Order entity 有 <code>customer_id</code>，但業務需要 <code>billing_address</code> + <code>shipping_address</code> 多個地址</li>
+  <li><strong>概念混淆</strong>：RLM glossary 把「會員」和「使用者」當同義，實作時發現是不同概念 (員工內部使用 vs 顧客)</li>
+  <li><strong>狀態機缺失</strong>：RLM story 沒提到「訂單退款後可以重新下單」這個分支</li>
+  <li><strong>邊界錯位</strong>：RLM 把 inventory 放在 orders context，但實作上需要獨立 context (多個 channel 共用)</li>
+  <li><strong>事實已過時</strong>：RLM 說「使用 Stripe」，但團隊已改用 Adyen，文件未更新</li>
+</ul>
+
+<h2>觸發條件</h2>
+
+<p>executor 在實作中執行 RLM-grounded 比對。任一條件成立 = V6：</p>
+
+<pre>1. spec 引用的 RLM entity 欄位與現實 schema 不同？
+2. RLM glossary 詞彙在代碼裡有多種用法 (語意不一)？
+3. spec 描述的 user flow 與測試 / UI 反映的真實 flow 不同？
+4. 為了完成 acceptance criteria，必須引入 RLM 沒登錄的概念？
+5. 現有代碼已採用某 pattern，但 RLM 描述的是另一種？
+
+任一 yes → emit rlm_changes_needed 信號，executor 暫停</pre>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">executor 開始實作</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>spec 通過 sanity check (不是 V5)，executor 進入實作階段。</p>
+  <p>例：spec 是「為信眾資料新增 CRUD」，引用 RLM 的 <code>Member</code> entity。</p>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">發現 RLM 與現實落差</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>實作過程中，executor 對照 RLM 與代碼/業務需求發現問題。</p>
+  <div class="action action-executor">
+    <div class="action-label">具體例</div>
+    <pre>RLM `payments.Member` 描述：
+  fields: id, name, phone, email
+
+但實作時發現業務需要：
+  - 法名 (vs 俗名) — 法會報名時用法名
+  - 戶籍地址 vs 通訊地址 — 開立功德證明用前者
+  - 緊急聯絡人 — 法會意外處理用
+
+這些不是「我想多加幾個欄位」— 而是 RLM 漏了真實的領域概念。</pre>
+  </div>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">executor 暫停 + 發信號</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>executor <strong>不偷改 RLM</strong> (沒有寫權)，<strong>不硬實作多餘欄位</strong> (會與 RLM 漂移)。</p>
+  <p>留 comment 在子 issue：</p>
+  <pre>&lt;!-- rlm_changes_needed --&gt;
+trigger: executor mid-implementation
+issue: spec 引用 RLM `payments.Member`，但業務需求需要 RLM 沒記錄的欄位
+
+evidence:
+  - acceptance criteria #3 提到「列印功德證明」需要戶籍地址
+  - 既有測試 (tests/legacy/funeral.spec.ts) 用了 dharma_name 欄位
+  - 與 #N 父 issue 的 stakeholder 訪談紀錄有提到緊急聯絡人
+
+proposed RLM changes:
+  - 擴充 Member entity，新增：
+    - dharma_name (法名，optional)
+    - registered_address (戶籍地址)
+    - mailing_address (通訊地址，可空)
+    - emergency_contact (json)
+  - 新增 glossary：法名 vs 俗名、戶籍 vs 通訊
+  - story 補充：「列印功德證明」流程
+
+executor_status: paused (waiting for RLM update)</pre>
+  <p style="margin-top: 8px"><strong>labels:</strong> <span class="gh-state">arch-state:awaiting-rlm-update</span> <span class="gh-state">status:blocked</span></p>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">workflow 派 rlm-modeler</span>
+    <span class="badge workflow">dispatcher</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>子 issue 有 <code>rlm_changes_needed</code> 信號</div>
+  <p>workflow 開新的 sub-issue 給 rlm-modeler，描述要做的 RLM 變更。</p>
+  <p>rlm-modeler 不是盲目套用 executor 提案 — 它會：</p>
+  <ul class="tight">
+    <li>讀 executor 的 evidence 重新評估提議的合理性</li>
+    <li>檢查是否影響其他 context (e.g. dharma_name 是否其他 service 也需要？)</li>
+    <li>必要時拒絕提議或修改範圍 (e.g. 「emergency_contact 應該獨立 entity，不該塞 Member」)</li>
+  </ul>
+</div>
+
+<div class="stage" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">rlm-modeler 修正 RLM</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <div class="action action-rlm-modeler">
+    <div class="action-label">執行</div>
+    <ul class="tight">
+      <li><code>rlm update-entity Member --add-field=dharma_name --type=string?</code></li>
+      <li><code>rlm define-glossary 法名 --description=...</code></li>
+      <li><code>rlm define-glossary 戶籍地址 --description=...</code></li>
+      <li><code>rlm update-story member-registration --add-step=...</code></li>
+      <li><code>rlm validate</code></li>
+    </ul>
+  </div>
+  <p style="margin-top: 8px">產出 PR：「fix: align RLM Member entity with funeral domain reality (#X)」</p>
+</div>
+
+<div class="stage" data-step="6">
+  <div class="stage-header">
+    <span class="stage-title">RLM PR review + merge</span>
+    <span class="badge github">PR</span>
+  </div>
+  <p>review 重點：</p>
+  <ul class="tight">
+    <li>新欄位是否真的屬於 Member 還是該獨立</li>
+    <li>glossary 是否與既有詞衝突</li>
+    <li>story 變更是否影響其他子任務</li>
+  </ul>
+  <p style="margin-top: 8px">通常這類 PR 比 bootstrap 簡單 (是局部修正)，可較快合併。</p>
+</div>
+
+<div class="stage" data-step="7">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 重評估子 spec</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>RLM PR merged + 原子 issue 標 <code>awaiting-rlm-update</code></div>
+  <p>workflow 派 arch-shape (而非直接派 executor) 因為 RLM 變了，子 issue 的 spec 可能也要更新。</p>
+  <p>arch-shape 三種可能動作：</p>
+  <ul class="tight">
+    <li><strong>更新 spec</strong>：寫進新欄位 / glossary / step → 派回 executor</li>
+    <li><strong>拆子任務</strong>：發現原本一個 issue 該拆兩個 (e.g. 「Member CRUD」+「emergency_contact 管理」)</li>
+    <li><strong>連鎖檢查</strong>：是否有其他子 issue 也受影響？(e.g. 法會報名 issue 也會用到 dharma_name)</li>
+  </ul>
+</div>
+
+<div class="stage" data-step="8">
+  <div class="stage-header">
+    <span class="stage-title">executor 重啟實作</span>
+    <span class="badge executor">executor</span>
+  </div>
+  <p>spec 已對齊新 RLM，executor 進入正常實作流程。</p>
+  <p>後續同主流程 Stage 8 (PR / merge / 關閉)。</p>
+</div>
+
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>executor 提議的 RLM 變更實際上是業務變化 (新需求)</td>
+      <td>不該偷渡進現有 issue</td>
+      <td>rlm-modeler 拒絕，改為要求人類開新 issue 走主流程</td>
+    </tr>
+    <tr>
+      <td>RLM 修正影響大量現有子 issue (連鎖效應)</td>
+      <td>多個 issue 需重評估</td>
+      <td>arch-shape 對所有受影響 issue 標 <code>awaiting-rlm-realign</code>，批次處理</td>
+    </tr>
+    <tr>
+      <td>同一 entity 在短時間內被多個 V6 修正</td>
+      <td>RLM 翻來覆去</td>
+      <td>升級為 V4 — 該 entity 的設計需要 ADR，不該邊做邊調</td>
+    </tr>
+    <tr>
+      <td>executor 「假報」V6 為了避開難實作的 spec</td>
+      <td>系統被濫用</td>
+      <td>rlm-modeler review 時要求 evidence — 沒有 evidence 的 V6 應視為 V5</td>
+    </tr>
+    <tr>
+      <td>RLM 修正後執行還是失敗</td>
+      <td>原因不是 RLM</td>
+      <td>進入 V5 (Mode C pushback)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>RLM 校準完 → arch-shape 修 spec → executor 重啟。後續流程 (Stage 8-11) 不變。</p>
+
+<p>V6 留下的痕跡 (RLM PR + executor pushback comment) 是<strong>系統健康度的指標</strong>：</p>
+
+<ul class="tight">
+  <li>同一 context 的 V6 頻率高 = bootstrap 階段建模草率</li>
+  <li>同一 entity 反覆 V6 = 該 entity 應升級為 V4 ADR</li>
+  <li>V6 集中在某個 advisor 沒參與的 subdomain = 該 advisor 應更早介入 (V3)</li>
+</ul>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>權限分離保護模型完整性</strong>　executor 沒有 RLM 寫權是<strong>關鍵紀律</strong>。如果 executor 能直接改 RLM，每個 spawn 都會「順手」加自己需要的欄位，幾週後 RLM 變成所有 executor 改動的雜燴，失去單一來源的價值。
+</div>
+
+<p>「<strong>暫停而非繞過</strong>」的紀律：</p>
+
+<ul class="tight">
+  <li>executor 寧可不開 PR 也不寫 RLM 沒記錄的概念 — 因為下次 advisor 查 RLM 看不到，會誤判現況</li>
+  <li>強制走 RLM PR，意味著 RLM 變更被獨立 review — 而不是混在「順便加幾個欄位」的 code PR 裡偷渡</li>
+  <li>每個 V6 都是 RLM 與現實對齊的機會；這是系統<strong>自我修復</strong>的機制</li>
+</ul>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v5-mode-c-pushback.html">
+    <strong>V5 · Mode C pushback</strong>
+    <span>當問題是 spec 寫錯而非 RLM 不對，應走 V5</span>
+  </a>
+  <a href="v1-rlm-exists.html">
+    <strong>V1 · RLM 已存在</strong>
+    <span>V6 修正後續的需求都走 V1，引用更新後的 RLM</span>
+  </a>
+  <a href="v4-adr-gate.html">
+    <strong>V4 · ADR 人工 gate</strong>
+    <span>同一 entity 反覆 V6 應升級為 ADR</span>
+  </a>
+  <a href="v3-advisor-consultation.html">
+    <strong>V3 · advisor 諮詢</strong>
+    <span>advisor 在諮詢時也可能發現 RLM 不準，發 V6 信號</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V6 是「模型校準」的常規迴路。健康的專案會週期性觸發 — RLM 從來不會一次寫對，只能透過實作不斷對齊現實。
+</footer>
+
+</div>
+</body>
+</html>

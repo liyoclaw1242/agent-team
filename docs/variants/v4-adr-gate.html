@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V4 — 架構決策 ADR 人工 gate</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V4 · 重大決策</span>
+  <h1>架構決策需要 ADR</h1>
+  <p class="tagline">arch-shape 遇到「在多個合理選項間選擇」時暫停，草擬 ADR，等人工選定方案後再繼續分解。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">arch-shape 識別出 ADR-worthy 的設計選擇</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">arch-shape (草擬) · rlm-modeler (寫入) · 人類 (選擇)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">在 Stage 5 中段插入 ADR draft → 人工 promote → 重啟分解</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>已在主流程 Stage 5 (arch-shape 分解)。arch-shape 發現某個子任務的實作方式有<strong>多個合理選項</strong>，每個選項都有實質的 tradeoff，而且選擇會影響後續多個子任務 — 這就是 ADR-worthy。</p>
+
+<p>典型 ADR 觸發場景：</p>
+<ul class="tight">
+  <li>技術棧選擇 (Postgres vs MongoDB / REST vs GraphQL / SSR vs CSR)</li>
+  <li>跨 context 整合方式 (同步呼叫 vs event-driven / monorepo vs polyrepo)</li>
+  <li>資料一致性策略 (強一致 vs 最終一致)</li>
+  <li>身份驗證模型 (session vs JWT / 自建 vs 第三方)</li>
+  <li>部署拓樸 (單一服務 vs 拆分 / serverless vs 容器)</li>
+</ul>
+
+<h2>觸發條件</h2>
+
+<p>arch-shape 自我判斷時的判準：</p>
+
+<table class="compact">
+  <thead>
+    <tr><th>檢查</th><th>是 → V4</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>是否有 ≥ 2 個合理選項？</td><td>有</td></tr>
+    <tr><td>選項之間的 tradeoff 是否實質 (非偏好)？</td><td>是</td></tr>
+    <tr><td>選擇是否影響 ≥ 3 個子任務？</td><td>是</td></tr>
+    <tr><td>RLM 是否已記錄類似決策？</td><td>否</td></tr>
+    <tr><td>選項是否需要組織 / 業務 / 預算考量？</td><td>否則 advisor 諮詢就夠 (V3)</td></tr>
+  </tbody>
+</table>
+
+<p>若 5 條都符合 → arch-shape 草擬 ADR；任一條不符 → 應該走 V3 諮詢或 arch-shape 自決。</p>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 識別 ADR-worthy 點</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>分解時遇到判準命中的選擇點。arch-shape 不假設答案，而是把問題 + 選項結構化。</p>
+  <div class="action action-arch">
+    <div class="action-label">範例：奉獻金流的同步性</div>
+    <ul class="tight">
+      <li><strong>問題</strong>：信眾完成奉獻後，發票該<em>同步</em>產生還是<em>非同步</em>？</li>
+      <li><strong>選項 A</strong>：同步 — 付款回應前產生發票，UX 即時但失敗風險高</li>
+      <li><strong>選項 B</strong>：非同步 — 付款後排入 queue，UX 需等通知但更穩定</li>
+      <li><strong>影響子任務</strong>：付款 service / 發票 service / UI 完成頁面 / 通知 worker</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 草擬 ADR</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>arch-shape 發 <code>rlm_changes_needed</code> 信號，請求把 ADR draft 寫進 RLM。</p>
+  <pre>&lt;!-- rlm_changes_needed --&gt;
+- new ADR (draft): 0042-invoice-issuance-sync-vs-async
+  context: payments
+  status: draft
+  question: 發票產生時機 — 同步 vs 非同步
+  options:
+    A: 同步產生
+       pros: UX 即時，邏輯線性
+       cons: 第三方稅務 API 失敗會擋付款流程
+    B: 非同步產生 (event-driven)
+       pros: 解耦，可重試，不擋付款
+       cons: UX 需等待通知，需要 worker 基礎設施
+  recommendation: B (穩定性優先)
+  decision: AWAITING HUMAN</pre>
+  <p style="margin-top: 8px">arch-shape 標 <span class="gh-state">arch-state:awaiting-decision-approval</span> 並退出。</p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">rlm-modeler 寫入 ADR draft</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>workflow 派 rlm-modeler 把 ADR 寫入 <code>project-rlm/decisions/draft/</code>。</p>
+  <div class="action action-rlm-modeler">
+    <div class="action-label">執行</div>
+    <pre>rlm define-decision \
+  --slug=0042-invoice-issuance-sync-vs-async \
+  --status=draft \
+  --context=payments \
+  --options=...
+rlm validate</pre>
+  </div>
+  <p style="margin-top: 8px">產出 PR：「ADR-0042 draft (awaiting decision)」。</p>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">PR merged → ADR draft 入庫</span>
+    <span class="badge github">PR merged</span>
+  </div>
+  <p>這個 PR review 重點不是「方案對不對」(那是下一步)，而是「<strong>選項列得完整嗎？tradeoff 寫得對嗎？</strong>」</p>
+  <p>merged 後 ADR 進入 <code>decisions/draft/</code>，#N 仍維持 <span class="gh-state">arch-state:awaiting-decision-approval</span>。</p>
+</div>
+
+</div>
+
+<div class="callout callout-gate">
+  ⚠️ <strong>人工 gate (核心)</strong>　ADR 的選擇必須由人類做，不能交給 LLM。這個 gate 才是 V4 的本質 — agent 系統把問題結構化，人類選方向。
+</div>
+
+<h2>人工 promote 流程</h2>
+
+<div class="timeline">
+
+<div class="stage branch" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">人類 review ADR</span>
+    <span class="badge warn">human</span>
+  </div>
+  <p>人類在 <code>decisions/draft/0042-...</code> 中做出選擇，可選方式：</p>
+  <ul class="tight">
+    <li><strong>選擇某個選項</strong>：編輯檔案，把 <code>decision: AWAITING HUMAN</code> 改成 <code>decision: B</code>，補上 rationale</li>
+    <li><strong>要求重新草擬</strong>：留 comment 指出選項列得不夠或缺漏，arch-shape 重做</li>
+    <li><strong>引入新選項</strong>：加 option C，arch-shape 重新評估</li>
+    <li><strong>拒絕 ADR</strong>：判定不需要決策 (e.g. 已有先例)，改走別的路徑</li>
+  </ul>
+</div>
+
+<div class="stage branch" data-step="6">
+  <div class="stage-header">
+    <span class="stage-title">promote draft → accepted</span>
+    <span class="badge warn">human</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>人類確定後，透過 rlm-modeler (或 rlm CLI 直接) 把 ADR 從 <code>draft/</code> 移到 <code>accepted/</code>，狀態改為 <code>accepted</code>，加上 decision date 和 decided-by。</p>
+  <pre>rlm promote-decision 0042-... --status=accepted \
+  --decision=B --decided-by=@your-handle</pre>
+  <p style="margin-top: 8px">這個動作會發 git commit，trigger workflow 重新檢查 #N。</p>
+</div>
+
+<div class="stage branch" data-step="7">
+  <div class="stage-header">
+    <span class="stage-title">workflow 重啟 arch-shape</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>ADR promoted to accepted + parent #N 仍 open</div>
+  <p>workflow 移除 <code>awaiting-decision-approval</code>，重派 arch-shape，把 ADR slug 一併傳入。</p>
+</div>
+
+<div class="stage branch" data-step="8">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 用 ADR 完成分解</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>arch-shape 讀 ADR-0042 (option B 已選定) 後切子任務，每個受影響的子 issue body 都標上 <code>implements-adr: 0042</code>：</p>
+  <pre>子 issue #X
+&lt;!-- subdomain: payments --&gt;
+&lt;!-- implements-adr: 0042-invoice-issuance-sync-vs-async --&gt;
+&lt;!-- deps: ... --&gt;
+
+spec: 建立 invoice queue worker，消費 PaymentSucceeded event...</pre>
+  <p style="margin-top: 8px">implements-adr 標記讓 executor 在實作時可以追溯到決策原因，避免重新發明。</p>
+</div>
+
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>人類遲遲不選</td>
+      <td>#N 永遠卡在 awaiting-decision-approval</td>
+      <td>系統不催；列入 stale issue 報表，由人類定期清理</td>
+    </tr>
+    <tr>
+      <td>人類選了未列出的方案 (option D)</td>
+      <td>arch-shape draft 沒涵蓋</td>
+      <td>視為「重新草擬」— rlm-modeler 更新 ADR 加入 D，重做 review</td>
+    </tr>
+    <tr>
+      <td>多個 ADR 互相依賴</td>
+      <td>需要連鎖決策</td>
+      <td>arch-shape 一次草擬全部，標 <code>blocks: 0043, 0044</code>，人類批次決</td>
+    </tr>
+    <tr>
+      <td>已 accepted 的 ADR 後來證明錯誤</td>
+      <td>需要 supersede</td>
+      <td>新開 ADR-NNNN，標 <code>supersedes: 0042</code>；舊 ADR 改 <code>status: superseded</code> 但保留</td>
+    </tr>
+    <tr>
+      <td>arch-shape 把不該開 ADR 的事情升級成 ADR</td>
+      <td>過度結構化、拖慢流程</td>
+      <td>review 時拒絕 draft；arch-shape 改走 V3 諮詢或自決</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>ADR promoted 後，arch-shape 重啟分解 → 接主流程 Stage 5 → 後續 (Stage 6-11) 不變。</p>
+
+<p>每個受影響的子任務 PR 在實作時都會引用 ADR slug；reviewer 看 PR 也能即時對照「為什麼要這樣做」。</p>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>把選擇還給人類</strong>　LLM 可以列選項、估 tradeoff，但<strong>不該替組織做架構決策</strong>。架構選擇牽涉組織能力、預算、招聘、風險偏好、政治 — 這些是人類的職責。V4 的價值是「把決策結構化」，讓人類更快做決定，而不是繞過人類。
+</div>
+
+<p>把 ADR 寫進 <code>project-rlm/decisions/</code> 的好處：</p>
+
+<ul class="tight">
+  <li>決策成為 RLM 的一部分，未來的 arch-shape 能查到先例</li>
+  <li>子 issue 的 <code>implements-adr</code> 標記提供反向追溯</li>
+  <li>ADR 修訂歷史 (git log) = 組織決策的演化史</li>
+  <li>新人 onboarding 看 RLM 就能理解「為什麼是這樣」</li>
+</ul>
+
+<p>對比「在 PR 描述裡寫決策」(常見的反模式)：PR 會被歸檔遺忘，新需求出現時又從頭重論一遍。ADR 是<strong>持久的決策原語</strong>。</p>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v3-advisor-consultation.html">
+    <strong>V3 · advisor 諮詢</strong>
+    <span>當問題只是「現況是什麼」而非「該怎麼選」，應走 V3 而非 V4</span>
+  </a>
+  <a href="v1-rlm-exists.html">
+    <strong>V1 · RLM 已存在</strong>
+    <span>有先例 ADR 時，arch-shape 直接引用，不再升級 V4</span>
+  </a>
+  <a href="v8-arch-judgment.html">
+    <strong>V8 · arch-judgment</strong>
+    <span>ADR 後設問題 (e.g. ADR 之間衝突) 會升級到 V8</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V4 是「人 vs agent 分工」最清楚的場景。agent 結構化問題 → 人選方向 → agent 執行。每個健康專案都會經歷十幾次 ADR。
+</footer>
+
+</div>
+</body>
+</html>

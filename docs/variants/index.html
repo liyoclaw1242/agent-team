@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>變體總覽 — agent-team</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .v-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .v-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.15s;
+    display: block;
+  }
+  .v-card:hover { border-color: var(--arch); transform: translateY(-1px); }
+  .v-card-num {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .v-card-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+  .v-card-when { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+  .v-card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  @media (max-width: 720px) { .v-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">VARIANTS</span>
+  <h1>情況變體總覽</h1>
+  <p class="tagline">主流程的 8 種常見偏離，每個變體都有獨立的詳細頁面。</p>
+</header>
+
+<p>主流程 (<a href="../flow.html" style="color: var(--arch);">happy path</a>) 描述「全新 repo + 第一個商模 issue」這個理想路徑。實務上系統會遇到下列變體；每一個都有自己的觸發條件、流程分歧、與主流程的接點。</p>
+
+<div class="v-grid">
+
+  <a class="v-card" href="v1-rlm-exists.html">
+    <span class="v-card-num">V1</span>
+    <div class="v-card-title">RLM 已存在，新需求進場</div>
+    <div class="v-card-when">第二個以後的商業 issue（最常見）</div>
+    <div class="v-card-tags">
+      <span class="badge arch-shape">arch-shape</span>
+      <span class="badge rlm-modeler">rlm-modeler (有條件)</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v2-legacy-bring-in.html">
+    <span class="v-card-num">V2</span>
+    <div class="v-card-title">既有代碼導入 (legacy bring-in)</div>
+    <div class="v-card-when">已有業務代碼但無 <code>project-rlm/</code></div>
+    <div class="v-card-tags">
+      <span class="badge rlm-modeler">rlm-modeler</span>
+      <span class="badge warn">人工 gate</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v3-advisor-consultation.html">
+    <span class="v-card-num">V3</span>
+    <div class="v-card-title">arch-shape 諮詢 advisor</div>
+    <div class="v-card-when">分解時遇到「現況是什麼」的問題</div>
+    <div class="v-card-tags">
+      <span class="badge arch-shape">arch-shape</span>
+      <span class="badge advisor">advisor</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v4-adr-gate.html">
+    <span class="v-card-num">V4</span>
+    <div class="v-card-title">架構決策需要 ADR</div>
+    <div class="v-card-when">遇到架構級選擇 (技術棧 / 整合策略 / 一致性)</div>
+    <div class="v-card-tags">
+      <span class="badge arch-shape">arch-shape</span>
+      <span class="badge rlm-modeler">rlm-modeler</span>
+      <span class="badge warn">人工 gate</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v5-mode-c-pushback.html">
+    <span class="v-card-num">V5</span>
+    <div class="v-card-title">executor 反推 (Mode C)</div>
+    <div class="v-card-when">spec 矛盾 / 不可達 / 違反 RLM</div>
+    <div class="v-card-tags">
+      <span class="badge executor">executor</span>
+      <span class="badge arch-shape">arch-shape</span>
+      <span class="badge danger">round-3 升級</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v6-rlm-drift.html">
+    <span class="v-card-num">V6</span>
+    <div class="v-card-title">RLM 與現實不符</div>
+    <div class="v-card-when">executor 實作中發現 RLM 失準</div>
+    <div class="v-card-tags">
+      <span class="badge executor">executor</span>
+      <span class="badge rlm-modeler">rlm-modeler</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v7-direct-dispatch.html">
+    <span class="v-card-num">V7</span>
+    <div class="v-card-title">小型 bug fix 直接派工</span></div>
+    <div class="v-card-when">issue 範圍小，不影響領域模型</div>
+    <div class="v-card-tags">
+      <span class="badge executor">executor</span>
+      <span class="badge danger">繞過風險</span>
+    </div>
+  </a>
+
+  <a class="v-card" href="v8-arch-judgment.html">
+    <span class="v-card-num">V8</span>
+    <div class="v-card-title">arch-judgment 兜底</div>
+    <div class="v-card-when">dispatcher 無法分類 / 衝突 / 異常狀態</div>
+    <div class="v-card-tags">
+      <span class="badge warn">arch-judgment</span>
+      <span class="badge">1-5% 觸發</span>
+    </div>
+  </a>
+
+</div>
+
+<h2>如何閱讀變體頁面<span class="sub">每頁的固定結構</span></h2>
+
+<p>每個變體頁面都按以下章節組織，所以你可以快速找到關心的部分：</p>
+
+<table class="compact">
+  <thead>
+    <tr><th>章節</th><th>內容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>前置狀態</td><td>進入這個變體之前，repo / RLM / issues 的狀態長什麼樣</td></tr>
+    <tr><td>觸發條件</td><td>workflow 用什麼 signal 判定要走這個分支</td></tr>
+    <tr><td>詳細流程</td><td>stage-by-stage 的操作 + label 變化 + agent 動作</td></tr>
+    <tr><td>分支與失敗模式</td><td>變體內部的二級分歧、卡死狀況、人工介入點</td></tr>
+    <tr><td>與主流程的接點</td><td>處理完之後如何匯回主路徑</td></tr>
+    <tr><td>為何這樣設計</td><td>背後的紀律與權衡 (與四角模型的關係)</td></tr>
+    <tr><td>相關變體</td><td>常一起出現或會升級為的其他變體</td></tr>
+  </tbody>
+</table>
+
+<footer class="footer">
+  <p>變體不是 bug，是系統的設計表面。流程能識別並有規律地處理它們，才表示路由規則健全。</p>
+</footer>
+
+</div>
+</body>
+</html>

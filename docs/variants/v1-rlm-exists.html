@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V1 — RLM 已存在，新需求進場</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V1 · 最常見</span>
+  <h1>RLM 已存在，新需求進場</h1>
+  <p class="tagline">第二個以後的商業 issue 進場時，跳過 bootstrap，直接由 arch-shape 處理 — 但需要判斷是否引入新 context。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value"><code>project-rlm/</code> 存在 + 新 <code>intake-kind: business</code> issue</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">arch-shape · 視情況 rlm-modeler</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">跳過 Stage 2-4 (bootstrap)；可能在 Stage 5 前插入 RLM 擴充</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+<p>這個變體假設專案已經至少完成過一輪主流程，<code>project-rlm/</code> 已建立並 merge：</p>
+<ul class="tight">
+  <li>有完整的 brief / contexts / glossary / stories</li>
+  <li>可能已有若干 ADR (decisions/)</li>
+  <li>已有業務代碼，並通過先前商模需求驗收</li>
+  <li>沒有未完成的 parent issue 卡在 <code>arch-state:tracking-children</code></li>
+</ul>
+
+<h2>觸發條件<span class="sub">workflow 如何辨識</span></h2>
+<p>新 issue 進場時，dispatcher 依序檢查：</p>
+<pre>1. issue body 是否含 &lt;!-- intake-kind: business --&gt;     → 是
+2. project-rlm/ 是否存在                                  → 是
+3. 是否已有 agent:&lt;role&gt; label                          → 否
+4. 沒有 deps 阻塞                                         → 否
+→ 規則命中：派 arch-shape (decomposition mode，非 bootstrap)</pre>
+
+<p>注意這裡不是 Stage 2 的「派 rlm-modeler bootstrap」，因為 RLM 已經存在；workflow 直接跳到「主流程 Stage 5：arch-shape 分解」。</p>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">新商業 issue 進場</span>
+    <span class="badge github">issue #N</span>
+  </div>
+  <p>使用者開新需求 issue：</p>
+  <div class="action action-rlm">
+    <div class="action-label">issue body</div>
+    <code>&lt;!-- intake-kind: business --&gt;</code><br>
+    <span style="color: var(--muted)">「新增線上奉獻金流：信眾可選擇 Apple Pay / Line Pay / 信用卡⋯」</span>
+  </div>
+  <p style="margin-top: 12px"><strong>labels:</strong> <span class="gh-state">status:ready</span></p>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">workflow 路由 → arch-shape</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>新 business issue + RLM 已存在</div>
+  <p>跳過 bootstrap，直接派 arch-shape decomposition mode。</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:arch-shape</span> <span class="gh-state">status:in-progress</span></p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 評估 RLM 充分性</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>讀現有 RLM，判斷新需求所需的概念是否已被覆蓋：</p>
+  <div class="action action-arch">
+    <div class="action-label">RLM-first 查詢</div>
+    <ul class="tight">
+      <li><code>rlm list-contexts</code> — 是否有「金流」或「奉獻」context？</li>
+      <li><code>rlm list-glossary</code> — 「奉獻」「捐款」「功德金」這些詞已定義？</li>
+      <li><code>rlm list-stories --context=信眾管理</code> — 是否已有付款相關 story？</li>
+    </ul>
+  </div>
+  <p style="margin-top: 10px">兩種結果，分支處理 →</p>
+</div>
+
+</div>
+
+<h3>分支判斷</h3>
+
+<div class="branches">
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">A</span>
+      <strong>RLM 已涵蓋新概念</strong>
+    </div>
+    <p>新需求只是現有 context 的延伸 (例如 brief 裡已寫過「線上付款是 Phase 2」)。</p>
+    <p style="margin-top: 8px"><strong>動作</strong>：直接進入分解，產出子 issue。等於進入主流程 Stage 5。</p>
+  </div>
+
+  <div class="branch-card">
+    <div class="branch-card-header">
+      <span class="branch-letter">B</span>
+      <strong>需要擴充 RLM</strong>
+    </div>
+    <p>新需求引入新 entity / story / context (例如「奉獻」是過去沒有的 bounded context)。</p>
+    <p style="margin-top: 8px"><strong>動作</strong>：arch-shape 暫停，發 <code>rlm_changes_needed</code> 信號，等 rlm-modeler 補完模型。</p>
+  </div>
+
+</div>
+
+<h2>分支 B 詳細流程<span class="sub">需要擴充 RLM 時</span></h2>
+
+<div class="timeline">
+
+<div class="stage branch" data-step="3B">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 發 rlm_changes_needed 信號</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>arch-shape 在 #N 留 comment：</p>
+  <pre>&lt;!-- rlm_changes_needed --&gt;
+- new context: payments (信眾付款)
+  parent: 信眾管理
+  reason: 引入 Apple Pay / Line Pay 整合，需獨立邊界處理 PCI 合規
+- new glossary: 奉獻 vs 捐款
+  reason: 法律語境不同，會影響稅務出據</pre>
+  <p style="margin-top: 8px"><strong>labels:</strong> <span class="gh-state">arch-state:awaiting-rlm-update</span></p>
+</div>
+
+<div class="stage branch" data-step="3B.1">
+  <div class="stage-header">
+    <span class="stage-title">workflow 派 rlm-modeler 擴充</span>
+    <span class="badge workflow">dispatcher</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>workflow 偵測 <code>rlm_changes_needed</code> 信號 → 開新的 sub-issue 給 rlm-modeler，標 <span class="gh-state">agent:rlm-modeler</span>。</p>
+  <div class="action action-rlm-modeler">
+    <div class="action-label">執行</div>
+    <ul class="tight">
+      <li><code>rlm define-context payments --parent=信眾管理</code></li>
+      <li><code>rlm define-glossary 奉獻 --description="..."</code></li>
+      <li><code>rlm define-story payment-flow --context=payments</code></li>
+      <li><code>rlm validate</code></li>
+    </ul>
+  </div>
+  <p style="margin-top: 10px">產出 RLM 變更 PR。</p>
+</div>
+
+<div class="stage branch" data-step="3B.2">
+  <div class="stage-header">
+    <span class="stage-title">RLM PR review</span>
+    <span class="badge github">PR</span>
+  </div>
+  <p>RLM 改動需要審查 (但不像 bootstrap 那樣全人工 — 通常只需要快速 sanity check)：</p>
+  <ul class="tight">
+    <li>新 context 邊界是否合理</li>
+    <li>glossary 定義是否與既有詞彙衝突</li>
+    <li>新 story 是否對齊 #N 的需求</li>
+  </ul>
+  <p style="margin-top: 8px">merged 後 → 回到 arch-shape。</p>
+</div>
+
+<div class="stage branch" data-step="3B.3">
+  <div class="stage-header">
+    <span class="stage-title">arch-shape 重啟，用最新 RLM 分解</span>
+    <span class="badge arch-shape">arch-shape</span>
+  </div>
+  <p>workflow 偵測到 RLM PR merged + #N 仍 open + 標 <code>arch-state:awaiting-rlm-update</code> → 重派 arch-shape。</p>
+  <p>arch-shape 重新查 RLM，現在已有 payments context → 進入分解。</p>
+</div>
+
+</div>
+
+<h2>與主流程的接點</h2>
+
+<p>分支 A 直接接主流程 Stage 5；分支 B 在 RLM 擴充完成後接 Stage 5。</p>
+
+<p>從 Stage 5 之後 (arch-shape 產出子 issues → executor 並行 → cascade unlock → arch-shape 收尾驗收) 完全相同。</p>
+
+<div class="callout callout-loop">
+  🔁 <strong>多次循環</strong>　大型專案中 V1 是<strong>系統的常態</strong>。Stage 1-3 (路由 + 評估) 通常很快；只有分支 B (需要擴充 RLM) 會明顯延長處理時間。
+</div>
+
+<h2>失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>arch-shape 誤判，認為現有 RLM 充足，但其實需要擴充</td>
+      <td>子 issue 的 spec 引用了不存在的 context / glossary slug</td>
+      <td>executor 在 Stage 7 會發現 → 觸發 V6 (RLM drift)</td>
+    </tr>
+    <tr>
+      <td>arch-shape 過度擴充 RLM</td>
+      <td>RLM 出現「等以後會用到」的空 context</td>
+      <td>review 時應拒絕投機性 entity；強制要求 story 對應到 #N 的需求</td>
+    </tr>
+    <tr>
+      <td>新需求需要 ADR (V4)</td>
+      <td>arch-shape 應該識別並走 V4，而非直接擴 RLM</td>
+      <td>判準：是否有「兩個合理選項需要選擇」？有則走 V4</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>四角紀律</strong>　arch-shape 自己不寫 RLM (沒有寫權)，遇到 RLM 不夠用時必須發信號讓 rlm-modeler 處理。這保證所有 RLM 改動都經過同一個 writer 和 <code>rlm validate</code>，避免概念漂移。
+</div>
+
+<p>這裡的關鍵設計是「<strong>分解前先校準模型</strong>」：如果 arch-shape 在 RLM 不足的情況下硬切子任務，產出的 spec 會引用模糊的概念，下游 executor 只能猜，最後實作出來的東西未必對齊原意。</p>
+
+<p>強制走分支 B 看起來慢，但它把「model 變化」和「code 變化」分開審查，每個 PR 都聚焦單一意圖：</p>
+<ul class="tight">
+  <li>RLM PR：審查領域邊界 / 概念定義是否合理</li>
+  <li>code PR：審查實作是否對齊 spec</li>
+</ul>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v4-adr-gate.html">
+    <strong>V4 · ADR 人工 gate</strong>
+    <span>當需要在多個方案之間選擇 (而非單純擴充)，應升級為 V4</span>
+  </a>
+  <a href="v3-advisor-consultation.html">
+    <strong>V3 · advisor 諮詢</strong>
+    <span>如果 arch-shape 不確定現有 code 已實作什麼，先諮詢 advisor</span>
+  </a>
+  <a href="v6-rlm-drift.html">
+    <strong>V6 · RLM 與現實不符</strong>
+    <span>分支 A 誤判時的下游後果</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V1 是系統穩態下最常見的路徑。分支 A vs B 的判斷品質直接決定後續變體的觸發頻率。
+</footer>
+
+</div>
+</body>
+</html>

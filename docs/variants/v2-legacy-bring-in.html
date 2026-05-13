@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2 — 既有代碼導入 (legacy bring-in)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../flow.html">← 主流程</a>
+  <span class="sep">·</span>
+  <a href="index.html">變體總覽</a>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">V2 · 接管現有專案</span>
+  <h1>既有代碼導入 (legacy bring-in)</h1>
+  <p class="tagline">repo 已有可運行的業務代碼，但 <code>project-rlm/</code> 不存在。rlm-modeler 進入 reverse-bootstrap 模式，從代碼逆向推導模型。</p>
+
+  <div class="facts">
+    <div class="fact">
+      <div class="fact-label">觸發條件</div>
+      <div class="fact-value">代碼存在 + RLM 不存在 + 需求或維護 issue 進場</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">主要角色</div>
+      <div class="fact-value">rlm-modeler (reverse-bootstrap mode)</div>
+    </div>
+    <div class="fact">
+      <div class="fact-label">偏離主流程</div>
+      <div class="fact-value">取代 Stage 3 — 從代碼推 RLM 而非從 business intake 推</div>
+    </div>
+  </div>
+</header>
+
+<h2>前置狀態</h2>
+
+<p>典型場景：團隊用 agent-team 接管一個既有專案。</p>
+
+<ul class="tight">
+  <li>repo 有可運行的應用：路由、ORM models、API endpoints、UI 頁面</li>
+  <li>沒有 <code>project-rlm/</code> 目錄</li>
+  <li>可能有部分文件 (README、ADR、口頭知識) 但散落各處</li>
+  <li>新進場的 issue 可能是商業需求，也可能是「先把這個專案 onboard 進 agent-team」</li>
+</ul>
+
+<h2>觸發條件</h2>
+
+<pre>1. 任何 issue 進場 (含特殊 issue: &lt;!-- intake-kind: onboarding --&gt;)
+2. project-rlm/ 不存在                      → 是
+3. repo 內存在可辨識的業務代碼              → 是
+   (有 src/, 有 package.json/pyproject, 不是空專案)
+→ 規則命中：派 rlm-modeler (reverse-bootstrap mode)</pre>
+
+<p>注意這條規則必須<strong>排在</strong>「business intake → bootstrap」之前判斷，否則會錯把已有代碼的專案當空專案處理，覆寫掉現有結構。</p>
+
+<h2>詳細流程</h2>
+
+<div class="timeline">
+
+<div class="stage" data-step="1">
+  <div class="stage-header">
+    <span class="stage-title">onboarding 觸發</span>
+    <span class="badge github">issue #1</span>
+  </div>
+  <p>三種典型觸發來源：</p>
+  <ul class="tight">
+    <li><strong>商業需求 issue</strong>：使用者直接開新需求，但專案還沒接 agent-team</li>
+    <li><strong>onboarding issue</strong>：明確的「請建模這個專案」<code>&lt;!-- intake-kind: onboarding --&gt;</code></li>
+    <li><strong>手動 trigger</strong>：人工開 issue 並直接標 <span class="gh-state">agent:rlm-modeler</span></li>
+  </ul>
+</div>
+
+<div class="stage" data-step="2">
+  <div class="stage-header">
+    <span class="stage-title">workflow 偵測代碼存在</span>
+    <span class="badge workflow">dispatcher</span>
+  </div>
+  <div class="trigger"><strong>trigger</strong>issue + 無 RLM + 有代碼</div>
+  <p>dispatcher 不能套主流程的 bootstrap 規則 (那條只適用空專案)，改派 rlm-modeler 進 reverse-bootstrap。</p>
+  <p><strong>labels:</strong> <span class="gh-state">agent:rlm-modeler</span> <span class="gh-state">arch-state:reverse-bootstrap</span></p>
+</div>
+
+<div class="stage" data-step="3">
+  <div class="stage-header">
+    <span class="stage-title">rlm-modeler 掃描代碼</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>rlm-modeler 不直接寫 RLM，先做<strong>結構性 read</strong>：</p>
+  <div class="action action-rlm-modeler">
+    <div class="action-label">讀取的線索</div>
+    <ul class="tight">
+      <li><strong>路由 / API 定義</strong> — Express routes, FastAPI routers, Next.js pages → 反映 user-facing capabilities</li>
+      <li><strong>ORM models / migrations</strong> — entity 名稱、欄位、關聯 → 反映 domain entities</li>
+      <li><strong>Job / queue handler</strong> — 反映非同步流程 / domain events</li>
+      <li><strong>測試的 user journey</strong> — 反映實際使用情境</li>
+      <li><strong>README / docs / ADR</strong> — 反映歷史決策 (如有)</li>
+      <li><strong>環境變數 / secrets</strong> — 反映外部整合 (Stripe / Twilio / S3...)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stage" data-step="4">
+  <div class="stage-header">
+    <span class="stage-title">推導 contexts</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>根據代碼分組推導 bounded contexts。常見啟發式：</p>
+  <ul class="tight">
+    <li>同一個資料表群被同一組 service 操作 → 一個 context</li>
+    <li>不同 prefix 的路由 (<code>/api/orders/*</code> vs <code>/api/users/*</code>) → 不同 context</li>
+    <li>明顯獨立的子系統 (notification / billing) → 各自 context</li>
+  </ul>
+  <div class="action action-rlm-modeler" style="margin-top: 10px">
+    <div class="action-label">產出 (推導，標註 inferred)</div>
+    <pre>contexts/
+  orders/        ← 從 src/orders/, models/order.py 推得
+    description.md
+    inferred: true   ← 標註這是逆向推導
+  users/         ← 從 src/auth/, models/user.py 推得
+  notifications/ ← 從 src/notifications/, jobs/email.ts 推得</pre>
+  </div>
+</div>
+
+<div class="stage" data-step="5">
+  <div class="stage-header">
+    <span class="stage-title">推導 glossary</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>從 model 名稱、API schema、UI 標題收集領域詞彙：</p>
+  <ul class="tight">
+    <li>程式碼用 <code>Order</code>、UI 標題用「訂單」、文件用「Sales Order」 → glossary 條目「訂單 (Order)」</li>
+    <li>同義詞衝突 (<code>customer</code> vs <code>client</code> vs <code>user</code>) → 標 ambiguous，留待人工釐清</li>
+  </ul>
+</div>
+
+<div class="stage" data-step="6">
+  <div class="stage-header">
+    <span class="stage-title">推導 stories</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <p>從 API endpoints 和 UI flow 反推用戶故事：</p>
+  <pre>POST /api/orders       → story: 顧客下單
+GET  /api/orders/:id   → story: 查詢訂單狀態
+POST /api/orders/:id/cancel → story: 取消訂單</pre>
+  <p>每個 story 標註 <code>inferred-from</code> 指向源代碼路徑，方便 review 時對照。</p>
+</div>
+
+<div class="stage" data-step="7">
+  <div class="stage-header">
+    <span class="stage-title">寫入 + 驗證</span>
+    <span class="badge rlm-modeler">rlm-modeler</span>
+  </div>
+  <div class="action action-rlm-modeler">
+    <div class="action-label">執行 (透過 rlm CLI)</div>
+    <ul class="tight">
+      <li><code>rlm define-context &lt;ctx&gt; --inferred</code> 系列</li>
+      <li><code>rlm define-glossary ...</code></li>
+      <li><code>rlm define-story ... --inferred-from=src/orders/handlers.ts</code></li>
+      <li><code>rlm validate</code></li>
+    </ul>
+  </div>
+  <p style="margin-top: 10px">每個 inferred 條目都帶來源指標，方便人工 review 時逐項對照。</p>
+</div>
+
+<div class="stage" data-step="8">
+  <div class="stage-header">
+    <span class="stage-title">開 PR + 標註審查重點</span>
+    <span class="badge github">PR</span>
+  </div>
+  <p>PR body 強調這是逆向推導：</p>
+  <pre>## ⚠️ Reverse-bootstrap PR
+
+這份 RLM 是從現有代碼逆向推導，請<strong>逐項確認</strong>：
+
+- [ ] contexts 的邊界是否符合團隊心智？
+- [ ] glossary 中標 (ambiguous) 的詞彙怎麼釐清？
+- [ ] inferred stories 是否遺漏了非顯性流程 (cron / 後台 / 客服)？
+- [ ] 有沒有「程式碼裡有但不該有」的東西需要在 RLM 標 deprecated？</pre>
+  <p style="margin-top: 8px"><strong>labels:</strong> <span class="gh-state">arch-state:awaiting-bootstrap-merge</span></p>
+</div>
+
+</div>
+
+<div class="callout callout-gate">
+  ⚠️ <strong>人工 gate (重度)</strong>　Reverse-bootstrap PR 比 V0 (空專案 bootstrap) 更需要仔細審查 — 機器只看代碼，但<strong>程式碼不等於意圖</strong>。團隊腦中的 domain 知識、被 deprecated 但還在 repo 的東西、客服流程、合規限制等都不會出現在代碼裡。
+</div>
+
+<h2>分支與失敗模式</h2>
+
+<table class="compact">
+  <thead>
+    <tr><th>狀況</th><th>後果</th><th>處理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>代碼結構混亂 (god module / 沒有清晰邊界)</td>
+      <td>rlm-modeler 切不出乾淨的 contexts</td>
+      <td>產出單一 monolithic context + 留 comment 標出問題區塊；後續用 V1 漸進切細</td>
+    </tr>
+    <tr>
+      <td>有死代碼 / 已 deprecated 但未刪</td>
+      <td>誤推導出不該存在的 stories</td>
+      <td>由人工 review 標 <code>deprecated: true</code>，不直接從 RLM 移除 (保留歷史)</td>
+    </tr>
+    <tr>
+      <td>有 monorepo 多服務</td>
+      <td>需要先決定建模範圍</td>
+      <td>onboarding issue 必須指定 <code>--scope=path/to/service</code>，rlm-modeler 不自行猜</td>
+    </tr>
+    <tr>
+      <td>review 時發現嚴重不對勁</td>
+      <td>整份 RLM 走偏</td>
+      <td>關閉 PR，重新 onboarding 並提供更明確的 hint (e.g. 「忽略 legacy/ 目錄」)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>與主流程的接點</h2>
+
+<p>Reverse-bootstrap PR merged 後，<code>project-rlm/</code> 第一次出現在 repo 裡。從這裡開始，後續所有新需求都走 V1 (RLM 已存在)。</p>
+
+<p>原本觸發 V2 的 issue (#1) 處理方式：</p>
+<ul class="tight">
+  <li>如果是<strong>商業需求</strong>：merged 後 workflow 把 #1 重新 dispatch，從 V1 流程繼續</li>
+  <li>如果是<strong>onboarding issue</strong>：merged 後直接關閉 #1，等待真正的需求 issue 進場</li>
+</ul>
+
+<h2>為何這樣設計</h2>
+
+<div class="callout callout-rationale">
+  <strong>「代碼是事實，意圖不是」</strong>　rlm-modeler 從代碼能可靠推導出「<em>系統做了什麼</em>」，但無法可靠推導出「<em>為什麼這樣做</em>」和「<em>應該做什麼</em>」。後者只能由人類在 review 時補上 — 所以 V2 的人工 gate 比 V0 更厚。
+</div>
+
+<p>不接受「自動 reverse-bootstrap」(機器自動 merge) 的理由：</p>
+<ul class="tight">
+  <li>程式碼裡的命名可能誤導 (<code>User</code> 在 UI 是「會員」，在後台是「員工」)</li>
+  <li>已決議要砍掉但還沒砍的功能會被當成 first-class story</li>
+  <li>外部整合的真正用途常常只活在工程師腦中</li>
+</ul>
+
+<p>把這些問題留給機器處理 = 把錯誤模型寫死成系統的 SSOT，後續所有 arch-shape 分解都會從錯處延伸。</p>
+
+<h2>相關變體</h2>
+<div class="related">
+  <a href="v1-rlm-exists.html">
+    <strong>V1 · RLM 已存在</strong>
+    <span>V2 完成後，所有後續需求走 V1</span>
+  </a>
+  <a href="v6-rlm-drift.html">
+    <strong>V6 · RLM 與現實不符</strong>
+    <span>V2 推得的 RLM 在後續使用中發現問題，會經常觸發 V6 直到穩定</span>
+  </a>
+</div>
+
+<footer class="footer">
+  V2 是「上岸」變體，每個專案最多走一次。前期投入的 review 品質決定了未來幾個月的決策品質。
+</footer>
+
+</div>
+</body>
+</html>
