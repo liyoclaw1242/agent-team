@@ -3,833 +3,706 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Sweet Home — 軟體工程孿生</title>
+<title>agent-team · 當前工作流</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
 <style>
-/* ── Design tokens (agent-sweet-home DESIGN.md) ──────────────────────── */
 :root {
-  --surface-0:  #0C1014;
-  --surface-1:  #141921;
-  --surface-2:  #1D2430;
-  --border-lo:  #2A3340;
-  --border-hi:  #3D4A5C;
-  --text-1:     #E8EAED;
-  --text-2:     #A7B0BC;
-  --text-3:     #6B7785;
+  --bg:         #0C1014;
+  --s1:         #141921;
+  --s2:         #1D2430;
+  --blo:        #2A3340;
+  --bhi:        #3D4A5C;
+  --t1:         #E8EAED;
+  --t2:         #A7B0BC;
+  --t3:         #6B7785;
 
-  --status-running:  #F5A524;
-  --status-healthy:  #3FB950;
-  --status-failed:   #F85149;
-  --status-frozen:   #7C8AA0;
+  --run:        #F5A524;
+  --ok:         #3FB950;
+  --fail:       #F85149;
+  --frozen:     #7C8AA0;
+  --accent:     #5BC0EB;
 
-  --accent:     #5BC0EB;  /* harbor cyan — twin / observation layer */
-
-  --role-rlm:       #F4C430;
-  --role-arch:      #5B8DEF;
-  --role-advisor:   #4CAF80;
-  --role-executor:  #FF8A65;
-  --role-arbiter:   #F85149;
+  --hermes:     #B392F0;  /* intake / design */
+  --worker:     #5BC0EB;  /* same as accent — harbor cyan */
+  --whitebox:   #3FB950;
+  --blackbox:   #FF8A65;
+  --arbiter:    #F85149;
 
   --font-sans: 'IBM Plex Sans Condensed', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 
 body {
   font-family: var(--font-sans);
-  background: var(--surface-0);
-  color: var(--text-1);
+  background: var(--bg);
+  color: var(--t1);
   line-height: 1.6;
   padding: 48px 20px 100px;
   font-size: 14px;
 }
+.wrap { max-width: 1040px; margin: 0 auto; }
 
-.container { max-width: 1020px; margin: 0 auto; }
-
-/* ── Typography ───────────────────────────────────────────────────────── */
-h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+/* ── Type ── */
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 h2 {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.1em; color: var(--text-3);
-  margin: 56px 0 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-lo);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--t3);
+  margin: 60px 0 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--blo);
 }
-h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-p  { color: var(--text-2); font-size: 13px; line-height: 1.65; }
+h3 { font-size: 14px; font-weight: 600; }
+p  { color: var(--t2); font-size: 13px; line-height: 1.65; }
 
-code, .mono {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: var(--surface-2);
-  padding: 1px 6px;
-  border: 1px solid var(--border-lo);
-  border-radius: 2px;
-  color: var(--text-2);
+code {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--s2); padding: 1px 6px;
+  border: 1px solid var(--blo); border-radius: 2px; color: var(--t2);
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── Layout helpers ───────────────────────────────────────────────────── */
-.row  { display: flex; gap: 16px; }
-.col  { flex: 1; min-width: 0; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-
-/* ── Badges ───────────────────────────────────────────────────────────── */
-.badge {
+/* ── Badges ── */
+.b {
   display: inline-flex; align-items: center;
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.06em;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
   padding: 2px 7px; border-radius: 2px; border: 1px solid;
-  white-space: nowrap;
+  white-space: nowrap; flex-shrink: 0;
 }
-.badge-rlm      { color: var(--role-rlm);      border-color: rgba(244,196,48,.4);  background: rgba(244,196,48,.07); }
-.badge-arch     { color: var(--role-arch);     border-color: rgba(91,141,239,.4);  background: rgba(91,141,239,.07); }
-.badge-advisor  { color: var(--role-advisor);  border-color: rgba(76,175,128,.4);  background: rgba(76,175,128,.07); }
-.badge-executor { color: var(--role-executor); border-color: rgba(255,138,101,.4); background: rgba(255,138,101,.07); }
-.badge-twin     { color: var(--accent);        border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
-.badge-github   { color: #6cb6ff;              border-color: rgba(108,182,255,.4); background: rgba(108,182,255,.07); }
-.badge-warn     { color: var(--status-running);border-color: rgba(245,165,36,.4);  background: rgba(245,165,36,.07); }
-.badge-ok       { color: var(--status-healthy);border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
-.badge-dim      { color: var(--text-3);        border-color: var(--border-lo);     background: transparent; }
+.b-hermes   { color: var(--hermes);   border-color: rgba(179,146,240,.4); background: rgba(179,146,240,.07); }
+.b-worker   { color: var(--worker);   border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
+.b-white    { color: var(--whitebox); border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
+.b-black    { color: var(--blackbox); border-color: rgba(255,138,101,.4); background: rgba(255,138,101,.07); }
+.b-arbiter  { color: var(--arbiter);  border-color: rgba(248,81,73,.4);   background: rgba(248,81,73,.07); }
+.b-twin     { color: var(--accent);   border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
+.b-ok       { color: var(--ok);       border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
+.b-warn     { color: var(--run);      border-color: rgba(245,165,36,.4);  background: rgba(245,165,36,.07); }
+.b-dim      { color: var(--t3);       border-color: var(--blo);           background: transparent; }
 
-/* ── Hero ─────────────────────────────────────────────────────────────── */
-.hero {
-  padding: 32px 0 48px;
-  border-bottom: 1px solid var(--border-lo);
-  margin-bottom: 8px;
-}
-.hero-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 10px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.12em; color: var(--accent);
-  margin-bottom: 14px;
-}
-.tagline {
-  font-size: 15px; color: var(--text-2);
-  margin-top: 10px; max-width: 560px;
-  line-height: 1.55;
-}
-
-/* ── Twin concept split ───────────────────────────────────────────────── */
-.twin-split {
-  display: grid;
-  grid-template-columns: 1fr 40px 1fr;
-  gap: 0;
-  align-items: stretch;
-  margin-top: 32px;
-  border: 1px solid var(--border-lo);
-}
-.twin-pane {
-  padding: 24px 22px;
-  background: var(--surface-1);
-}
-.twin-pane.is-twin { background: rgba(91,192,235,.04); border-left: 2px solid var(--accent); }
-.twin-pane-label {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--text-3); margin-bottom: 8px;
-}
-.twin-pane.is-twin .twin-pane-label { color: var(--accent); }
-.twin-pane h3 { font-size: 16px; margin-bottom: 10px; }
-.twin-pane p  { font-size: 12px; }
-.twin-arrow {
-  display: flex; align-items: center; justify-content: center;
-  background: var(--surface-2); border-left: 1px solid var(--border-lo); border-right: 1px solid var(--border-lo);
-  color: var(--text-3); font-size: 16px;
-}
-
-/* ── Role cards ───────────────────────────────────────────────────────── */
-.role-card {
-  padding: 16px; background: var(--surface-1);
-  border: 1px solid var(--border-lo);
-}
-.role-card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.role-card-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; }
-.role-card.rlm      .role-card-name { color: var(--role-rlm); }
-.role-card.arch     .role-card-name { color: var(--role-arch); }
-.role-card.advisor  .role-card-name { color: var(--role-advisor); }
-.role-card.executor .role-card-name { color: var(--role-executor); }
-
-/* ── Signal table ─────────────────────────────────────────────────────── */
-.signal-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.signal-table th {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-3); text-align: left;
-  padding: 8px 14px; border-bottom: 1px solid var(--border-lo);
-  background: var(--surface-2);
-}
-.signal-table td {
-  padding: 9px 14px; border-bottom: 1px solid var(--border-lo);
-  vertical-align: top; color: var(--text-2);
-}
-.signal-table tr:last-child td { border-bottom: none; }
-.signal-table tr:hover td { background: var(--surface-2); }
-.signal-table .key {
-  font-family: var(--font-mono); font-size: 11px; color: var(--accent);
-  white-space: nowrap;
-}
-.signal-table .vis-ok   { color: var(--status-healthy); font-weight: 600; }
-.signal-table .vis-part { color: var(--status-running); font-weight: 600; }
-.signal-table .vis-dark { color: var(--text-3); }
-
-/* ── Coverage indicator ───────────────────────────────────────────────── */
-.cov { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
-.cov::before {
-  content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-}
-.cov-ok   { color: var(--status-healthy); }
-.cov-ok::before   { background: var(--status-healthy); }
-.cov-part { color: var(--status-running); }
-.cov-part::before { background: var(--status-running); }
-.cov-dark { color: var(--text-3); }
-.cov-dark::before { background: var(--border-hi); }
-
-/* ── Timeline ─────────────────────────────────────────────────────────── */
-.timeline { position: relative; padding-left: 36px; }
-.timeline::before {
-  content: ''; position: absolute; left: 11px; top: 10px; bottom: 10px;
-  width: 1px; background: var(--border-lo);
-}
-
-.stage {
-  position: relative; margin-bottom: 20px;
-}
-.stage-dot {
-  position: absolute; left: -36px; top: 16px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--surface-2); border: 1px solid var(--border-hi);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  color: var(--text-3); z-index: 1;
-}
-
-.stage-inner {
-  background: var(--surface-1); border: 1px solid var(--border-lo);
-  overflow: hidden;
-}
-.stage-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px 12px; border-bottom: 1px solid var(--border-lo);
-  flex-wrap: wrap;
-}
-.stage-title { font-size: 14px; font-weight: 600; flex: 1; }
-.stage-body { padding: 14px 16px; }
-.stage-body p { margin-bottom: 8px; }
-.stage-body p:last-child { margin-bottom: 0; }
-
-/* Twin observation strip */
-.twin-strip {
-  border-top: 1px solid rgba(91,192,235,.2);
-  background: rgba(91,192,235,.04);
-  padding: 12px 16px;
-}
-.twin-strip-label {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--accent); margin-bottom: 7px;
-}
-.twin-strip ul { padding-left: 16px; margin: 0; }
-.twin-strip li { font-size: 12px; color: var(--text-2); margin-bottom: 3px; line-height: 1.5; }
-.twin-strip li:last-child { margin-bottom: 0; }
-.twin-strip .dark { color: var(--text-3); font-style: italic; }
-
-/* ── Action blocks ────────────────────────────────────────────────────── */
-.action-block {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: var(--surface-2);
-  border-left: 2px solid var(--border-hi);
-  font-size: 12px; color: var(--text-2);
-}
-.action-block.rlm      { border-left-color: var(--role-rlm); }
-.action-block.arch     { border-left-color: var(--role-arch); }
-.action-block.executor { border-left-color: var(--role-executor); }
-.action-block.twin     { border-left-color: var(--accent); }
-.action-label {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-3); margin-bottom: 5px;
-}
-.action-block ul { padding-left: 16px; margin-top: 4px; }
-.action-block li { margin-bottom: 3px; }
-
-/* ── Gate banner ──────────────────────────────────────────────────────── */
-.gate-banner {
-  margin: 12px 0 12px 0;
-  padding: 12px 16px;
-  background: rgba(245,165,36,.06);
-  border: 1px solid rgba(245,165,36,.3);
-  font-size: 12px; color: var(--text-2);
-}
-.gate-banner strong { color: var(--status-running); }
-
-/* ── Loop banner ──────────────────────────────────────────────────────── */
-.loop-banner {
-  margin: 8px 0 16px;
-  padding: 12px 16px;
-  background: rgba(91,141,239,.06);
-  border: 1px solid rgba(91,141,239,.25);
-  text-align: center; font-size: 12px; color: var(--text-2);
-}
-
-/* ── Label pill (GitHub state) ────────────────────────────────────────── */
+/* GitHub label pill */
 .gh {
   display: inline-block;
   font-family: var(--font-mono); font-size: 10px;
-  padding: 1px 7px;
-  background: var(--surface-2); border: 1px solid var(--border-hi);
-  color: var(--text-2); border-radius: 2px;
-  margin: 1px 2px; white-space: nowrap;
+  padding: 1px 7px; background: var(--s2);
+  border: 1px solid var(--bhi); color: var(--t2);
+  border-radius: 2px; margin: 1px 2px; white-space: nowrap;
 }
+.gh.agent   { color: var(--hermes);   border-color: rgba(179,146,240,.5); }
+.gh.worker  { color: var(--worker);   border-color: rgba(91,192,235,.5); }
+.gh.ok      { color: var(--ok);       border-color: rgba(63,185,80,.5); }
+.gh.fail    { color: var(--fail);     border-color: rgba(248,81,73,.5); }
+.gh.blocked { color: var(--run);      border-color: rgba(245,165,36,.5); }
+.gh.arb     { color: var(--arbiter);  border-color: rgba(248,81,73,.5); }
 
-/* ── Coverage map ─────────────────────────────────────────────────────── */
-.coverage-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--border-lo);
-  border: 1px solid var(--border-lo);
+/* ── Hero ── */
+.hero { padding: 32px 0 44px; border-bottom: 1px solid var(--blo); }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--accent); margin-bottom: 12px;
 }
-.cov-cell {
-  background: var(--surface-1);
-  padding: 14px 16px;
-}
-.cov-cell-title {
-  font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--text-1);
-}
-.cov-cell-desc {
-  font-size: 11px; color: var(--text-3); line-height: 1.5;
-}
+.tagline { font-size: 14px; color: var(--t2); margin-top: 8px; max-width: 620px; line-height: 1.6; }
 
-/* ── Variants ─────────────────────────────────────────────────────────── */
-.variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.variant-card {
-  background: var(--surface-1); border: 1px solid var(--border-lo);
-  padding: 18px 18px 14px; font-size: 12px;
-}
-.variant-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.variant-title { font-size: 13px; font-weight: 600; }
-.variant-when { font-size: 11px; color: var(--text-3); margin-bottom: 10px; }
-.variant-when::before { content: '觸發：'; font-weight: 600; color: var(--text-2); }
-.variant-flow { color: var(--text-2); line-height: 1.6; }
-.variant-twin {
-  margin-top: 10px; padding: 8px 10px;
-  background: rgba(91,192,235,.05); border-left: 2px solid var(--accent);
-  font-size: 11px; color: var(--text-3);
-}
-.variant-twin::before {
-  content: '孿生可見 ▸ ';
-  font-family: var(--font-mono); font-weight: 600;
-  font-size: 9px; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--accent);
-}
+/* ── Role cards grid ── */
+.roles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 28px; }
+.role-card { padding: 14px 14px 12px; background: var(--s1); border: 1px solid var(--blo); }
+.role-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.role-desc { font-size: 10px; color: var(--t3); line-height: 1.5; }
+.role-card.hermes  .role-name { color: var(--hermes); }
+.role-card.worker  .role-name { color: var(--worker); }
+.role-card.white   .role-name { color: var(--whitebox); }
+.role-card.black   .role-name { color: var(--blackbox); }
+.role-card.arbiter .role-name { color: var(--arbiter); }
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
-.footer {
-  margin-top: 72px; padding: 28px 0;
-  border-top: 1px solid var(--border-lo);
-  font-size: 11px; color: var(--text-3);
+/* ── Pipeline strip ── */
+.pipeline {
+  display: flex; align-items: stretch;
+  gap: 0; margin-top: 24px; margin-bottom: 8px;
+  border: 1px solid var(--blo); overflow: hidden;
 }
-.footer-axioms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
-.axiom { padding: 14px 14px 12px; background: var(--surface-1); border: 1px solid var(--border-lo); }
-.axiom-label {
+.pipe-stage {
+  flex: 1; padding: 14px 12px; background: var(--s1);
+  border-right: 1px solid var(--blo);
+  display: flex; flex-direction: column; gap: 5px;
+  position: relative;
+}
+.pipe-stage:last-child { border-right: none; }
+.pipe-stage::after {
+  content: '→';
+  position: absolute; right: -10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--t3); font-size: 14px; z-index: 2;
+  background: var(--bg); padding: 2px;
+}
+.pipe-stage:last-child::after { display: none; }
+.pipe-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
+}
+.pipe-name { font-size: 12px; font-weight: 600; }
+.pipe-stage.hermes  { border-top: 2px solid var(--hermes); }
+.pipe-stage.worker  { border-top: 2px solid var(--worker); }
+.pipe-stage.white   { border-top: 2px solid var(--whitebox); }
+.pipe-stage.black   { border-top: 2px solid var(--blackbox); }
+.pipe-stage.arbiter { border-top: 2px solid var(--arbiter); background: rgba(248,81,73,.04); }
+.pipe-stage.human   { border-top: 2px solid var(--t3); background: rgba(245,165,36,.03); }
+.pipe-stage.hermes .pipe-name  { color: var(--hermes); }
+.pipe-stage.worker .pipe-name  { color: var(--worker); }
+.pipe-stage.white  .pipe-name  { color: var(--whitebox); }
+.pipe-stage.black  .pipe-name  { color: var(--blackbox); }
+.pipe-stage.arbiter .pipe-name { color: var(--arbiter); }
+.pipe-stage.human  .pipe-name  { color: var(--t2); }
+.pipe-meta { font-size: 10px; color: var(--t3); line-height: 1.4; }
+
+/* ── State machine ── */
+.state-machine { border: 1px solid var(--blo); overflow: hidden; }
+.sm-row {
+  display: grid; grid-template-columns: 180px 1fr 1fr 240px;
+  border-bottom: 1px solid var(--blo);
+  font-size: 12px;
+}
+.sm-row:last-child { border-bottom: none; }
+.sm-row.header { background: var(--s2); }
+.sm-cell {
+  padding: 9px 14px; vertical-align: top;
+  border-right: 1px solid var(--blo);
+}
+.sm-cell:last-child { border-right: none; }
+.sm-row.header .sm-cell {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
+}
+.sm-role { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+
+/* ── Timeline ── */
+.timeline { position: relative; padding-left: 36px; }
+.timeline::before {
+  content: ''; position: absolute; left: 11px; top: 10px; bottom: 10px;
+  width: 1px; background: var(--blo);
+}
+.stage { position: relative; margin-bottom: 18px; }
+.stage-dot {
+  position: absolute; left: -36px; top: 15px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--s2); border: 1px solid var(--bhi);
+  display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
-  margin-bottom: 5px;
+  color: var(--t3); z-index: 1;
 }
-.axiom-value { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.stage-inner { background: var(--s1); border: 1px solid var(--blo); overflow: hidden; }
+.stage-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 16px 11px; border-bottom: 1px solid var(--blo); flex-wrap: wrap;
+}
+.stage-title { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
+.stage-body { padding: 13px 16px; }
+.stage-body p { margin-bottom: 8px; }
+.stage-body p:last-child { margin-bottom: 0; }
+.stage-body ul { padding-left: 18px; margin-top: 4px; }
+.stage-body li { font-size: 13px; color: var(--t2); margin-bottom: 3px; line-height: 1.55; }
 
-@media (max-width: 780px) {
-  body { padding: 28px 14px 72px; }
-  .twin-split { grid-template-columns: 1fr; }
-  .twin-arrow { display: none; }
-  .grid-4, .grid-3, .grid-2, .variant-grid, .coverage-grid { grid-template-columns: 1fr; }
+/* Action block */
+.ablock {
+  margin-top: 10px; padding: 10px 13px;
+  background: var(--s2); font-size: 12px; color: var(--t2);
+  border-left: 2px solid var(--bhi);
+}
+.ablock.hermes  { border-left-color: var(--hermes); }
+.ablock.worker  { border-left-color: var(--worker); }
+.ablock.white   { border-left-color: var(--whitebox); }
+.ablock.black   { border-left-color: var(--blackbox); }
+.ablock.arbiter { border-left-color: var(--arbiter); }
+.ablock.twin    { border-left-color: var(--accent); background: rgba(91,192,235,.05); }
+.ablock-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3); margin-bottom: 5px;
+}
+.ablock ul { padding-left: 16px; margin-top: 4px; }
+.ablock li { margin-bottom: 3px; }
+
+/* Twin strip */
+.twin-strip {
+  border-top: 1px solid rgba(91,192,235,.2);
+  background: rgba(91,192,235,.04); padding: 10px 16px;
+}
+.twin-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--accent); margin-bottom: 6px;
+}
+.twin-strip ul { padding-left: 16px; margin: 0; }
+.twin-strip li { font-size: 12px; color: var(--t2); margin-bottom: 3px; line-height: 1.5; }
+.twin-strip li:last-child { margin-bottom: 0; }
+.dark { color: var(--t3) !important; font-style: italic; }
+
+/* Gate / loop banners */
+.gate-banner {
+  margin: 10px 0; padding: 11px 15px;
+  background: rgba(245,165,36,.06); border: 1px solid rgba(245,165,36,.3);
+  font-size: 12px; color: var(--t2);
+}
+.gate-banner strong { color: var(--run); }
+
+.loop-banner {
+  margin: 6px 0 14px;
+  padding: 11px 15px;
+  background: rgba(91,141,239,.05); border: 1px solid rgba(91,141,239,.25);
+  text-align: center; font-size: 12px; color: var(--t2);
+}
+
+/* Dispatch rules table */
+.rules-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rules-table th {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
+  padding: 8px 13px; border-bottom: 1px solid var(--blo);
+  background: var(--s2); text-align: left;
+}
+.rules-table td { padding: 9px 13px; border-bottom: 1px solid var(--blo); color: var(--t2); vertical-align: top; }
+.rules-table tr:last-child td { border-bottom: none; }
+.rules-table tr:hover td { background: var(--s2); }
+.rules-table .when { font-family: var(--font-mono); font-size: 11px; color: var(--t1); }
+.rules-table .then { font-family: var(--font-mono); font-size: 11px; }
+.rules-table .then.spawn   { color: var(--accent); }
+.rules-table .then.noop    { color: var(--t3); }
+.rules-table .num { color: var(--t3); font-family: var(--font-mono); font-size: 10px; text-align: right; }
+
+/* On-result table */
+.or-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.or-table th {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
+  padding: 8px 13px; border-bottom: 1px solid var(--blo);
+  background: var(--s2); text-align: left;
+}
+.or-table td { padding: 9px 13px; border-bottom: 1px solid var(--blo); color: var(--t2); vertical-align: top; }
+.or-table tr:last-child td { border-bottom: none; }
+.or-table tr:hover td { background: var(--s2); }
+.or-table .kind { font-family: var(--font-mono); font-size: 11px; color: var(--t1); }
+
+/* Misc layout */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.border-box { border: 1px solid var(--blo); overflow: hidden; }
+.mt8 { margin-top: 8px; }
+.mt12 { margin-top: 12px; }
+.mt16 { margin-top: 16px; }
+.t3 { color: var(--t3); }
+
+/* Footer */
+.footer {
+  margin-top: 72px; padding: 24px 0;
+  border-top: 1px solid var(--blo);
+  font-size: 11px; color: var(--t3);
+  text-align: center;
+}
+
+@media (max-width: 840px) {
+  .roles { grid-template-columns: repeat(3, 1fr); }
+  .pipeline { flex-direction: column; }
+  .pipe-stage::after { display: none; }
+  .sm-row { grid-template-columns: 1fr; }
   .timeline { padding-left: 28px; }
   .stage-dot { left: -28px; }
-  .footer-axioms { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
 
-<!-- ================================================================== HERO -->
+<!-- ================================================================ HERO -->
 <header class="hero">
-  <div class="hero-eyebrow">agent-sweet-home · digital twin</div>
-  <h1>軟體工程孿生</h1>
+  <div class="eyebrow">agent-team · 當前工作流 · v1</div>
+  <h1>Delivery Pipeline</h1>
   <p class="tagline">
-    一個 AI 代理艦隊在跑業務流程。另一個系統完整地看著它——
-    每一個 dispatch 決策、每一次 tool call、每一分燒掉的錢。
-    這份文件從孿生的視角重述整個流程。
+    以 GitHub label 作狀態機，workflow YAML 宣告 dispatch 規則 + side effects。
+    六個角色分工，每個 spawn 是一次性 claude -p，無長駐進程。
   </p>
 
-  <div class="twin-split" style="margin-top: 28px;">
-    <div class="twin-pane">
-      <div class="twin-pane-label">執行側</div>
-      <h3>agent-team</h3>
-      <p>
-        四角架構的 AI 代理艦隊，在 GitHub 上以 issue 作為狀態機，
-        用 RLM 作為事實來源，自主完成從商業意圖到可部署代碼的全流程。
-        stateless、event-driven、沒有長駐進程。
-      </p>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
-        <span class="badge badge-rlm">rlm-modeler</span>
-        <span class="badge badge-arch">arch-shape</span>
-        <span class="badge badge-advisor">advisors</span>
-        <span class="badge badge-executor">implementer</span>
-      </div>
+  <div class="roles" style="margin-top: 28px;">
+    <div class="role-card hermes">
+      <div class="role-name">hermes-intake</div>
+      <div class="role-desc">Business signal → draft Spec。<br>skill: signal-to-spec</div>
     </div>
-    <div class="twin-arrow">⇄</div>
-    <div class="twin-pane is-twin">
-      <div class="twin-pane-label">觀測側 · 孿生</div>
-      <h3>agent-sweet-home</h3>
-      <p>
-        Tauri 2 桌面 app。把 GitHub repo、本機 git 狀態、每個
-        agent spawn 的完整執行軌跡（thinking、tool calls、structured output、cost）
-        整合成一個即時觀測工作站。dispatch 決策即時推送；call chain 可逐步展開。
-      </p>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
-        <span class="badge badge-twin">dispatch log</span>
-        <span class="badge badge-twin">call chain</span>
-        <span class="badge badge-twin">live cost</span>
-        <span class="badge badge-twin">blocking graph</span>
-      </div>
+    <div class="role-card hermes">
+      <div class="role-name">hermes-design</div>
+      <div class="role-desc">Spec → WorkPackage 分解。<br>skill: decompose-spec</div>
+    </div>
+    <div class="role-card worker">
+      <div class="role-name">worker</div>
+      <div class="role-desc">TDD 寫代碼，開 PR。<br>skill: tdd-loop + scaffolds</div>
+    </div>
+    <div class="role-card white">
+      <div class="role-name">whitebox-validator</div>
+      <div class="role-desc">PR diff 靜態審查。<br>skill: code-review + stress-test</div>
+    </div>
+    <div class="role-card black">
+      <div class="role-name">blackbox-validator</div>
+      <div class="role-desc">Sandbox E2E / API 測試。<br>skill: e2e-browser-test</div>
+    </div>
+    <div class="role-card arbiter">
+      <div class="role-name">arbiter</div>
+      <div class="role-desc">Recovery：retry / escalate / cancel。<br>skill: arbiter</div>
     </div>
   </div>
 </header>
 
-<!-- ============================================================= ROLES -->
-<h2>四角色 · 分工</h2>
-<div class="grid-4">
-  <div class="role-card rlm">
-    <div class="role-card-name">rlm-modeler</div>
-    <div class="role-card-desc">唯一 RLM writer。從 intake / 逆向工程 / 執行反饋寫入 project-rlm/。任何模型變動都走這個角色。</div>
+<!-- ========================================================= PIPELINE -->
+<h2>流水線全貌</h2>
+<div class="pipeline">
+  <div class="pipe-stage hermes">
+    <div class="pipe-label">Phase 1</div>
+    <div class="pipe-name">hermes-intake</div>
+    <div class="pipe-meta">kind:spec<br>agent:hermes-intake<br>status:proposed</div>
   </div>
-  <div class="role-card arch">
-    <div class="role-card-name">arch-shape</div>
-    <div class="role-card-desc">讀 RLM，把商業意圖分解成帶完整 spec + AC + deps 的 atomic 子任務。召喚 advisor 做現況查詢。</div>
+  <div class="pipe-stage hermes">
+    <div class="pipe-label">Phase 2</div>
+    <div class="pipe-name">hermes-design</div>
+    <div class="pipe-meta">kind:spec<br>agent:hermes-design<br>status:proposed</div>
   </div>
-  <div class="role-card advisor">
-    <div class="role-card-name">advisors</div>
-    <div class="role-card-desc">be / fe / ops / design — read-only。回答現況問題（現有 service？衝突元件？blast radius？）不寫任何狀態。</div>
+  <div class="pipe-stage human">
+    <div class="pipe-label">⚠ Gate</div>
+    <div class="pipe-name">Design Approval</div>
+    <div class="pipe-meta">人工核准每個 WP<br>status:approved 才觸發 worker</div>
   </div>
-  <div class="role-card executor">
-    <div class="role-card-name">implementer</div>
-    <div class="role-card-desc">收 RLM-grounded child issue，按需載入 scenario skills，TDD 產出代碼，開 PR。模式 A/B/C。</div>
+  <div class="pipe-stage worker">
+    <div class="pipe-label">Phase 3</div>
+    <div class="pipe-name">worker</div>
+    <div class="pipe-meta">kind:workpackage<br>agent:worker<br>status:approved</div>
   </div>
-</div>
-
-<!-- =========================================================== SIGNALS -->
-<h2>孿生接收哪些信號</h2>
-<p style="margin-bottom: 14px; font-size: 12px;">
-  孿生的全部知識來自三個來源：SQLite（持久化）、Tauri events（即時推送）、GitHub API（15 分鐘同步）。
-</p>
-<div style="border: 1px solid var(--border-lo); overflow: hidden;">
-<table class="signal-table">
-  <thead>
-    <tr>
-      <th>信號來源</th>
-      <th>內容</th>
-      <th>觸發時機</th>
-      <th>孿生可見度</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td class="key">dispatch_log</td>
-      <td>每次 issue 被評估的決策：rule index、directive（spawn_fresh / no_action / wait / human_review）、reason、matched_at</td>
-      <td>workflow 引擎每次 poll 到 status:ready issue</td>
-      <td><span class="cov cov-ok">即時可見</span></td>
-    </tr>
-    <tr>
-      <td class="key">one_shot_runs</td>
-      <td>run metadata：role、argv（含 --name 帶 role+issue）、status、cost、started/ended</td>
-      <td>agent spawn 後立刻寫入 + 推送 oneshot:created event</td>
-      <td><span class="cov cov-ok">即時可見</span></td>
-    </tr>
-    <tr>
-      <td class="key">run_events</td>
-      <td>結構化事件序列：thinking / tool_use / tool_result / result，含 input_json / output_json / is_error</td>
-      <td>run 結束後從 stream-json log 解析，lazy-parse on demand</td>
-      <td><span class="cov cov-ok">call chain 可展開</span></td>
-    </tr>
-    <tr>
-      <td class="key">one_shot_log_lines</td>
-      <td>原始 stdout/stderr 逐行，stream-json NDJSON</td>
-      <td>oneshot:line:{id} 事件逐行即時推送</td>
-      <td><span class="cov cov-ok">即時串流</span></td>
-    </tr>
-    <tr>
-      <td class="key">graph_edges</td>
-      <td>issue → issue 「blocked_by」邊（從 &lt;!-- deps: --&gt; 解析）；issue → run「dispatched_to」邊</td>
-      <td>workflow 引擎解析 deps 後寫入</td>
-      <td><span class="cov cov-ok">blocking graph 可視</span></td>
-    </tr>
-    <tr>
-      <td class="key">GitHub API cache</td>
-      <td>issues（title / labels）、PRs（title / draft / merged）</td>
-      <td>fetch_issues / fetch_prs，15 min 自動刷新</td>
-      <td><span class="cov cov-part">15 min 延遲</span></td>
-    </tr>
-    <tr>
-      <td class="key">pre_spawn 結果</td>
-      <td>Abort / Reroute / Continue 決策及原因</td>
-      <td>runtime 執行但<strong>未記錄</strong>到任何持久化表</td>
-      <td><span class="cov cov-dark">暗區 · 不可見</span></td>
-    </tr>
-    <tr>
-      <td class="key">on_result 步驟</td>
-      <td>handler 執行了哪些 steps（CreateIssue / Comment / Label / push_branch_and_pr / run_command）</td>
-      <td>runtime 執行但<strong>未記錄</strong></td>
-      <td><span class="cov cov-dark">暗區 · 不可見</span></td>
-    </tr>
-  </tbody>
-</table>
+  <div class="pipe-stage white">
+    <div class="pipe-label">Phase 4a</div>
+    <div class="pipe-name">whitebox-validator</div>
+    <div class="pipe-meta">agent:validator<br>status:delivered</div>
+  </div>
+  <div class="pipe-stage black">
+    <div class="pipe-label">Phase 4b</div>
+    <div class="pipe-name">blackbox-validator</div>
+    <div class="pipe-meta">agent:blackbox-validator<br>status:delivered</div>
+  </div>
+  <div class="pipe-stage human">
+    <div class="pipe-label">⚠ Gate</div>
+    <div class="pipe-name">Human Merge</div>
+    <div class="pipe-meta">status:validated<br>人工 merge PR</div>
+  </div>
+  <div class="pipe-stage arbiter" style="flex: 0 0 auto; min-width: 120px;">
+    <div class="pipe-label">Recovery</div>
+    <div class="pipe-name">arbiter</div>
+    <div class="pipe-meta">任何 reject<br>/ degrade 觸發</div>
+  </div>
 </div>
 
 <!-- ============================================================= FLOW -->
-<h2>主流程 · 孿生視角 <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-3);">— 11 個階段，每個階段孿生看到什麼</span></h2>
+<h2>主流程 · 階段說明</h2>
 
 <div class="timeline">
 
-<!-- Stage 0 -->
-<div class="stage">
-  <div class="stage-dot">0</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">起點：空專案</span>
-      <span class="badge badge-github">git state</span>
-    </div>
-    <div class="stage-body">
-      <p>新建 git repo，可能只有空 README 或 <code>.gitignore</code>。沒有 <code>project-rlm/</code>，沒有業務代碼，沒有 GitHub issues。</p>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
-      <ul>
-        <li>HomeView 顯示 repo 基本資訊（本機路徑、default branch、git clean 狀態）</li>
-        <li>Dispatch Log 區塊：無記錄 — "No dispatch decisions recorded yet."</li>
-        <li>Blocking graph：無依賴</li>
-        <li>One-shot sidebar：無 run</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- Stage 1 -->
+<!-- Stage 1: Intake -->
 <div class="stage">
   <div class="stage-dot">1</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">商模意圖進場</span>
-      <span class="badge badge-github">issue #1 created</span>
+      <span class="stage-title">Hermes Intake — Spec 初始化</span>
+      <span class="b b-hermes">hermes-intake</span>
     </div>
     <div class="stage-body">
-      <p>使用者開了第一個 issue 描述商業需求，body 帶 <code>&lt;!-- intake-kind: business --&gt;</code>，labels 加上 <span class="gh">status:ready</span>。</p>
+      <p><strong>觸發條件：</strong><span class="gh agent">kind:spec</span> <span class="gh agent">agent:hermes-intake</span> <span class="gh">status:proposed</span></p>
+      <div class="ablock hermes">
+        <div class="ablock-label">pre_spawn</div>
+        <code>transition_status: proposed → in-progress</code>
+      </div>
+      <div class="ablock hermes" style="margin-top: 8px;">
+        <div class="ablock-label">skill: signal-to-spec</div>
+        <ul>
+          <li>讀 issue body 中的業務信號（business-model-probe / deployment-constraints-probe）</li>
+          <li>產出 intake-complete → 寫 Spec body + subdomain marker</li>
+          <li>或產出 intake-question → 轉給 Discord（enqueue-message）</li>
+          <li>或產出 intake-decline → 標 cancelled</li>
+        </ul>
+      </div>
+      <div class="ablock hermes" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: intake-complete</div>
+        <ul>
+          <li>留 comment、remove <span class="gh agent">agent:hermes-intake</span>、add <span class="gh agent">agent:hermes-design</span></li>
+          <li><code>transition_status: in-progress → proposed</code></li>
+        </ul>
+      </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>HomeView Open Issues 列表出現 #1（15 min 內或手動 Refresh 後）</li>
-        <li>Labels 顯示 <span class="gh">status:ready</span> 顏色徽章</li>
-        <li class="dark">Dispatch 尚未發生，dispatch_log 還沒有記錄</li>
+        <li>Dispatch Log：<span class="b b-hermes" style="font-size:9px;">spawn</span> · kind:spec #N · rule index</li>
+        <li>One-shot sidebar：role = <code>hermes-intake</code>（紫色 badge）</li>
+        <li>Call chain：signal-to-spec 讀 issue + 各種 probe 執行 tool calls 可見</li>
+        <li class="dark">intake-question enqueue_exit 成功或失敗不可見（on_result step）</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 2 -->
+<!-- Stage 2: Design -->
 <div class="stage">
   <div class="stage-dot">2</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">workflow 偵測 + 路由決策</span>
-      <span class="badge badge-dim">agent-sweet-home poll</span>
+      <span class="stage-title">Hermes Design — Spec → WorkPackages</span>
+      <span class="b b-hermes">hermes-design</span>
     </div>
     <div class="stage-body">
-      <p>workflow runtime 讀 <code>agent-team-v2.workflow.yaml</code>，評估 dispatch rules：</p>
-      <div class="action-block arch">
-        <div class="action-label">規則評估（依序）</div>
+      <p><strong>觸發條件：</strong><span class="gh agent">kind:spec</span> <span class="gh agent">agent:hermes-design</span> <span class="gh">status:proposed</span></p>
+      <p class="mt8">注意：hermes-design 在 dispatch rules 中<strong>刻意不自動觸發</strong>。使用者在 Persistent terminal 手動執行 <code>/decompose-spec</code> slash command 啟動，需要人工參與 DesignApproval gate。</p>
+      <div class="ablock hermes" style="margin-top: 8px;">
+        <div class="ablock-label">skill: decompose-spec</div>
         <ul>
-          <li><code>project-rlm/</code> 不存在 + intake-kind: business → <strong>spawn_fresh</strong> role: rlm-modeler</li>
-          <li>規則命中後寫入 <code>dispatch_log</code>，emit <code>dispatch:logged</code> event</li>
+          <li>讀 RLM + Spec，切出 N 個 atomic WorkPackage</li>
+          <li>每個 WP 含 subdomain / spec / AC / impact_scope / ADR refs / deps</li>
+          <li>產出 kind: decomposed → 批量 create_issue（kind:workpackage）</li>
+          <li>enqueue-message 通知 Discord 待 Design Approval</li>
         </ul>
       </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li><strong>即時</strong>：dispatch:logged event 觸發，HomeView Dispatch Log 新增一行</li>
-        <li>顯示：<span class="badge badge-twin" style="font-size:9px;">spawn</span> #1 · rule 0 · role: rlm-modeler · 時間戳</li>
-        <li>One-shot sidebar 出現新 run（<code>oneshot:created</code> event）</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- Stage 3 -->
-<div class="stage">
-  <div class="stage-dot">3</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">rlm-modeler bootstrap</span>
-      <span class="badge badge-rlm">rlm-modeler</span>
-    </div>
-    <div class="stage-body">
-      <p>從 business intake 推導出初始 RLM 模型，是唯一 RLM writer 第一次落筆。</p>
-      <div class="action-block rlm">
-        <div class="action-label">執行（透過 rlm CLI）</div>
-        <ul>
-          <li><code>rlm define-brief</code> — 產品 brief</li>
-          <li><code>rlm define-context</code> — 切 bounded contexts</li>
-          <li><code>rlm define-glossary</code> — 領域詞彙</li>
-          <li><code>rlm define-story</code> — 用戶故事</li>
-          <li><code>rlm validate</code> — 強制一致性驗證</li>
-        </ul>
-      </div>
-      <p style="margin-top: 8px">產出 <code>project-rlm/</code> PR 對應 #1，打上 <span class="gh">arch-state:awaiting-bootstrap-merge</span></p>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
-      <ul>
-        <li>One-shot chat view：即時串流 thinking blocks（折疊，顯示字元數）</li>
-        <li>Tool call chain 逐步展開：每次 Bash / Read / Write 都可看到 input/output</li>
-        <li>Run header：role badge <span class="badge badge-rlm" style="font-size:9px;">rlm-modeler</span> + issue #1 + 即時燒錢速率</li>
-        <li>Run 完成後：Structured Output 展開 JSON（含 agent 回傳的 kind 欄位）</li>
-        <li class="dark">pre_spawn hook 評估結果不可見（runtime 未記錄）</li>
+        <li>Call chain：decompose-spec 讀 RLM + 構建 WP spec 的全過程可見</li>
+        <li>Structured Output：out.workpackages 的完整 JSON（N 個 WP 定義）</li>
+        <li>HomeView Issues：WP issues #N–#M 出現（15 min 或手動刷新）</li>
+        <li>Blocking graph：WP 之間的 deps 關係即時顯示</li>
+        <li class="dark">create_issue steps 成功/失敗不記錄；enqueue_exit 不可見</li>
       </ul>
     </div>
   </div>
 </div>
 
 <div class="gate-banner">
-  ⚠️ <strong>人工 gate</strong> — bootstrap PR 必須人工審查並 merge。這是 RLM 第一次定型，需要人類確認方向。孿生在 HomeView PRs 列表看到這個 PR，但 merge 決策在人類手上。
+  ⚠️ <strong>Design Approval Gate</strong> — hermes-design 產出的 WP 預設帶 <span class="gh agent">status:proposed</span>，dispatch rules 要求 <span class="gh">status:approved</span> + <span class="gh worker">agent:worker</span> 才會觸發 worker。人工在 Discord 回 <code>approve all</code> 或 <code>approve N</code> 後由 intake-confirmation skill 翻 labels。
 </div>
 
-<!-- Stage 4 -->
+<!-- Stage 3: Worker -->
 <div class="stage">
-  <div class="stage-dot">4</div>
+  <div class="stage-dot">3</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">PR merged → workflow 重新評估 #1</span>
-      <span class="badge badge-github">PR merged</span>
+      <span class="stage-title">Worker — TDD 實作 + PR</span>
+      <span class="b b-worker">worker</span>
     </div>
     <div class="stage-body">
-      <p>Trigger：PR closed（merged）且 #1 仍 open。</p>
-      <ul style="padding-left: 18px; font-size: 13px; color: var(--text-2);">
-        <li style="margin-bottom: 4px;"><code>project-rlm/</code> 存在 → ✓；有業務代碼 → ✗；有子 issues → ✗</li>
-        <li>→ dispatch rules → <strong>spawn_fresh</strong> role: arch-shape</li>
-      </ul>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
-      <ul>
-        <li>Dispatch Log 新增一行：<span class="badge badge-arch" style="font-size:9px;">arch</span> spawn · #1 · 新 rule index</li>
-        <li>Sidebar One-shot 出現第二個 run，role badge = arch-shape</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- Stage 5 -->
-<div class="stage">
-  <div class="stage-dot">5</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">arch-shape 分解子任務</span>
-      <span class="badge badge-arch">arch-shape</span>
-    </div>
-    <div class="stage-body">
-      <p>讀 RLM 完整模型，根據 contexts + stories 切出可獨立執行的子任務，一次性輸出完整依賴圖。</p>
-      <div class="action-block arch">
-        <div class="action-label">產出（atomic）</div>
+      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh worker">agent:worker</span> <span class="gh ok">status:approved</span></p>
+      <div class="ablock worker">
+        <div class="ablock-label">pre_spawn</div>
+        <code>transition_status: approved → in-progress</code>（防止重複派發）
+      </div>
+      <div class="ablock worker" style="margin-top: 8px;">
+        <div class="ablock-label">skill: tdd-loop + scenario skills</div>
         <ul>
-          <li>#2 subdomain: scaffold — <code>deps: []</code></li>
-          <li>#3 subdomain: feature-A — <code>deps: [#2]</code></li>
-          <li>#4 subdomain: feature-B — <code>deps: [#2, #3]</code></li>
-          <li>每個 issue body 帶完整 spec + AC + RLM context slug</li>
+          <li>偵測技術棧（package.json / go.mod / *.csproj）→ 派對應 TDD sub-skill</li>
+          <li>vitest-test-first / xunit-test-first / gotest-table-driven / playwright-test-first</li>
+          <li>scaffold-nextjs / scaffold-cloudflare-worker / scaffold-aspnet-minimal / scaffold-go-http</li>
+          <li><code>needs_worktree: true</code> — 每次在獨立 git worktree 工作</li>
+          <li>產出 kind: delivered（含 PR URL + branch + fact commits）</li>
+        </ul>
+      </div>
+      <div class="ablock worker" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: delivered</div>
+        <ul>
+          <li>留 worker_summary_comment（PR URL + fact commits + verify cmd）</li>
+          <li>remove <span class="gh worker">agent:worker</span>，add <span class="gh">agent:validator</span></li>
+          <li><code>transition_status: in-progress → delivered</code></li>
+          <li><code>push_branch_and_pr</code>（base: main，closes_issue: false）</li>
         </ul>
       </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>arch-shape run call chain：可見它用哪些工具讀 RLM（File, Bash）、如何組裝 spec</li>
-        <li>Structured Output JSON 含 arch-shape 產出的子任務清單</li>
-        <li>HomeView Issues：#2–#N 出現在 Open Issues 列表（15 min 後或手動刷新）</li>
-        <li>Blocking graph：deps 關係寫入 graph_edges → 立刻顯示 blocked issues</li>
+        <li>即時串流：每一個 git / pnpm / go / dotnet tool call 逐一顯示 input/output</li>
+        <li>Thinking blocks：TDD 推理過程可展開（red → green → refactor 決策）</li>
+        <li>Structured Output：out.pr_url + out.branch + out.fact_commits 完整 JSON</li>
+        <li>Run header：issue #N + <span class="b b-worker" style="font-size:9px;">worker</span> badge + 即時 cost 累積</li>
+        <li>Dispatch Log 新增 whitebox-validator spawn（on_result label 翻轉後下一個 tick）</li>
+        <li class="dark">push_branch_and_pr step 成功/失敗不記錄</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 6 -->
+<!-- Stage 4a: WhiteBox -->
 <div class="stage">
-  <div class="stage-dot">6</div>
+  <div class="stage-dot">4a</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">workflow 派發子任務</span>
-      <span class="badge badge-dim">dispatch cascade</span>
+      <span class="stage-title">WhiteBox Validator — PR diff 靜態審查</span>
+      <span class="b b-white">whitebox-validator</span>
     </div>
     <div class="stage-body">
-      <p>workflow 根據 deps 計算可執行性，無依賴的子任務可<strong>並行</strong>執行。</p>
-      <ul style="padding-left: 18px; font-size: 13px; color: var(--text-2);">
-        <li style="margin-bottom: 4px;">#2 deps 為空 → <span class="gh">status:ready</span> → spawn executor</li>
-        <li>#3 #4 等待 #2 → <span class="gh">status:blocked</span></li>
-      </ul>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
-      <ul>
-        <li>Dispatch Log 出現多行：每個子 issue 各一條 dispatch 決策</li>
-        <li>#2 → <span class="badge badge-executor" style="font-size:9px;">spawn</span>；#3 #4 → <span class="badge badge-dim" style="font-size:9px;">wait</span>（顯示 reason）</li>
-        <li>Blocking graph 顯示 #3 #4 被 #2 block</li>
-        <li>One-shot sidebar：新增 executor run，role badge = worker</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- Stage 7 -->
-<div class="stage">
-  <div class="stage-dot">7</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">implementer 拾取技能 + 實作</span>
-      <span class="badge badge-executor">implementer</span>
-    </div>
-    <div class="stage-body">
-      <p>每個 executor spawn 收到一個 RLM-grounded child issue，按需載入 scenario skills，TDD red-green-refactor。</p>
-      <div class="action-block executor">
-        <div class="action-label">spawn 輸入</div>
+      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:validator</span> <span class="gh">status:delivered</span></p>
+      <div class="ablock white">
+        <div class="ablock-label">skill: whitebox-validator + sub-skills</div>
         <ul>
-          <li><code>subdomain</code>、<code>spec</code>（RLM story 衍生）、<code>acceptance_criteria</code>、<code>deps</code></li>
+          <li>code-review：讀 PR diff，找 logic / type / security / edge case 問題</li>
+          <li>stress-test：高複雜度 WP 才啟動，分析 DB query plan / 並發風險 / N+1</li>
+          <li>產出 kind: approved 或 kind: rejected（含 findings + verdict）</li>
         </ul>
       </div>
-      <div class="action-block executor" style="margin-top: 8px;">
-        <div class="action-label">scenario skills（按需）</div>
-        <ul>
-          <li>API endpoint → <code>api-design</code> + <code>tdd</code></li>
-          <li>UI 元件 → <code>frontend-ui</code> + <code>a11y</code></li>
-          <li>schema → <code>migration-safety</code></li>
-        </ul>
+      <div class="ablock white" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: approved</div>
+        remove <span class="gh">agent:validator</span>，add <span class="gh">agent:blackbox-validator</span>，status 維持 delivered
+      </div>
+      <div class="ablock arbiter" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: rejected → arbiter</div>
+        remove <span class="gh">agent:validator</span>，add <span class="gh arb">agent:arbiter</span>
       </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li><strong>即時串流</strong>：One-shot chat view 顯示每一個 tool call（Bash, Edit, Read, Write…）</li>
-        <li>Thinking blocks 折疊顯示，字元數可見，展開讀完整推理過程</li>
-        <li>Tool input / output 可展開（TDD 跑了哪些測試？lint 結果如何？）</li>
-        <li>Run header：issue #N badge + worker role + 即時 cost 累積</li>
-        <li class="dark">pre_spawn Abort/Reroute 不可見；on_result steps 不可見</li>
+        <li>Call chain：whitebox 讀哪些檔案、跑什麼檢查工具，全部 tool calls 可見</li>
+        <li>Structured Output：findings 列表 + verdict + sub-skills run</li>
+        <li>verdict 決定下一個 dispatch：Dispatch Log 出現 blackbox 或 arbiter spawn</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 8 -->
+<!-- Stage 4b: BlackBox -->
 <div class="stage">
-  <div class="stage-dot">8</div>
+  <div class="stage-dot">4b</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">PR 開出 → review → merge → issue close</span>
-      <span class="badge badge-github">PR lifecycle</span>
+      <span class="stage-title">BlackBox Validator — Sandbox E2E / API 測試</span>
+      <span class="b b-black">blackbox-validator</span>
     </div>
     <div class="stage-body">
-      <p>implementer 發 PR，另一個 spawn 可進入 review mode。CI 通過 → 合併 → issue 自動關閉。</p>
+      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:blackbox-validator</span> <span class="gh">status:delivered</span></p>
+      <div class="ablock black">
+        <div class="ablock-label">skill: blackbox-validator + sub-skills</div>
+        <ul>
+          <li>e2e-browser-test：Playwright 操作 sandbox app，截圖為憑</li>
+          <li>api-contract-test：curl / HTTP probe 驗 AC 的 request/response shapes</li>
+          <li>Failure 分類：<code>implementation-defect</code>（bounce 回 worker）vs <code>ac-ambiguity</code>（退回 hermes-design）</li>
+        </ul>
+      </div>
+      <div class="ablock white" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: approved</div>
+        remove <span class="gh">agent:blackbox-validator</span>，<code>transition_status: delivered → validated</code>，留「PR ready for merge」comment
+      </div>
+      <div class="ablock arbiter" style="margin-top: 8px;">
+        <div class="ablock-label">on_result: rejected-* → arbiter</div>
+        remove <span class="gh">agent:blackbox-validator</span>，add <span class="gh arb">agent:arbiter</span>
+      </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Run call chain 底部 result bar：<span class="cov cov-ok" style="font-size:11px;">completed</span> + 總 cost</li>
-        <li>Structured Output 展開：agent 回傳的完整 JSON（PR branch、structured kind、summary）</li>
-        <li>HomeView PRs：新 PR 出現（15 min 或手動刷新）</li>
-        <li class="dark">push_branch_and_pr 是 on_result step，成功/失敗記錄不可見</li>
+        <li>Call chain：Playwright / curl tool calls + assertion 結果可見</li>
+        <li>Structured Output：failure_classification 欄位決定 arbiter 如何路由</li>
+        <li>完整通過後 Dispatch Log 出現 <span class="b b-dim" style="font-size:9px;">no_action</span>（status:validated 不再觸發）</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 9 -->
+<div class="gate-banner">
+  ⚠️ <strong>Human Merge Gate</strong> — blackbox approved 後 issue 標 <span class="gh ok">status:validated</span>，dispatch rule 返回 no_action（awaiting human merge）。PR 需要人工 review + merge。Merge 後 issue close，WP done。
+</div>
+
+<!-- Stage 5: Arbiter -->
 <div class="stage">
-  <div class="stage-dot">9</div>
+  <div class="stage-dot">R</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">workflow 解鎖下游</span>
-      <span class="badge badge-dim">unblock pass</span>
+      <span class="stage-title">Arbiter — Recovery 路由</span>
+      <span class="b b-arbiter">arbiter</span>
     </div>
     <div class="stage-body">
-      <p>Trigger：issue #2 closed。unblock pass 掃描所有 <span class="gh">status:blocked</span>，重新計算 deps，解鎖就緒的下游。</p>
+      <p><strong>觸發條件：</strong><span class="gh arb">agent:arbiter</span>（任何 reject 或 degrade 後加上）</p>
+      <div class="ablock arbiter">
+        <div class="ablock-label">輸出三選一</div>
+        <ul>
+          <li><strong>retry</strong>：根據 out.retry_stage（worker / white-box / black-box）重置 label + status，回到對應 dispatch rule</li>
+          <li><strong>escalate</strong>：enqueue-message → Discord，add <span class="gh">agent:human-help</span>，status:blocked</li>
+          <li><strong>cancel</strong>：transition_status: cancelled</li>
+        </ul>
+      </div>
+      <div class="ablock arbiter" style="margin-top: 8px;">
+        <div class="ablock-label">retry 路由細節</div>
+        <ul>
+          <li>retry worker → add agent:worker，reset status: approved（worker dispatch 要求）</li>
+          <li>retry white-box → add agent:validator，status 維持 delivered</li>
+          <li>retry black-box → add agent:blackbox-validator，status 維持 delivered</li>
+          <li>set_body_marker 更新 retry 計數器</li>
+        </ul>
+      </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Dispatch Log 出現新批次：#3 → <span class="badge badge-executor" style="font-size:9px;">spawn</span>，#4 → <span class="badge badge-dim" style="font-size:9px;">wait</span>（#3 未完成）</li>
-        <li>Blocking graph 自動更新：#3 從 blocked 移除</li>
-        <li class="dark">unblock pass 本身的執行細節不可見（無事件記錄）</li>
-        <li class="dark">on_unblock steps 執行情況不可見</li>
+        <li>Dispatch Log：arbiter spawn + 之後的 retry spawn 形成清楚的 recovery 路徑</li>
+        <li>Structured Output：out.decision + out.reasoning + out.failed_stage 完整可見</li>
+        <li>同一 issue 的多次 dispatch 記錄全部保留，可看出 retry 幾次</li>
       </ul>
     </div>
   </div>
 </div>
 
-<div class="loop-banner">
-  🔁 <strong>主迴圈</strong> — Stages 6–9 對每個子任務循環，直到全部 closed
-</div>
-
-<!-- Stage 10 -->
+<!-- Degrade -->
 <div class="stage">
-  <div class="stage-dot">10</div>
+  <div class="stage-dot">D</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">arch-shape 收尾驗收</span>
-      <span class="badge badge-arch">arch-shape</span>
+      <span class="stage-title">Degrade Fallback — 無結構化輸出時</span>
+      <span class="b b-warn">on_no_structured_output</span>
     </div>
     <div class="stage-body">
-      <p>Trigger：最後一個子 issue closed，parent #1 仍 open。arch-shape 確認原始商業意圖是否達成，視情況派 rlm-modeler 補寫模型，最後關閉 #1。</p>
+      <p><strong>觸發條件：</strong>任何 spawn 結束但沒有可解析的 JSON structured output。</p>
+      <div class="ablock arbiter">
+        <div class="ablock-label">固定處理</div>
+        <ul>
+          <li>留 degrade_comment（role / end_reason / cost / last_assistant_text 截斷）</li>
+          <li>清除所有 agent:* labels</li>
+          <li>add <span class="gh arb">agent:arbiter</span></li>
+          <li>set_body_marker：last-degrade-role / last-degrade-end-reason</li>
+        </ul>
+      </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>arch-shape run call chain：可見它讀了哪些 RLM 文件、哪些 PR diff</li>
-        <li>Dispatch Log 出現 arch-shape 的最後一次 spawn 記錄</li>
-        <li>若需 RLM 更新：rlm-modeler 再次出現在 sidebar，role badge 切回黃色</li>
+        <li>Dispatch Log：run 結束後下一 tick 出現 arbiter spawn</li>
+        <li>One-shot chat：stderr lines（紅色）通常顯示為何沒輸出結構化 JSON</li>
+        <li>Result bar：completed 但 structured output JSON 缺少 kind 欄位</li>
+        <li class="dark">degrade_comment 是 on_result step，post 成功/失敗不記錄</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 11 -->
+<!-- Unblock -->
 <div class="stage">
-  <div class="stage-dot">11</div>
+  <div class="stage-dot">U</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">商模需求完成</span>
-      <span class="badge badge-ok">done</span>
-      <span class="badge badge-rlm">RLM ✓</span>
+      <span class="stage-title">Unblock Pass — Dep 解鎖</span>
+      <span class="b b-dim">unblock_pass: enabled</span>
     </div>
     <div class="stage-body">
-      <p>系統終態：<code>project-rlm/</code> 反映完整領域模型；業務代碼可測試可部署；每個改動可追溯到 RLM story；成本完整記帳。</p>
+      <p>每次 poll 前執行。掃描所有帶 <code>&lt;!-- deps: #N #M --&gt;</code> 的 issues，當所有 dep issues 都已 close 時解鎖。</p>
+      <div class="ablock">
+        <div class="ablock-label">on_unblock steps</div>
+        留 comment「Dependencies satisfied」，remove <span class="gh blocked">status:blocked</span>，add <span class="gh ok">status:approved</span>
+      </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-strip-label">孿生觀測全貌</div>
+      <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Dispatch Log：完整的 N 次評估記錄，涵蓋每個 issue 被派發的決策歷程</li>
-        <li>One-shot sidebar：所有 run 列表，role badge 顯示誰做了什麼，cost 全部加總可見</li>
-        <li>Call chain：每個 agent 的 tool call 序列可回放，thinking 可逐一讀</li>
-        <li>HomeView：Issues 和 PRs 列表回到空白，Blocking graph 清零</li>
+        <li>Blocking graph：deps 關係即時更新，blocked issue 在 deps close 後消失</li>
+        <li>Dispatch Log：unblock 後下一 tick 出現 worker spawn（status:approved 命中 dispatch rule）</li>
+        <li class="dark">unblock pass 本身的執行過程不記錄（無 dispatch_log 條目）</li>
+        <li class="dark">on_unblock comment post 成功/失敗不記錄</li>
       </ul>
     </div>
   </div>
@@ -837,181 +710,203 @@ a:hover { text-decoration: underline; }
 
 </div><!-- /timeline -->
 
-<!-- ======================================================= COVERAGE MAP -->
-<h2>觀測覆蓋率 · 哪裡有光，哪裡還暗</h2>
-<p style="margin-bottom: 16px; font-size: 12px;">
-  綠色 = 孿生可完整觀測；橙色 = 部分可見；灰色 = 暗區，runtime 執行但不留任何可查詢記錄。
-</p>
-<div class="coverage-grid">
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Dispatch 決策</span></div>
-    <div class="cov-cell-desc">dispatch_log 記錄每次 rule 評估結果：哪條規則、什麼 directive、reason、issue number、時間戳。即時推送到 HomeView。</div>
+<!-- ========================================================= DISPATCH RULES -->
+<h2>Dispatch Rules · 完整列表（first-match）</h2>
+<div class="border-box">
+<table class="rules-table">
+  <thead>
+    <tr>
+      <th class="num">#</th>
+      <th>When（labels / state）</th>
+      <th>Then</th>
+      <th>備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="num">0</td>
+      <td class="when">issue_state: closed</td>
+      <td class="then noop">no_action — closed</td>
+      <td>Terminal check 先行</td>
+    </tr>
+    <tr>
+      <td class="num">1</td>
+      <td class="when">has_label: status:cancelled</td>
+      <td class="then noop">no_action — cancelled</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">2</td>
+      <td class="when">has_label: status:done</td>
+      <td class="then noop">no_action — done</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">3</td>
+      <td class="when">has_label: human-review</td>
+      <td class="then noop">no_action — awaiting human review</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">4</td>
+      <td class="when">has_label: agent:human-help</td>
+      <td class="then noop">no_action — blocked on Discord</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">5</td>
+      <td class="when">has_label: agent:arbiter</td>
+      <td class="then spawn">spawn_fresh — arbiter</td>
+      <td>Recovery 最高優先</td>
+    </tr>
+    <tr>
+      <td class="num">6</td>
+      <td class="when">kind:spec + agent:hermes-intake + status:proposed</td>
+      <td class="then spawn">spawn_fresh — hermes-intake</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">—</td>
+      <td class="when">kind:spec + agent:hermes-design + status:proposed</td>
+      <td class="then noop">（無 rule）手動觸發 /decompose-spec</td>
+      <td>刻意不自動 dispatch</td>
+    </tr>
+    <tr>
+      <td class="num">7</td>
+      <td class="when">kind:workpackage + agent:worker + status:approved</td>
+      <td class="then spawn">spawn_fresh — worker</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">8</td>
+      <td class="when">kind:workpackage + agent:validator + status:delivered</td>
+      <td class="then spawn">spawn_fresh — whitebox-validator</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">9</td>
+      <td class="when">kind:workpackage + agent:blackbox-validator + status:delivered</td>
+      <td class="then spawn">spawn_fresh — blackbox-validator</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">10</td>
+      <td class="when">kind:workpackage + status:validated</td>
+      <td class="then noop">no_action — awaiting human merge</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="num">—</td>
+      <td class="when">（none matched）</td>
+      <td class="then noop">implicit no_action</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ========================================================= STATUS MAP -->
+<h2>Label 狀態機</h2>
+<div class="border-box">
+<table class="or-table">
+  <thead>
+    <tr>
+      <th>Status Label</th>
+      <th>進入條件</th>
+      <th>離開條件</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="gh">status:proposed</span></td>
+      <td>issue 建立時；intake-complete on_result；hermes-design pre_spawn（in-progress 後回到 proposed）</td>
+      <td>worker pre_spawn → in-progress；hermes-intake pre_spawn → in-progress</td>
+    </tr>
+    <tr>
+      <td><span class="gh ok">status:approved</span></td>
+      <td>hermes-design decomposed on_result；unblock_pass on_unblock</td>
+      <td>worker pre_spawn → in-progress；arbiter retry worker → approved（reset）</td>
+    </tr>
+    <tr>
+      <td><span class="gh blocked">status:in-progress</span></td>
+      <td>worker pre_spawn；hermes-* pre_spawn</td>
+      <td>worker delivered on_result → delivered；degrade → （清除並由 arbiter 處理）</td>
+    </tr>
+    <tr>
+      <td><span class="gh">status:delivered</span></td>
+      <td>worker delivered on_result</td>
+      <td>blackbox approved → validated；arbiter retry worker → approved</td>
+    </tr>
+    <tr>
+      <td><span class="gh ok">status:validated</span></td>
+      <td>blackbox approved on_result</td>
+      <td>人工 merge → 手動 <code>rlm mark-delivered</code> → done</td>
+    </tr>
+    <tr>
+      <td><span class="gh blocked">status:blocked</span></td>
+      <td>arbiter escalate；intake-question；design-clarification</td>
+      <td>unblock_pass（deps closed）→ approved；人工介入</td>
+    </tr>
+    <tr>
+      <td><span class="gh fail">status:cancelled</span></td>
+      <td>arbiter cancel；intake-decline；worker self-declined；design-decline</td>
+      <td>Terminal — 不再 dispatch</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ========================================================= TWIN COVERAGE -->
+<h2>孿生觀測覆蓋率</h2>
+<div class="grid-2">
+  <div>
+    <p style="margin-bottom: 10px; font-size: 12px; color: var(--ok);">● 完整可見</p>
+    <ul style="padding-left: 18px; font-size: 12px; color: var(--t2);">
+      <li style="margin-bottom: 5px;">Dispatch 決策記錄（dispatch_log 即時推送）</li>
+      <li style="margin-bottom: 5px;">每個 spawn 的 role / issue# 連結</li>
+      <li style="margin-bottom: 5px;">Tool call 序列（thinking / tool_use / tool_result）</li>
+      <li style="margin-bottom: 5px;">Thinking blocks（字元數 + 可展開）</li>
+      <li style="margin-bottom: 5px;">Structured output 完整 JSON（kind + 全部欄位）</li>
+      <li style="margin-bottom: 5px;">Spawn prompt（argv + 完整 prompt body）</li>
+      <li style="margin-bottom: 5px;">Cost per run（即時累積）</li>
+      <li>Issue blocking graph（deps 關係）</li>
+    </ul>
   </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Spawn 執行</span></div>
-    <div class="cov-cell-desc">one_shot_runs 表：role、prompt、argv、status、cost、duration。sidebar 即時更新，call chain 可展開。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Tool Call 序列</span></div>
-    <div class="cov-cell-desc">run_events 從 stream-json 解析，包含 tool_use / tool_result 配對、is_error、input/output JSON。可展開讀完整 I/O。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Thinking Blocks</span></div>
-    <div class="cov-cell-desc">Extended thinking 的內容完整保留在 run_events，chat view 顯示字元數 + 可折疊展開讀完整推理。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Structured Output</span></div>
-    <div class="cov-cell-desc">result event 的完整 output_json（含 kind + 所有 agent 決策欄位）在 call chain 底部展開顯示。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-ok">Issue Blocking Graph</span></div>
-    <div class="cov-cell-desc">graph_edges 的 blocked_by 關係，HomeView 顯示哪些 issue 被哪些 deps 擋著，即時更新。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-part">Issue / PR 列表</span></div>
-    <div class="cov-cell-desc">GitHub API 快取，15 分鐘自動刷新。Labels 即時顯示（workflow 加的 vs. 人工加的無法區分）。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-part">Cost 歸因</span></div>
-    <div class="cov-cell-desc">每個 run 的 total_cost_usd 可見。但 per-tool-call cost breakdown 不可見，phase 間的成本分配需手動加總。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-part">Agent Role</span></div>
-    <div class="cov-cell-desc">從 dispatch_log.directive_json.role 或 argv --name flag 反推，新舊 run 都可識別。mode 資訊部分可見。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-dark">Pre-Spawn 結果</span></div>
-    <div class="cov-cell-desc">apply_pre_spawn() 的 Abort / Reroute / Continue 結果不記錄。spawn 中止時孿生完全不知道為什麼。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-dark">On-Result Steps</span></div>
-    <div class="cov-cell-desc">handler 執行了哪些 steps（CreateIssue / AddLabels / push_branch_and_pr / run_command）沒有任何記錄。成功失敗都不知道。</div>
-  </div>
-  <div class="cov-cell">
-    <div class="cov-cell-title"><span class="cov cov-dark">Error Quarantine</span></div>
-    <div class="cov-cell-desc">dispatch 或 spawn 出錯後 runtime 加 human-review label，無法區分「設計上的人工審查」和「錯誤後的隔離」。</div>
+  <div>
+    <p style="margin-bottom: 10px; font-size: 12px; color: var(--fail);">○ 暗區 · 不可見</p>
+    <ul style="padding-left: 18px; font-size: 12px; color: var(--t2);">
+      <li style="margin-bottom: 5px;">on_result steps 執行結果（create_issue / comment / run_command 成功失敗）</li>
+      <li style="margin-bottom: 5px;">pre_spawn Abort / Reroute（現有 workflow 均為 Continue，無 abort）</li>
+      <li style="margin-bottom: 5px;">push_branch_and_pr 執行結果</li>
+      <li style="margin-bottom: 5px;">unblock_pass 執行細節</li>
+      <li style="margin-bottom: 5px;">enqueue-message 到 Discord 的成功/失敗</li>
+      <li style="margin-bottom: 5px;">GitHub label 是人工加的還是 workflow 加的（無法區分）</li>
+      <li>Arbiter retry 後，error quarantine（human-review）原因</li>
+    </ul>
   </div>
 </div>
 
-<!-- ======================================================== VARIANTS -->
-<h2>情況變體 <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-3);">— 主流程的常見偏離 · 8 種</span></h2>
-
-<div class="variant-grid">
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-rlm">V1</span>
-      <span class="variant-title">RLM 已存在，新商業需求</span>
-    </div>
-    <div class="variant-when">第二個以後的商業 issue。最常見。</div>
-    <div class="variant-flow">
-      跳過 bootstrap → workflow 偵測 <code>project-rlm/</code> 已存在 → 直接派 arch-shape Stage 5。若新需求引入新 context，arch-shape 發 <code>rlm_changes_needed</code> 先讓 rlm-modeler 擴充模型。
-    </div>
-    <div class="variant-twin">Dispatch Log 第一條即為 arch-shape spawn，role badge 直接跳到藍色。rlm-modeler run 只在有模型更新時出現。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-rlm">V2</span>
-      <span class="variant-title">既有代碼導入</span>
-    </div>
-    <div class="variant-when">repo 已有業務代碼但 project-rlm/ 不存在。</div>
-    <div class="variant-flow">
-      rlm-modeler 進入 <em>reverse-bootstrap</em>：讀代碼結構逆向推導 contexts / stories → PR → 人工確認後進主流程。
-    </div>
-    <div class="variant-twin">Call chain 中可見大量 Read / Bash tool calls（rlm-modeler 在掃代碼結構）。Thinking blocks 顯示它如何從代碼推導 bounded context。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-arch">V3</span>
-      <span class="variant-title">arch-shape 需要 advisor 諮詢</span>
-    </div>
-    <div class="variant-when">arch-shape 不確定現況（"現有類似 service 嗎？"）。</div>
-    <div class="variant-flow">
-      arch-shape 標 <span class="gh">arch-state:awaiting-consultation</span> → workflow 派 advisor（be/fe/ops/design）→ advisor 留結構化 comment → arch-shape 重啟。
-    </div>
-    <div class="variant-twin">Dispatch Log 出現 advisor spawn。Sidebar 顯示 advisor run，role badge = advisor（green）。arch-shape 重啟時出現第二個 arch run。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-arch">V4</span>
-      <span class="variant-title">架構決策需要 ADR</span>
-    </div>
-    <div class="variant-when">arch-shape 遇到架構級選擇。</div>
-    <div class="variant-flow">
-      arch-shape 草擬 ADR → <strong>人工 gate</strong> 選方案 → arch-shape 重啟把 <code>implements-adr</code> 寫入子 issue → Stage 6。ADR 由 rlm-modeler 寫入 <code>project-rlm/decisions/</code>。
-    </div>
-    <div class="variant-twin">arch-shape run 結束但 Dispatch Log 無後續 spawn，說明在等人工決策。ADR merge 後新 arch-shape spawn 出現。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-executor">V5</span>
-      <span class="variant-title">implementer 反推（Mode C）</span>
-    </div>
-    <div class="variant-when">spec 矛盾 / 缺資訊 / 違反 RLM。</div>
-    <div class="variant-flow">
-      executor 留 pushback comment → 標 <span class="gh">mode-c-rounds:1</span> → arch-shape 重新檢視 → 修正 spec → 派回 executor。達到 rounds:3 升級為 human-review。
-    </div>
-    <div class="variant-twin">Dispatch Log 同一 issue 出現多次 spawn 記錄。Call chain 中 structured output 的 kind 欄位為 pushback / mode-c。同一 issue 重複出現的 executor run 可見。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-executor">V6</span>
-      <span class="variant-title">executor 發現 RLM 漂移</span>
-    </div>
-    <div class="variant-when">實作中發現 RLM 與現實領域不符。</div>
-    <div class="variant-flow">
-      executor 不越權 → 在子 issue 留 <code>rlm_changes_needed</code> → workflow 派 rlm-modeler 修正 → RLM PR merge → executor 重啟。
-    </div>
-    <div class="variant-twin">Sidebar 出現 rlm-modeler run（黃色 badge）夾在兩個 executor run 之間。Dispatch Log 顯示完整路徑：executor spawn → wait → rlm-modeler spawn → executor re-spawn。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-executor">V7</span>
-      <span class="variant-title">小型 bug fix 直接派工</span>
-    </div>
-    <div class="variant-when">issue 範圍小、不影響領域模型。</div>
-    <div class="variant-flow">
-      dispatcher 判斷無商業意圖 → 跳過 arch-shape → 直接派 executor → PR → merge。
-    </div>
-    <div class="variant-twin">Dispatch Log 只有一條 executor spawn，無 arch-shape 記錄。整個流程 Dispatch Log 只有一行，call chain 短而直接。</div>
-  </div>
-
-  <div class="variant-card">
-    <div class="variant-head">
-      <span class="badge badge-warn">V8</span>
-      <span class="variant-title">arch-judgment 兜底</span>
-    </div>
-    <div class="variant-when">dispatcher 5 條規則都不命中 / agents 衝突 / malformed intake。</div>
-    <div class="variant-flow">
-      派 arch-judgment（escape-hatch 變體）→ 讀更廣 context → 做<strong>一個</strong>有界決策 → 退出。預期觸發率 1–5%。
-    </div>
-    <div class="variant-twin">Dispatch Log 出現 arch-judgment 的特殊 role badge。Call chain 中可見它讀了 RLM survey + git history + parent thread 等更廣的 context。</div>
-  </div>
+<!-- ======================================================= RUNTIME NOTES -->
+<h2>Runtime 注意事項（v1 已知限制）</h2>
+<div class="ablock" style="font-size: 13px; color: var(--t2);">
+  <div class="ablock-label">v1 Simplifications（workflow YAML 開頭有記）</div>
+  <ul style="padding-left: 18px;">
+    <li style="margin-bottom: 6px;"><strong>max_in_flight: 1</strong> — Worker 和 Validators 互相 block。同一時間只跑一個 agent。Phase 2 改為 per-role semaphore。</li>
+    <li style="margin-bottom: 6px;"><strong>Dep 自動解析</strong> — 目前僅靠 issue body 中的 <code>&lt;!-- deps: #N --&gt;</code> markers，unblock_pass 解鎖。for_each iter result-number 自動 wiring 是 Phase 2。</li>
+    <li style="margin-bottom: 6px;"><strong>Post-condition trust</strong> — 信任 agent 的 JSON（worker 說 delivered + pr_url，就信它）。Validators 是真正的驗證機制，不做二次確認。</li>
+    <li><strong>Arbiter reads prior output via gh comments</strong> — 每個 on_result handler 都把 structured JSON echo 成 comment（paper trail）。Arbiter 靠讀 comments 得知上一個 agent 的輸出。Sweet-home 直接注入 prior output 到 prompt header 是 Phase 2。</li>
+  </ul>
 </div>
 
-<!-- ============================================================= FOOTER -->
 <footer class="footer">
-  <div class="footer-axioms">
-    <div class="axiom">
-      <div class="axiom-label">執行側公理</div>
-      <div class="axiom-value">RLM = 事實單一來源 · GitHub = 狀態機 · agents = stateless functions · 沒有長駐進程</div>
-    </div>
-    <div class="axiom">
-      <div class="axiom-label">孿生側公理</div>
-      <div class="axiom-value">SQLite = 觀測記憶 · Tauri events = 即時神經 · call chain = 可回放執行軌跡 · dispatch_log = 決策稽核</div>
-    </div>
-    <div class="axiom">
-      <div class="axiom-label">暗區誠實聲明</div>
-      <div class="axiom-value">pre_spawn outcomes、on_result steps、degrade fallbacks、worktree lifecycle — 孿生目前看不到。這是下一個觀測層的目標。</div>
-    </div>
-  </div>
-  <p style="text-align: center; margin-top: 4px;">
-    agent-sweet-home — dispatch station for one operator · <code>Tauri 2 + React 19 + SQLite</code>
+  <p>
+    GitHub label = 狀態機 &nbsp;·&nbsp;
+    dispatch_log = 決策稽核 &nbsp;·&nbsp;
+    run_events = 可回放 call chain &nbsp;·&nbsp;
+    SQLite = 觀測記憶
+  </p>
+  <p style="margin-top: 6px; color: var(--t3);">
+    agent-sweet-home · Tauri 2 + React 19 · runtime reads <code>agent-team.workflow.yaml</code>
   </p>
 </footer>
 
