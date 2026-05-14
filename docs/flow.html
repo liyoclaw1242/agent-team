@@ -9,63 +9,52 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
 <style>
 :root {
-  --bg:         #0C1014;
-  --s1:         #141921;
-  --s2:         #1D2430;
-  --blo:        #2A3340;
-  --bhi:        #3D4A5C;
-  --t1:         #E8EAED;
-  --t2:         #A7B0BC;
-  --t3:         #6B7785;
+  --bg:       #0C1014;
+  --s1:       #141921;
+  --s2:       #1D2430;
+  --blo:      #2A3340;
+  --bhi:      #3D4A5C;
+  --t1:       #E8EAED;
+  --t2:       #A7B0BC;
+  --t3:       #6B7785;
+  --ok:       #3FB950;
+  --fail:     #F85149;
+  --run:      #F5A524;
+  --accent:   #5BC0EB;
 
-  --run:        #F5A524;
-  --ok:         #3FB950;
-  --fail:       #F85149;
-  --frozen:     #7C8AA0;
-  --accent:     #5BC0EB;
-
-  --hermes:     #B392F0;  /* intake / design */
-  --worker:     #5BC0EB;  /* same as accent — harbor cyan */
-  --whitebox:   #3FB950;
-  --blackbox:   #FF8A65;
-  --arbiter:    #F85149;
+  --hermes:   #B392F0;
+  --worker:   #5BC0EB;
+  --white:    #3FB950;
+  --black:    #FF8A65;
+  --arbiter:  #F85149;
 
   --font-sans: 'IBM Plex Sans Condensed', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-
 body {
   font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--t1);
-  line-height: 1.6;
-  padding: 48px 20px 100px;
-  font-size: 14px;
+  background: var(--bg); color: var(--t1);
+  line-height: 1.6; padding: 48px 20px 100px; font-size: 14px;
 }
 .wrap { max-width: 1040px; margin: 0 auto; }
 
-/* ── Type ── */
 h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 h2 {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.12em; color: var(--t3);
-  margin: 60px 0 18px;
-  padding-bottom: 8px;
+  margin: 56px 0 18px; padding-bottom: 8px;
   border-bottom: 1px solid var(--blo);
 }
-h3 { font-size: 14px; font-weight: 600; }
+h3 { font-size: 13px; font-weight: 600; }
 p  { color: var(--t2); font-size: 13px; line-height: 1.65; }
-
 code {
   font-family: var(--font-mono); font-size: 11px;
   background: var(--s2); padding: 1px 6px;
   border: 1px solid var(--blo); border-radius: 2px; color: var(--t2);
 }
 
-/* ── Badges ── */
+/* Badges */
 .b {
   display: inline-flex; align-items: center;
   font-family: var(--font-mono); font-size: 9px; font-weight: 700;
@@ -73,69 +62,83 @@ code {
   padding: 2px 7px; border-radius: 2px; border: 1px solid;
   white-space: nowrap; flex-shrink: 0;
 }
-.b-hermes   { color: var(--hermes);   border-color: rgba(179,146,240,.4); background: rgba(179,146,240,.07); }
-.b-worker   { color: var(--worker);   border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
-.b-white    { color: var(--whitebox); border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
-.b-black    { color: var(--blackbox); border-color: rgba(255,138,101,.4); background: rgba(255,138,101,.07); }
-.b-arbiter  { color: var(--arbiter);  border-color: rgba(248,81,73,.4);   background: rgba(248,81,73,.07); }
-.b-twin     { color: var(--accent);   border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
-.b-ok       { color: var(--ok);       border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
-.b-warn     { color: var(--run);      border-color: rgba(245,165,36,.4);  background: rgba(245,165,36,.07); }
-.b-dim      { color: var(--t3);       border-color: var(--blo);           background: transparent; }
+.b-hermes  { color: var(--hermes); border-color: rgba(179,146,240,.4); background: rgba(179,146,240,.07); }
+.b-worker  { color: var(--worker); border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
+.b-white   { color: var(--white);  border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
+.b-black   { color: var(--black);  border-color: rgba(255,138,101,.4); background: rgba(255,138,101,.07); }
+.b-arbiter { color: var(--arbiter);border-color: rgba(248,81,73,.4);   background: rgba(248,81,73,.07); }
+.b-twin    { color: var(--accent); border-color: rgba(91,192,235,.4);  background: rgba(91,192,235,.07); }
+.b-ok      { color: var(--ok);     border-color: rgba(63,185,80,.4);   background: rgba(63,185,80,.07); }
+.b-warn    { color: var(--run);    border-color: rgba(245,165,36,.4);  background: rgba(245,165,36,.07); }
+.b-dim     { color: var(--t3);     border-color: var(--blo);           background: transparent; }
+.b-pty     { color: var(--hermes); border-color: rgba(179,146,240,.4); background: rgba(179,146,240,.05); }
 
 /* GitHub label pill */
 .gh {
-  display: inline-block;
-  font-family: var(--font-mono); font-size: 10px;
-  padding: 1px 7px; background: var(--s2);
-  border: 1px solid var(--bhi); color: var(--t2);
-  border-radius: 2px; margin: 1px 2px; white-space: nowrap;
+  display: inline-block; font-family: var(--font-mono); font-size: 10px;
+  padding: 1px 7px; background: var(--s2); border: 1px solid var(--bhi);
+  color: var(--t2); border-radius: 2px; margin: 1px 2px; white-space: nowrap;
 }
-.gh.agent   { color: var(--hermes);   border-color: rgba(179,146,240,.5); }
-.gh.worker  { color: var(--worker);   border-color: rgba(91,192,235,.5); }
-.gh.ok      { color: var(--ok);       border-color: rgba(63,185,80,.5); }
-.gh.fail    { color: var(--fail);     border-color: rgba(248,81,73,.5); }
-.gh.blocked { color: var(--run);      border-color: rgba(245,165,36,.5); }
-.gh.arb     { color: var(--arbiter);  border-color: rgba(248,81,73,.5); }
+.gh.ok     { color: var(--ok);     border-color: rgba(63,185,80,.5); }
+.gh.fail   { color: var(--fail);   border-color: rgba(248,81,73,.5); }
+.gh.run    { color: var(--run);    border-color: rgba(245,165,36,.5); }
+.gh.worker { color: var(--worker); border-color: rgba(91,192,235,.5); }
+.gh.arb    { color: var(--arbiter);border-color: rgba(248,81,73,.5); }
 
-/* ── Hero ── */
+/* Hero */
 .hero { padding: 32px 0 44px; border-bottom: 1px solid var(--blo); }
 .eyebrow {
   font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--accent); margin-bottom: 12px;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 12px;
 }
-.tagline { font-size: 14px; color: var(--t2); margin-top: 8px; max-width: 620px; line-height: 1.6; }
+.tagline { font-size: 14px; color: var(--t2); margin-top: 8px; max-width: 620px; }
 
-/* ── Role cards grid ── */
-.roles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 28px; }
-.role-card { padding: 14px 14px 12px; background: var(--s1); border: 1px solid var(--blo); }
-.role-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
-.role-desc { font-size: 10px; color: var(--t3); line-height: 1.5; }
-.role-card.hermes  .role-name { color: var(--hermes); }
-.role-card.worker  .role-name { color: var(--worker); }
-.role-card.white   .role-name { color: var(--whitebox); }
-.role-card.black   .role-name { color: var(--blackbox); }
-.role-card.arbiter .role-name { color: var(--arbiter); }
+/* Two-layer architecture diagram */
+.arch-split {
+  display: grid; grid-template-columns: 1fr 2px 1fr;
+  margin-top: 28px; border: 1px solid var(--blo); overflow: hidden;
+}
+.arch-divider { background: var(--blo); }
+.arch-pane { padding: 22px 20px; background: var(--s1); }
+.arch-pane.is-wf { background: rgba(91,192,235,.03); }
+.arch-pane-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--t3); margin-bottom: 8px;
+}
+.arch-pane.is-pty .arch-pane-label { color: var(--hermes); }
+.arch-pane.is-wf  .arch-pane-label { color: var(--accent); }
+.arch-pane h3 { font-size: 15px; margin-bottom: 8px; }
+.arch-roles { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 
-/* ── Pipeline strip ── */
+/* Handoff bar */
+.handoff {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 10px 20px;
+  background: var(--s2); border-top: 1px solid var(--blo);
+  font-size: 12px; color: var(--t2);
+}
+.handoff-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--run);
+  flex-shrink: 0;
+}
+.handoff-arrow { color: var(--t3); flex-shrink: 0; }
+
+/* Delivery pipeline strip */
 .pipeline {
-  display: flex; align-items: stretch;
-  gap: 0; margin-top: 24px; margin-bottom: 8px;
-  border: 1px solid var(--blo); overflow: hidden;
+  display: flex; align-items: stretch; border: 1px solid var(--blo); overflow: hidden;
+  border-top: 2px solid var(--accent);
 }
 .pipe-stage {
-  flex: 1; padding: 14px 12px; background: var(--s1);
+  flex: 1; padding: 13px 12px; background: var(--s1);
   border-right: 1px solid var(--blo);
-  display: flex; flex-direction: column; gap: 5px;
-  position: relative;
+  display: flex; flex-direction: column; gap: 4px; position: relative;
 }
 .pipe-stage:last-child { border-right: none; }
 .pipe-stage::after {
-  content: '→';
-  position: absolute; right: -10px; top: 50%;
-  transform: translateY(-50%);
-  color: var(--t3); font-size: 14px; z-index: 2;
+  content: '→'; position: absolute; right: -9px; top: 50%;
+  transform: translateY(-50%); color: var(--t3); font-size: 13px; z-index: 2;
   background: var(--bg); padding: 2px;
 }
 .pipe-stage:last-child::after { display: none; }
@@ -144,41 +147,19 @@ code {
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
 }
 .pipe-name { font-size: 12px; font-weight: 600; }
-.pipe-stage.hermes  { border-top: 2px solid var(--hermes); }
+.pipe-meta { font-size: 10px; color: var(--t3); line-height: 1.4; }
 .pipe-stage.worker  { border-top: 2px solid var(--worker); }
-.pipe-stage.white   { border-top: 2px solid var(--whitebox); }
-.pipe-stage.black   { border-top: 2px solid var(--blackbox); }
-.pipe-stage.arbiter { border-top: 2px solid var(--arbiter); background: rgba(248,81,73,.04); }
+.pipe-stage.white   { border-top: 2px solid var(--white); }
+.pipe-stage.black   { border-top: 2px solid var(--black); }
+.pipe-stage.arbiter { border-top: 2px solid var(--arbiter); background: rgba(248,81,73,.03); }
 .pipe-stage.human   { border-top: 2px solid var(--t3); background: rgba(245,165,36,.03); }
-.pipe-stage.hermes .pipe-name  { color: var(--hermes); }
 .pipe-stage.worker .pipe-name  { color: var(--worker); }
-.pipe-stage.white  .pipe-name  { color: var(--whitebox); }
-.pipe-stage.black  .pipe-name  { color: var(--blackbox); }
+.pipe-stage.white  .pipe-name  { color: var(--white); }
+.pipe-stage.black  .pipe-name  { color: var(--black); }
 .pipe-stage.arbiter .pipe-name { color: var(--arbiter); }
 .pipe-stage.human  .pipe-name  { color: var(--t2); }
-.pipe-meta { font-size: 10px; color: var(--t3); line-height: 1.4; }
 
-/* ── State machine ── */
-.state-machine { border: 1px solid var(--blo); overflow: hidden; }
-.sm-row {
-  display: grid; grid-template-columns: 180px 1fr 1fr 240px;
-  border-bottom: 1px solid var(--blo);
-  font-size: 12px;
-}
-.sm-row:last-child { border-bottom: none; }
-.sm-row.header { background: var(--s2); }
-.sm-cell {
-  padding: 9px 14px; vertical-align: top;
-  border-right: 1px solid var(--blo);
-}
-.sm-cell:last-child { border-right: none; }
-.sm-row.header .sm-cell {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
-}
-.sm-role { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
-
-/* ── Timeline ── */
+/* Timeline */
 .timeline { position: relative; padding-left: 36px; }
 .timeline::before {
   content: ''; position: absolute; left: 11px; top: 10px; bottom: 10px;
@@ -190,15 +171,14 @@ code {
   width: 22px; height: 22px; border-radius: 50%;
   background: var(--s2); border: 1px solid var(--bhi);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
-  color: var(--t3); z-index: 1;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600; color: var(--t3); z-index: 1;
 }
 .stage-inner { background: var(--s1); border: 1px solid var(--blo); overflow: hidden; }
 .stage-head {
   display: flex; align-items: center; gap: 10px;
   padding: 13px 16px 11px; border-bottom: 1px solid var(--blo); flex-wrap: wrap;
 }
-.stage-title { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
+.stage-title { font-size: 14px; font-weight: 600; flex: 1; }
 .stage-body { padding: 13px 16px; }
 .stage-body p { margin-bottom: 8px; }
 .stage-body p:last-child { margin-bottom: 0; }
@@ -213,8 +193,8 @@ code {
 }
 .ablock.hermes  { border-left-color: var(--hermes); }
 .ablock.worker  { border-left-color: var(--worker); }
-.ablock.white   { border-left-color: var(--whitebox); }
-.ablock.black   { border-left-color: var(--blackbox); }
+.ablock.white   { border-left-color: var(--white); }
+.ablock.black   { border-left-color: var(--black); }
 .ablock.arbiter { border-left-color: var(--arbiter); }
 .ablock.twin    { border-left-color: var(--accent); background: rgba(91,192,235,.05); }
 .ablock-label {
@@ -231,80 +211,67 @@ code {
 }
 .twin-label {
   font-family: var(--font-mono); font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--accent); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 6px;
 }
 .twin-strip ul { padding-left: 16px; margin: 0; }
 .twin-strip li { font-size: 12px; color: var(--t2); margin-bottom: 3px; line-height: 1.5; }
 .twin-strip li:last-child { margin-bottom: 0; }
 .dark { color: var(--t3) !important; font-style: italic; }
 
-/* Gate / loop banners */
+/* Banners */
 .gate-banner {
   margin: 10px 0; padding: 11px 15px;
   background: rgba(245,165,36,.06); border: 1px solid rgba(245,165,36,.3);
   font-size: 12px; color: var(--t2);
 }
 .gate-banner strong { color: var(--run); }
-
 .loop-banner {
-  margin: 6px 0 14px;
-  padding: 11px 15px;
+  margin: 6px 0 14px; padding: 11px 15px;
   background: rgba(91,141,239,.05); border: 1px solid rgba(91,141,239,.25);
   text-align: center; font-size: 12px; color: var(--t2);
 }
 
-/* Dispatch rules table */
-.rules-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.rules-table th {
+/* Tables */
+.rules-table, .or-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rules-table th, .or-table th {
   font-family: var(--font-mono); font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
   padding: 8px 13px; border-bottom: 1px solid var(--blo);
   background: var(--s2); text-align: left;
 }
-.rules-table td { padding: 9px 13px; border-bottom: 1px solid var(--blo); color: var(--t2); vertical-align: top; }
-.rules-table tr:last-child td { border-bottom: none; }
-.rules-table tr:hover td { background: var(--s2); }
-.rules-table .when { font-family: var(--font-mono); font-size: 11px; color: var(--t1); }
-.rules-table .then { font-family: var(--font-mono); font-size: 11px; }
-.rules-table .then.spawn   { color: var(--accent); }
-.rules-table .then.noop    { color: var(--t3); }
-.rules-table .num { color: var(--t3); font-family: var(--font-mono); font-size: 10px; text-align: right; }
-
-/* On-result table */
-.or-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.or-table th {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
-  padding: 8px 13px; border-bottom: 1px solid var(--blo);
-  background: var(--s2); text-align: left;
+.rules-table td, .or-table td {
+  padding: 9px 13px; border-bottom: 1px solid var(--blo); color: var(--t2); vertical-align: top;
 }
-.or-table td { padding: 9px 13px; border-bottom: 1px solid var(--blo); color: var(--t2); vertical-align: top; }
-.or-table tr:last-child td { border-bottom: none; }
-.or-table tr:hover td { background: var(--s2); }
-.or-table .kind { font-family: var(--font-mono); font-size: 11px; color: var(--t1); }
+.rules-table tr:last-child td, .or-table tr:last-child td { border-bottom: none; }
+.rules-table tr:hover td, .or-table tr:hover td { background: var(--s2); }
+.when, .kind { font-family: var(--font-mono); font-size: 11px; color: var(--t1); }
+.then.spawn { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
+.then.noop  { font-family: var(--font-mono); font-size: 11px; color: var(--t3); }
+.num { color: var(--t3); font-family: var(--font-mono); font-size: 10px; text-align: right; }
 
-/* Misc layout */
+/* Misc */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .border-box { border: 1px solid var(--blo); overflow: hidden; }
-.mt8 { margin-top: 8px; }
-.mt12 { margin-top: 12px; }
-.mt16 { margin-top: 16px; }
-.t3 { color: var(--t3); }
+.section-divider {
+  margin: 48px 0 20px; padding: 10px 16px;
+  background: var(--s2); border-left: 3px solid var(--blo);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--t3);
+}
+.section-divider.pty { border-left-color: var(--hermes); color: var(--hermes); }
+.section-divider.wf  { border-left-color: var(--accent);  color: var(--accent); }
 
-/* Footer */
 .footer {
   margin-top: 72px; padding: 24px 0;
   border-top: 1px solid var(--blo);
-  font-size: 11px; color: var(--t3);
-  text-align: center;
+  font-size: 11px; color: var(--t3); text-align: center;
 }
 
 @media (max-width: 840px) {
-  .roles { grid-template-columns: repeat(3, 1fr); }
+  .arch-split { grid-template-columns: 1fr; }
+  .arch-divider { display: none; }
   .pipeline { flex-direction: column; }
   .pipe-stage::after { display: none; }
-  .sm-row { grid-template-columns: 1fr; }
   .timeline { padding-left: 28px; }
   .stage-dot { left: -28px; }
   .grid-2 { grid-template-columns: 1fr; }
@@ -314,73 +281,173 @@ code {
 <body>
 <div class="wrap">
 
-<!-- ================================================================ HERO -->
+<!-- ============================================================== HERO -->
 <header class="hero">
   <div class="eyebrow">agent-team · 當前工作流 · v1</div>
-  <h1>Delivery Pipeline</h1>
+  <h1>兩層架構</h1>
   <p class="tagline">
-    以 GitHub label 作狀態機，workflow YAML 宣告 dispatch 規則 + side effects。
-    六個角色分工，每個 spawn 是一次性 claude -p，無長駐進程。
+    Intake &amp; Design 跑在 sweet-home 的 <strong>Persistent terminal</strong>（手動 slash commands）；
+    Delivery Pipeline 由 <strong>workflow.yaml</strong> 自動 dispatch。兩層分開運作，以 GitHub label 作交接點。
   </p>
 
-  <div class="roles" style="margin-top: 28px;">
-    <div class="role-card hermes">
-      <div class="role-name">hermes-intake</div>
-      <div class="role-desc">Business signal → draft Spec。<br>skill: signal-to-spec</div>
+  <!-- Architecture split card -->
+  <div class="arch-split" style="margin-top: 28px;">
+    <div class="arch-pane is-pty">
+      <div class="arch-pane-label">Layer 1 · Persistent Terminal（手動）</div>
+      <h3>Intake &amp; Design</h3>
+      <p style="font-size: 12px;">
+        使用者在 sweet-home Persistent tab 開互動 claude session，
+        以 slash commands 驅動。<br>
+        <strong>不走 workflow.yaml dispatch</strong>。
+      </p>
+      <div class="arch-roles">
+        <span class="b b-hermes">hermes-intake</span>
+        <span class="b b-hermes">hermes-design</span>
+      </div>
+      <div style="margin-top: 12px; font-size: 11px; color: var(--t3);">
+        <code>/signal-to-spec</code> &nbsp;·&nbsp; <code>/decompose-spec</code> &nbsp;·&nbsp; <code>/design-approval</code>
+      </div>
     </div>
-    <div class="role-card hermes">
-      <div class="role-name">hermes-design</div>
-      <div class="role-desc">Spec → WorkPackage 分解。<br>skill: decompose-spec</div>
+    <div class="arch-divider"></div>
+    <div class="arch-pane is-wf">
+      <div class="arch-pane-label">Layer 2 · workflow.yaml（自動）</div>
+      <h3>Delivery Pipeline</h3>
+      <p style="font-size: 12px;">
+        workflow engine 每 30 秒 poll GitHub issues，
+        依 dispatch rules 自動 spawn <code>claude -p</code>。<br>
+        <strong>完全無人值守，label 驅動。</strong>
+      </p>
+      <div class="arch-roles">
+        <span class="b b-worker">worker</span>
+        <span class="b b-white">whitebox-validator</span>
+        <span class="b b-black">blackbox-validator</span>
+        <span class="b b-arbiter">arbiter</span>
+      </div>
+      <div style="margin-top: 12px; font-size: 11px; color: var(--t3);">
+        max_in_flight: 1 &nbsp;·&nbsp; interval_sec: 30
+      </div>
     </div>
-    <div class="role-card worker">
-      <div class="role-name">worker</div>
-      <div class="role-desc">TDD 寫代碼，開 PR。<br>skill: tdd-loop + scaffolds</div>
-    </div>
-    <div class="role-card white">
-      <div class="role-name">whitebox-validator</div>
-      <div class="role-desc">PR diff 靜態審查。<br>skill: code-review + stress-test</div>
-    </div>
-    <div class="role-card black">
-      <div class="role-name">blackbox-validator</div>
-      <div class="role-desc">Sandbox E2E / API 測試。<br>skill: e2e-browser-test</div>
-    </div>
-    <div class="role-card arbiter">
-      <div class="role-name">arbiter</div>
-      <div class="role-desc">Recovery：retry / escalate / cancel。<br>skill: arbiter</div>
+
+    <!-- Handoff bar -->
+    <div class="handoff">
+      <span class="handoff-label">接口點</span>
+      <span>hermes-design 產出</span>
+      <span class="gh worker">kind:workpackage</span>
+      <span class="gh worker">agent:worker</span>
+      <span class="gh ok">status:approved</span>
+      <span class="handoff-arrow">→</span>
+      <span>workflow.yaml 接手，自動觸發 worker</span>
     </div>
   </div>
 </header>
 
-<!-- ========================================================= PIPELINE -->
-<h2>流水線全貌</h2>
-<div class="pipeline">
-  <div class="pipe-stage hermes">
-    <div class="pipe-label">Phase 1</div>
-    <div class="pipe-name">hermes-intake</div>
-    <div class="pipe-meta">kind:spec<br>agent:hermes-intake<br>status:proposed</div>
+<!-- ===================================================== LAYER 1: PTY -->
+<div class="section-divider pty">Layer 1 · Persistent Terminal · Intake &amp; Design</div>
+
+<div class="timeline">
+
+<!-- hermes-intake -->
+<div class="stage">
+  <div class="stage-dot">1</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">hermes-intake — Business Signal → Draft Spec</span>
+      <span class="b b-pty">Persistent</span>
+      <span class="b b-hermes">hermes-intake</span>
+    </div>
+    <div class="stage-body">
+      <p>使用者在 Persistent terminal 跑 <code>/signal-to-spec</code>（signal-to-spec skill）。</p>
+      <div class="ablock hermes">
+        <div class="ablock-label">skill: signal-to-spec</div>
+        <ul>
+          <li>讀 issue body 業務信號 → business-model-probe / deployment-constraints-probe sub-skills</li>
+          <li>產出 intake-complete → 寫 Spec body（subdomain + intake metadata）</li>
+          <li>或產出 intake-question → enqueue-message 到 Discord</li>
+          <li>或產出 intake-decline → 標 cancelled</li>
+        </ul>
+      </div>
+      <div class="ablock hermes" style="margin-top: 8px;">
+        <div class="ablock-label">結束狀態</div>
+        issue 帶 <span class="gh">kind:spec</span> <span class="gh">agent:hermes-design</span> <span class="gh">status:proposed</span>
+      </div>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-label">孿生觀測（Persistent tab）</div>
+      <ul>
+        <li>互動式 xterm.js 終端，輸入/輸出即時可見（非 one-shot，無 call chain）</li>
+        <li>Persistent sidebar：session 顯示 running / frozen 狀態</li>
+        <li class="dark">無 dispatch_log 記錄（不走 workflow.yaml）</li>
+      </ul>
+    </div>
   </div>
-  <div class="pipe-stage hermes">
-    <div class="pipe-label">Phase 2</div>
-    <div class="pipe-name">hermes-design</div>
-    <div class="pipe-meta">kind:spec<br>agent:hermes-design<br>status:proposed</div>
+</div>
+
+<!-- hermes-design -->
+<div class="stage">
+  <div class="stage-dot">2</div>
+  <div class="stage-inner">
+    <div class="stage-head">
+      <span class="stage-title">hermes-design — Spec → WorkPackages</span>
+      <span class="b b-pty">Persistent</span>
+      <span class="b b-hermes">hermes-design</span>
+    </div>
+    <div class="stage-body">
+      <p>使用者在 Persistent terminal 跑 <code>/decompose-spec</code>（decompose-spec skill）。</p>
+      <div class="ablock hermes">
+        <div class="ablock-label">skill: decompose-spec</div>
+        <ul>
+          <li>讀 RLM + Spec body，切出 N 個 atomic WorkPackages</li>
+          <li>每個 WP 帶 subdomain / spec / AC / impact_scope / ADR refs / deps</li>
+          <li>建立 WP issues（kind:workpackage）</li>
+          <li>enqueue-message → Discord 通知 Design Approval</li>
+        </ul>
+      </div>
+      <div class="ablock hermes" style="margin-top: 8px;">
+        <div class="ablock-label">Design Approval gate</div>
+        使用者在 Discord 回 <code>approve all</code> 或 <code>approve N</code>，
+        intake-confirmation skill 翻 labels →
+        WP 變成 <span class="gh worker">agent:worker</span> <span class="gh ok">status:approved</span>
+      </div>
+    </div>
+    <div class="twin-strip">
+      <div class="twin-label">孿生觀測（Persistent tab）</div>
+      <ul>
+        <li>互動式 xterm，decompose-spec 執行過程即時可見</li>
+        <li>HomeView Issues：WP issues 出現（15 min 刷新）</li>
+        <li>Blocking graph：deps 關係即時顯示</li>
+        <li class="dark">無 dispatch_log 記錄（不走 workflow.yaml）</li>
+      </ul>
+    </div>
   </div>
-  <div class="pipe-stage human">
-    <div class="pipe-label">⚠ Gate</div>
-    <div class="pipe-name">Design Approval</div>
-    <div class="pipe-meta">人工核准每個 WP<br>status:approved 才觸發 worker</div>
-  </div>
+</div>
+
+</div><!-- /layer 1 timeline -->
+
+<div style="margin: 24px 0; padding: 12px 16px; background: rgba(245,165,36,.06); border: 1px solid rgba(245,165,36,.3); font-size: 12px; color: var(--t2);">
+  ⚡ <strong>接口點</strong> — Design Approval 完成後，WP 帶上
+  <span class="gh worker">kind:workpackage</span>
+  <span class="gh worker">agent:worker</span>
+  <span class="gh ok">status:approved</span>。
+  workflow.yaml 的下一個 poll tick（≤30s）自動命中 dispatch rule → 派 worker。
+</div>
+
+<!-- ===================================================== LAYER 2: WF -->
+<div class="section-divider wf">Layer 2 · workflow.yaml · Delivery Pipeline（自動）</div>
+
+<!-- Pipeline strip -->
+<div class="pipeline" style="margin-bottom: 28px;">
   <div class="pipe-stage worker">
-    <div class="pipe-label">Phase 3</div>
+    <div class="pipe-label">Phase 1</div>
     <div class="pipe-name">worker</div>
-    <div class="pipe-meta">kind:workpackage<br>agent:worker<br>status:approved</div>
+    <div class="pipe-meta">agent:worker<br>status:approved</div>
   </div>
   <div class="pipe-stage white">
-    <div class="pipe-label">Phase 4a</div>
+    <div class="pipe-label">Phase 2a</div>
     <div class="pipe-name">whitebox-validator</div>
     <div class="pipe-meta">agent:validator<br>status:delivered</div>
   </div>
   <div class="pipe-stage black">
-    <div class="pipe-label">Phase 4b</div>
+    <div class="pipe-label">Phase 2b</div>
     <div class="pipe-name">blackbox-validator</div>
     <div class="pipe-meta">agent:blackbox-validator<br>status:delivered</div>
   </div>
@@ -389,448 +456,286 @@ code {
     <div class="pipe-name">Human Merge</div>
     <div class="pipe-meta">status:validated<br>人工 merge PR</div>
   </div>
-  <div class="pipe-stage arbiter" style="flex: 0 0 auto; min-width: 120px;">
+  <div class="pipe-stage arbiter" style="flex: 0 0 auto; min-width: 110px;">
     <div class="pipe-label">Recovery</div>
     <div class="pipe-name">arbiter</div>
-    <div class="pipe-meta">任何 reject<br>/ degrade 觸發</div>
+    <div class="pipe-meta">任何 reject<br>/ degrade</div>
   </div>
 </div>
-
-<!-- ============================================================= FLOW -->
-<h2>主流程 · 階段說明</h2>
 
 <div class="timeline">
 
-<!-- Stage 1: Intake -->
+<!-- worker -->
 <div class="stage">
-  <div class="stage-dot">1</div>
+  <div class="stage-dot">W</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">Hermes Intake — Spec 初始化</span>
-      <span class="b b-hermes">hermes-intake</span>
-    </div>
-    <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh agent">kind:spec</span> <span class="gh agent">agent:hermes-intake</span> <span class="gh">status:proposed</span></p>
-      <div class="ablock hermes">
-        <div class="ablock-label">pre_spawn</div>
-        <code>transition_status: proposed → in-progress</code>
-      </div>
-      <div class="ablock hermes" style="margin-top: 8px;">
-        <div class="ablock-label">skill: signal-to-spec</div>
-        <ul>
-          <li>讀 issue body 中的業務信號（business-model-probe / deployment-constraints-probe）</li>
-          <li>產出 intake-complete → 寫 Spec body + subdomain marker</li>
-          <li>或產出 intake-question → 轉給 Discord（enqueue-message）</li>
-          <li>或產出 intake-decline → 標 cancelled</li>
-        </ul>
-      </div>
-      <div class="ablock hermes" style="margin-top: 8px;">
-        <div class="ablock-label">on_result: intake-complete</div>
-        <ul>
-          <li>留 comment、remove <span class="gh agent">agent:hermes-intake</span>、add <span class="gh agent">agent:hermes-design</span></li>
-          <li><code>transition_status: in-progress → proposed</code></li>
-        </ul>
-      </div>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-label">孿生觀測</div>
-      <ul>
-        <li>Dispatch Log：<span class="b b-hermes" style="font-size:9px;">spawn</span> · kind:spec #N · rule index</li>
-        <li>One-shot sidebar：role = <code>hermes-intake</code>（紫色 badge）</li>
-        <li>Call chain：signal-to-spec 讀 issue + 各種 probe 執行 tool calls 可見</li>
-        <li class="dark">intake-question enqueue_exit 成功或失敗不可見（on_result step）</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- Stage 2: Design -->
-<div class="stage">
-  <div class="stage-dot">2</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">Hermes Design — Spec → WorkPackages</span>
-      <span class="b b-hermes">hermes-design</span>
-    </div>
-    <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh agent">kind:spec</span> <span class="gh agent">agent:hermes-design</span> <span class="gh">status:proposed</span></p>
-      <p class="mt8">注意：hermes-design 在 dispatch rules 中<strong>刻意不自動觸發</strong>。使用者在 Persistent terminal 手動執行 <code>/decompose-spec</code> slash command 啟動，需要人工參與 DesignApproval gate。</p>
-      <div class="ablock hermes" style="margin-top: 8px;">
-        <div class="ablock-label">skill: decompose-spec</div>
-        <ul>
-          <li>讀 RLM + Spec，切出 N 個 atomic WorkPackage</li>
-          <li>每個 WP 含 subdomain / spec / AC / impact_scope / ADR refs / deps</li>
-          <li>產出 kind: decomposed → 批量 create_issue（kind:workpackage）</li>
-          <li>enqueue-message 通知 Discord 待 Design Approval</li>
-        </ul>
-      </div>
-    </div>
-    <div class="twin-strip">
-      <div class="twin-label">孿生觀測</div>
-      <ul>
-        <li>Call chain：decompose-spec 讀 RLM + 構建 WP spec 的全過程可見</li>
-        <li>Structured Output：out.workpackages 的完整 JSON（N 個 WP 定義）</li>
-        <li>HomeView Issues：WP issues #N–#M 出現（15 min 或手動刷新）</li>
-        <li>Blocking graph：WP 之間的 deps 關係即時顯示</li>
-        <li class="dark">create_issue steps 成功/失敗不記錄；enqueue_exit 不可見</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<div class="gate-banner">
-  ⚠️ <strong>Design Approval Gate</strong> — hermes-design 產出的 WP 預設帶 <span class="gh agent">status:proposed</span>，dispatch rules 要求 <span class="gh">status:approved</span> + <span class="gh worker">agent:worker</span> 才會觸發 worker。人工在 Discord 回 <code>approve all</code> 或 <code>approve N</code> 後由 intake-confirmation skill 翻 labels。
-</div>
-
-<!-- Stage 3: Worker -->
-<div class="stage">
-  <div class="stage-dot">3</div>
-  <div class="stage-inner">
-    <div class="stage-head">
-      <span class="stage-title">Worker — TDD 實作 + PR</span>
+      <span class="stage-title">worker — TDD 實作 + PR</span>
       <span class="b b-worker">worker</span>
     </div>
     <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh worker">agent:worker</span> <span class="gh ok">status:approved</span></p>
+      <p><strong>dispatch 觸發：</strong><span class="gh">kind:workpackage</span> <span class="gh worker">agent:worker</span> <span class="gh ok">status:approved</span></p>
       <div class="ablock worker">
         <div class="ablock-label">pre_spawn</div>
         <code>transition_status: approved → in-progress</code>（防止重複派發）
       </div>
       <div class="ablock worker" style="margin-top: 8px;">
-        <div class="ablock-label">skill: tdd-loop + scenario skills</div>
+        <div class="ablock-label">skill: tdd-loop + scenario skills（needs_worktree: true）</div>
         <ul>
-          <li>偵測技術棧（package.json / go.mod / *.csproj）→ 派對應 TDD sub-skill</li>
-          <li>vitest-test-first / xunit-test-first / gotest-table-driven / playwright-test-first</li>
-          <li>scaffold-nextjs / scaffold-cloudflare-worker / scaffold-aspnet-minimal / scaffold-go-http</li>
-          <li><code>needs_worktree: true</code> — 每次在獨立 git worktree 工作</li>
-          <li>產出 kind: delivered（含 PR URL + branch + fact commits）</li>
+          <li>偵測技術棧 → 派對應 TDD sub-skill（vitest / xunit / gotest / playwright）</li>
+          <li>scaffold skills：nextjs / cloudflare-worker / aspnet-minimal / go-http</li>
+          <li>budget: $5.0 · model: claude-sonnet-4-6</li>
+          <li>產出 kind: delivered（pr_url + branch + fact_commits）</li>
+          <li>或 kind: self-declined（spec 有問題，ADR-0016）</li>
         </ul>
       </div>
       <div class="ablock worker" style="margin-top: 8px;">
         <div class="ablock-label">on_result: delivered</div>
         <ul>
           <li>留 worker_summary_comment（PR URL + fact commits + verify cmd）</li>
-          <li>remove <span class="gh worker">agent:worker</span>，add <span class="gh">agent:validator</span></li>
+          <li>remove <span class="gh worker">agent:worker</span> → add <span class="gh">agent:validator</span></li>
           <li><code>transition_status: in-progress → delivered</code></li>
           <li><code>push_branch_and_pr</code>（base: main，closes_issue: false）</li>
         </ul>
       </div>
     </div>
     <div class="twin-strip">
-      <div class="twin-label">孿生觀測</div>
+      <div class="twin-label">孿生觀測（One-shot）</div>
       <ul>
-        <li>即時串流：每一個 git / pnpm / go / dotnet tool call 逐一顯示 input/output</li>
-        <li>Thinking blocks：TDD 推理過程可展開（red → green → refactor 決策）</li>
-        <li>Structured Output：out.pr_url + out.branch + out.fact_commits 完整 JSON</li>
-        <li>Run header：issue #N + <span class="b b-worker" style="font-size:9px;">worker</span> badge + 即時 cost 累積</li>
-        <li>Dispatch Log 新增 whitebox-validator spawn（on_result label 翻轉後下一個 tick）</li>
-        <li class="dark">push_branch_and_pr step 成功/失敗不記錄</li>
+        <li>即時串流：git / pnpm / go 每個 tool call + input/output 可展開</li>
+        <li>Thinking blocks：TDD red→green→refactor 推理過程可讀</li>
+        <li>Structured Output：out.pr_url + out.fact_commits 完整 JSON</li>
+        <li>Run header：issue #N + <span class="b b-worker" style="font-size:9px;">worker</span> + 即時 cost</li>
+        <li class="dark">push_branch_and_pr 成功/失敗不記錄</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 4a: WhiteBox -->
+<!-- whitebox -->
 <div class="stage">
-  <div class="stage-dot">4a</div>
+  <div class="stage-dot">Wb</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">WhiteBox Validator — PR diff 靜態審查</span>
+      <span class="stage-title">whitebox-validator — PR diff 靜態審查</span>
       <span class="b b-white">whitebox-validator</span>
     </div>
     <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:validator</span> <span class="gh">status:delivered</span></p>
+      <p><strong>dispatch 觸發：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:validator</span> <span class="gh">status:delivered</span></p>
       <div class="ablock white">
-        <div class="ablock-label">skill: whitebox-validator + sub-skills</div>
+        <div class="ablock-label">skill: whitebox-validator · budget: $2.0</div>
         <ul>
-          <li>code-review：讀 PR diff，找 logic / type / security / edge case 問題</li>
-          <li>stress-test：高複雜度 WP 才啟動，分析 DB query plan / 並發風險 / N+1</li>
+          <li>code-review sub-skill：logic / type / security / edge case 問題</li>
+          <li>stress-test sub-skill（高複雜度 WP）：DB query plan / 並發風險 / N+1</li>
           <li>產出 kind: approved 或 kind: rejected（含 findings + verdict）</li>
         </ul>
       </div>
       <div class="ablock white" style="margin-top: 8px;">
         <div class="ablock-label">on_result: approved</div>
-        remove <span class="gh">agent:validator</span>，add <span class="gh">agent:blackbox-validator</span>，status 維持 delivered
+        remove <span class="gh">agent:validator</span> → add <span class="gh">agent:blackbox-validator</span>，status 維持 delivered
       </div>
       <div class="ablock arbiter" style="margin-top: 8px;">
         <div class="ablock-label">on_result: rejected → arbiter</div>
-        remove <span class="gh">agent:validator</span>，add <span class="gh arb">agent:arbiter</span>
+        remove <span class="gh">agent:validator</span> → add <span class="gh arb">agent:arbiter</span>
       </div>
     </div>
     <div class="twin-strip">
       <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Call chain：whitebox 讀哪些檔案、跑什麼檢查工具，全部 tool calls 可見</li>
-        <li>Structured Output：findings 列表 + verdict + sub-skills run</li>
-        <li>verdict 決定下一個 dispatch：Dispatch Log 出現 blackbox 或 arbiter spawn</li>
+        <li>Call chain：讀哪些檔案、跑哪些檢查全部可見</li>
+        <li>Structured Output：findings + verdict + sub_skills 清單</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Stage 4b: BlackBox -->
+<!-- blackbox -->
 <div class="stage">
-  <div class="stage-dot">4b</div>
+  <div class="stage-dot">Bb</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">BlackBox Validator — Sandbox E2E / API 測試</span>
+      <span class="stage-title">blackbox-validator — Sandbox E2E / API 測試</span>
       <span class="b b-black">blackbox-validator</span>
     </div>
     <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:blackbox-validator</span> <span class="gh">status:delivered</span></p>
+      <p><strong>dispatch 觸發：</strong><span class="gh">kind:workpackage</span> <span class="gh">agent:blackbox-validator</span> <span class="gh">status:delivered</span></p>
       <div class="ablock black">
-        <div class="ablock-label">skill: blackbox-validator + sub-skills</div>
+        <div class="ablock-label">skill: blackbox-validator · budget: $2.5</div>
         <ul>
           <li>e2e-browser-test：Playwright 操作 sandbox app，截圖為憑</li>
-          <li>api-contract-test：curl / HTTP probe 驗 AC 的 request/response shapes</li>
-          <li>Failure 分類：<code>implementation-defect</code>（bounce 回 worker）vs <code>ac-ambiguity</code>（退回 hermes-design）</li>
+          <li>api-contract-test：curl / HTTP probe 驗 AC</li>
+          <li>Failure 分類：implementation-defect（bounce 回 worker）vs ac-ambiguity（退回 hermes-design）</li>
         </ul>
       </div>
       <div class="ablock white" style="margin-top: 8px;">
         <div class="ablock-label">on_result: approved</div>
-        remove <span class="gh">agent:blackbox-validator</span>，<code>transition_status: delivered → validated</code>，留「PR ready for merge」comment
+        <code>transition_status: delivered → validated</code> · 留「PR ready for merge」comment
       </div>
       <div class="ablock arbiter" style="margin-top: 8px;">
         <div class="ablock-label">on_result: rejected-* → arbiter</div>
-        remove <span class="gh">agent:blackbox-validator</span>，add <span class="gh arb">agent:arbiter</span>
+        remove <span class="gh">agent:blackbox-validator</span> → add <span class="gh arb">agent:arbiter</span>
       </div>
     </div>
     <div class="twin-strip">
       <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Call chain：Playwright / curl tool calls + assertion 結果可見</li>
-        <li>Structured Output：failure_classification 欄位決定 arbiter 如何路由</li>
-        <li>完整通過後 Dispatch Log 出現 <span class="b b-dim" style="font-size:9px;">no_action</span>（status:validated 不再觸發）</li>
+        <li>Structured Output：failure_classification 欄位決定 arbiter 路由方向</li>
       </ul>
     </div>
   </div>
 </div>
 
 <div class="gate-banner">
-  ⚠️ <strong>Human Merge Gate</strong> — blackbox approved 後 issue 標 <span class="gh ok">status:validated</span>，dispatch rule 返回 no_action（awaiting human merge）。PR 需要人工 review + merge。Merge 後 issue close，WP done。
+  ⚠️ <strong>Human Merge Gate</strong> — blackbox approved → <span class="gh ok">status:validated</span>。dispatch rule 返回 no_action（awaiting human merge）。PR 需人工 review + merge。Merge 後 issue close → done。
 </div>
 
-<!-- Stage 5: Arbiter -->
+<!-- arbiter -->
 <div class="stage">
-  <div class="stage-dot">R</div>
+  <div class="stage-dot">Ar</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">Arbiter — Recovery 路由</span>
+      <span class="stage-title">arbiter — Recovery 路由</span>
       <span class="b b-arbiter">arbiter</span>
     </div>
     <div class="stage-body">
-      <p><strong>觸發條件：</strong><span class="gh arb">agent:arbiter</span>（任何 reject 或 degrade 後加上）</p>
+      <p><strong>dispatch 觸發：</strong><span class="gh arb">agent:arbiter</span>（任何 reject 或 degrade 後加上）</p>
       <div class="ablock arbiter">
-        <div class="ablock-label">輸出三選一</div>
+        <div class="ablock-label">三種輸出 · budget: $1.0</div>
         <ul>
-          <li><strong>retry</strong>：根據 out.retry_stage（worker / white-box / black-box）重置 label + status，回到對應 dispatch rule</li>
-          <li><strong>escalate</strong>：enqueue-message → Discord，add <span class="gh">agent:human-help</span>，status:blocked</li>
-          <li><strong>cancel</strong>：transition_status: cancelled</li>
+          <li><strong>retry</strong> — out.retry_stage 決定路由：
+            <ul style="margin-top: 4px;">
+              <li>worker → add agent:worker，reset status: approved</li>
+              <li>white-box → add agent:validator，status 維持 delivered</li>
+              <li>black-box → add agent:blackbox-validator，status 維持 delivered</li>
+            </ul>
+          </li>
+          <li><strong>escalate</strong> — enqueue-message → Discord，add agent:human-help，status:blocked</li>
+          <li><strong>cancel</strong> — transition_status: cancelled</li>
         </ul>
       </div>
       <div class="ablock arbiter" style="margin-top: 8px;">
-        <div class="ablock-label">retry 路由細節</div>
-        <ul>
-          <li>retry worker → add agent:worker，reset status: approved（worker dispatch 要求）</li>
-          <li>retry white-box → add agent:validator，status 維持 delivered</li>
-          <li>retry black-box → add agent:blackbox-validator，status 維持 delivered</li>
-          <li>set_body_marker 更新 retry 計數器</li>
-        </ul>
+        <div class="ablock-label">Retry 計數器</div>
+        set_body_marker 更新 retry-worker / retry-white-box / retry-black-box
       </div>
     </div>
     <div class="twin-strip">
       <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Dispatch Log：arbiter spawn + 之後的 retry spawn 形成清楚的 recovery 路徑</li>
+        <li>Dispatch Log：arbiter spawn → retry spawn 形成清楚 recovery 路徑</li>
         <li>Structured Output：out.decision + out.reasoning + out.failed_stage 完整可見</li>
-        <li>同一 issue 的多次 dispatch 記錄全部保留，可看出 retry 幾次</li>
+        <li>同一 issue 多次 dispatch 記錄保留，retry 次數一目了然</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Degrade -->
+<!-- degrade -->
 <div class="stage">
-  <div class="stage-dot">D</div>
+  <div class="stage-dot">Dg</div>
   <div class="stage-inner">
     <div class="stage-head">
-      <span class="stage-title">Degrade Fallback — 無結構化輸出時</span>
+      <span class="stage-title">Degrade — 無結構化輸出時</span>
       <span class="b b-warn">on_no_structured_output</span>
     </div>
     <div class="stage-body">
-      <p><strong>觸發條件：</strong>任何 spawn 結束但沒有可解析的 JSON structured output。</p>
+      <p>任何 spawn 結束但 JSON 無法解析 → 固定路由到 arbiter。</p>
       <div class="ablock arbiter">
-        <div class="ablock-label">固定處理</div>
-        <ul>
-          <li>留 degrade_comment（role / end_reason / cost / last_assistant_text 截斷）</li>
-          <li>清除所有 agent:* labels</li>
-          <li>add <span class="gh arb">agent:arbiter</span></li>
-          <li>set_body_marker：last-degrade-role / last-degrade-end-reason</li>
-        </ul>
+        <div class="ablock-label">步驟</div>
+        留 degrade_comment（role / end_reason / cost / last_assistant_text）→
+        清除所有 agent:* labels → add <span class="gh arb">agent:arbiter</span> →
+        set_body_marker: last-degrade-role / last-degrade-end-reason
       </div>
     </div>
     <div class="twin-strip">
       <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Dispatch Log：run 結束後下一 tick 出現 arbiter spawn</li>
-        <li>One-shot chat：stderr lines（紅色）通常顯示為何沒輸出結構化 JSON</li>
-        <li>Result bar：completed 但 structured output JSON 缺少 kind 欄位</li>
-        <li class="dark">degrade_comment 是 on_result step，post 成功/失敗不記錄</li>
+        <li>One-shot chat：stderr（紅色）通常顯示無輸出原因</li>
+        <li>Dispatch Log：下一個 tick 出現 arbiter spawn</li>
+        <li class="dark">degrade_comment post 成功/失敗不記錄</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- Unblock -->
+<!-- unblock -->
 <div class="stage">
-  <div class="stage-dot">U</div>
+  <div class="stage-dot">Un</div>
   <div class="stage-inner">
     <div class="stage-head">
       <span class="stage-title">Unblock Pass — Dep 解鎖</span>
       <span class="b b-dim">unblock_pass: enabled</span>
     </div>
     <div class="stage-body">
-      <p>每次 poll 前執行。掃描所有帶 <code>&lt;!-- deps: #N #M --&gt;</code> 的 issues，當所有 dep issues 都已 close 時解鎖。</p>
+      <p>每次 poll 前執行，掃描 <code>&lt;!-- deps: #N #M --&gt;</code> markers，deps 全 close → 解鎖。</p>
       <div class="ablock">
-        <div class="ablock-label">on_unblock steps</div>
-        留 comment「Dependencies satisfied」，remove <span class="gh blocked">status:blocked</span>，add <span class="gh ok">status:approved</span>
+        <div class="ablock-label">on_unblock</div>
+        remove <span class="gh run">status:blocked</span> → add <span class="gh ok">status:approved</span> → 留 comment
       </div>
     </div>
     <div class="twin-strip">
       <div class="twin-label">孿生觀測</div>
       <ul>
-        <li>Blocking graph：deps 關係即時更新，blocked issue 在 deps close 後消失</li>
-        <li>Dispatch Log：unblock 後下一 tick 出現 worker spawn（status:approved 命中 dispatch rule）</li>
-        <li class="dark">unblock pass 本身的執行過程不記錄（無 dispatch_log 條目）</li>
-        <li class="dark">on_unblock comment post 成功/失敗不記錄</li>
+        <li>Blocking graph：deps close 後 issue 自動消失</li>
+        <li>Dispatch Log：解鎖後下一 tick 出現 worker spawn</li>
+        <li class="dark">unblock pass 本身執行細節不記錄</li>
       </ul>
     </div>
   </div>
 </div>
 
-</div><!-- /timeline -->
+</div><!-- /layer 2 timeline -->
 
-<!-- ========================================================= DISPATCH RULES -->
-<h2>Dispatch Rules · 完整列表（first-match）</h2>
+<!-- ======================================================= DISPATCH RULES -->
+<h2>Dispatch Rules（workflow.yaml · first-match）</h2>
 <div class="border-box">
 <table class="rules-table">
   <thead>
     <tr>
       <th class="num">#</th>
-      <th>When（labels / state）</th>
+      <th>When</th>
       <th>Then</th>
       <th>備註</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td class="num">0</td>
-      <td class="when">issue_state: closed</td>
-      <td class="then noop">no_action — closed</td>
-      <td>Terminal check 先行</td>
-    </tr>
-    <tr>
-      <td class="num">1</td>
-      <td class="when">has_label: status:cancelled</td>
-      <td class="then noop">no_action — cancelled</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">2</td>
-      <td class="when">has_label: status:done</td>
-      <td class="then noop">no_action — done</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">3</td>
-      <td class="when">has_label: human-review</td>
-      <td class="then noop">no_action — awaiting human review</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">4</td>
-      <td class="when">has_label: agent:human-help</td>
-      <td class="then noop">no_action — blocked on Discord</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">5</td>
-      <td class="when">has_label: agent:arbiter</td>
-      <td class="then spawn">spawn_fresh — arbiter</td>
-      <td>Recovery 最高優先</td>
-    </tr>
-    <tr>
-      <td class="num">6</td>
-      <td class="when">kind:spec + agent:hermes-intake + status:proposed</td>
-      <td class="then spawn">spawn_fresh — hermes-intake</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">—</td>
-      <td class="when">kind:spec + agent:hermes-design + status:proposed</td>
-      <td class="then noop">（無 rule）手動觸發 /decompose-spec</td>
-      <td>刻意不自動 dispatch</td>
-    </tr>
-    <tr>
-      <td class="num">7</td>
-      <td class="when">kind:workpackage + agent:worker + status:approved</td>
-      <td class="then spawn">spawn_fresh — worker</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">8</td>
-      <td class="when">kind:workpackage + agent:validator + status:delivered</td>
-      <td class="then spawn">spawn_fresh — whitebox-validator</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">9</td>
-      <td class="when">kind:workpackage + agent:blackbox-validator + status:delivered</td>
-      <td class="then spawn">spawn_fresh — blackbox-validator</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">10</td>
-      <td class="when">kind:workpackage + status:validated</td>
-      <td class="then noop">no_action — awaiting human merge</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="num">—</td>
-      <td class="when">（none matched）</td>
-      <td class="then noop">implicit no_action</td>
-      <td></td>
-    </tr>
+    <tr><td class="num">0</td><td class="when">issue_state: closed</td><td class="then noop">no_action</td><td>Terminal check 先行</td></tr>
+    <tr><td class="num">1</td><td class="when">status:cancelled</td><td class="then noop">no_action</td><td></td></tr>
+    <tr><td class="num">2</td><td class="when">status:done</td><td class="then noop">no_action</td><td></td></tr>
+    <tr><td class="num">3</td><td class="when">human-review</td><td class="then noop">no_action</td><td></td></tr>
+    <tr><td class="num">4</td><td class="when">agent:human-help</td><td class="then noop">no_action</td><td>Blocked on Discord</td></tr>
+    <tr><td class="num">5</td><td class="when">agent:arbiter</td><td class="then spawn">spawn — arbiter</td><td>Recovery 最高優先</td></tr>
+    <tr><td class="num">6</td><td class="when">kind:workpackage + agent:worker + status:approved</td><td class="then spawn">spawn — worker</td><td>Layer 2 入口</td></tr>
+    <tr><td class="num">7</td><td class="when">kind:workpackage + agent:validator + status:delivered</td><td class="then spawn">spawn — whitebox-validator</td><td></td></tr>
+    <tr><td class="num">8</td><td class="when">kind:workpackage + agent:blackbox-validator + status:delivered</td><td class="then spawn">spawn — blackbox-validator</td><td></td></tr>
+    <tr><td class="num">9</td><td class="when">kind:workpackage + status:validated</td><td class="then noop">no_action — awaiting merge</td><td></td></tr>
+    <tr><td class="num">—</td><td class="when">（none matched）</td><td class="then noop">implicit no_action</td><td></td></tr>
   </tbody>
 </table>
 </div>
+<p style="margin-top: 10px; font-size: 11px; color: var(--t3);">
+  注：hermes-intake 有寫進 YAML（rule 6 原始版本），但目前由 Persistent terminal 手動執行，dispatch rule 實際不觸發。
+</p>
 
-<!-- ========================================================= STATUS MAP -->
-<h2>Label 狀態機</h2>
+<!-- ======================================================= STATUS MAP -->
+<h2>Label 狀態流</h2>
 <div class="border-box">
 <table class="or-table">
-  <thead>
-    <tr>
-      <th>Status Label</th>
-      <th>進入條件</th>
-      <th>離開條件</th>
-    </tr>
-  </thead>
+  <thead><tr><th>Status</th><th>進入</th><th>離開</th></tr></thead>
   <tbody>
     <tr>
       <td><span class="gh">status:proposed</span></td>
-      <td>issue 建立時；intake-complete on_result；hermes-design pre_spawn（in-progress 後回到 proposed）</td>
-      <td>worker pre_spawn → in-progress；hermes-intake pre_spawn → in-progress</td>
+      <td>hermes-design 建立 WP 時</td>
+      <td>Design Approval → approved</td>
     </tr>
     <tr>
       <td><span class="gh ok">status:approved</span></td>
-      <td>hermes-design decomposed on_result；unblock_pass on_unblock</td>
-      <td>worker pre_spawn → in-progress；arbiter retry worker → approved（reset）</td>
+      <td>Design Approval；unblock_pass</td>
+      <td>worker pre_spawn → in-progress</td>
     </tr>
     <tr>
-      <td><span class="gh blocked">status:in-progress</span></td>
-      <td>worker pre_spawn；hermes-* pre_spawn</td>
-      <td>worker delivered on_result → delivered；degrade → （清除並由 arbiter 處理）</td>
+      <td><span class="gh run">status:in-progress</span></td>
+      <td>worker pre_spawn</td>
+      <td>worker delivered → delivered</td>
     </tr>
     <tr>
       <td><span class="gh">status:delivered</span></td>
@@ -843,70 +748,27 @@ code {
       <td>人工 merge → 手動 <code>rlm mark-delivered</code> → done</td>
     </tr>
     <tr>
-      <td><span class="gh blocked">status:blocked</span></td>
-      <td>arbiter escalate；intake-question；design-clarification</td>
-      <td>unblock_pass（deps closed）→ approved；人工介入</td>
+      <td><span class="gh run">status:blocked</span></td>
+      <td>arbiter escalate；hermes-* clarification</td>
+      <td>unblock_pass → approved；人工介入</td>
     </tr>
     <tr>
       <td><span class="gh fail">status:cancelled</span></td>
-      <td>arbiter cancel；intake-decline；worker self-declined；design-decline</td>
-      <td>Terminal — 不再 dispatch</td>
+      <td>arbiter cancel；worker self-declined</td>
+      <td>Terminal</td>
     </tr>
   </tbody>
 </table>
 </div>
 
-<!-- ========================================================= TWIN COVERAGE -->
-<h2>孿生觀測覆蓋率</h2>
-<div class="grid-2">
-  <div>
-    <p style="margin-bottom: 10px; font-size: 12px; color: var(--ok);">● 完整可見</p>
-    <ul style="padding-left: 18px; font-size: 12px; color: var(--t2);">
-      <li style="margin-bottom: 5px;">Dispatch 決策記錄（dispatch_log 即時推送）</li>
-      <li style="margin-bottom: 5px;">每個 spawn 的 role / issue# 連結</li>
-      <li style="margin-bottom: 5px;">Tool call 序列（thinking / tool_use / tool_result）</li>
-      <li style="margin-bottom: 5px;">Thinking blocks（字元數 + 可展開）</li>
-      <li style="margin-bottom: 5px;">Structured output 完整 JSON（kind + 全部欄位）</li>
-      <li style="margin-bottom: 5px;">Spawn prompt（argv + 完整 prompt body）</li>
-      <li style="margin-bottom: 5px;">Cost per run（即時累積）</li>
-      <li>Issue blocking graph（deps 關係）</li>
-    </ul>
-  </div>
-  <div>
-    <p style="margin-bottom: 10px; font-size: 12px; color: var(--fail);">○ 暗區 · 不可見</p>
-    <ul style="padding-left: 18px; font-size: 12px; color: var(--t2);">
-      <li style="margin-bottom: 5px;">on_result steps 執行結果（create_issue / comment / run_command 成功失敗）</li>
-      <li style="margin-bottom: 5px;">pre_spawn Abort / Reroute（現有 workflow 均為 Continue，無 abort）</li>
-      <li style="margin-bottom: 5px;">push_branch_and_pr 執行結果</li>
-      <li style="margin-bottom: 5px;">unblock_pass 執行細節</li>
-      <li style="margin-bottom: 5px;">enqueue-message 到 Discord 的成功/失敗</li>
-      <li style="margin-bottom: 5px;">GitHub label 是人工加的還是 workflow 加的（無法區分）</li>
-      <li>Arbiter retry 後，error quarantine（human-review）原因</li>
-    </ul>
-  </div>
-</div>
-
-<!-- ======================================================= RUNTIME NOTES -->
-<h2>Runtime 注意事項（v1 已知限制）</h2>
-<div class="ablock" style="font-size: 13px; color: var(--t2);">
-  <div class="ablock-label">v1 Simplifications（workflow YAML 開頭有記）</div>
-  <ul style="padding-left: 18px;">
-    <li style="margin-bottom: 6px;"><strong>max_in_flight: 1</strong> — Worker 和 Validators 互相 block。同一時間只跑一個 agent。Phase 2 改為 per-role semaphore。</li>
-    <li style="margin-bottom: 6px;"><strong>Dep 自動解析</strong> — 目前僅靠 issue body 中的 <code>&lt;!-- deps: #N --&gt;</code> markers，unblock_pass 解鎖。for_each iter result-number 自動 wiring 是 Phase 2。</li>
-    <li style="margin-bottom: 6px;"><strong>Post-condition trust</strong> — 信任 agent 的 JSON（worker 說 delivered + pr_url，就信它）。Validators 是真正的驗證機制，不做二次確認。</li>
-    <li><strong>Arbiter reads prior output via gh comments</strong> — 每個 on_result handler 都把 structured JSON echo 成 comment（paper trail）。Arbiter 靠讀 comments 得知上一個 agent 的輸出。Sweet-home 直接注入 prior output 到 prompt header 是 Phase 2。</li>
-  </ul>
-</div>
-
 <footer class="footer">
   <p>
-    GitHub label = 狀態機 &nbsp;·&nbsp;
-    dispatch_log = 決策稽核 &nbsp;·&nbsp;
-    run_events = 可回放 call chain &nbsp;·&nbsp;
-    SQLite = 觀測記憶
+    Layer 1（Persistent）: hermes-intake / hermes-design · 手動 slash commands &nbsp;·&nbsp;
+    Layer 2（workflow.yaml）: worker → whitebox → blackbox → arbiter · 自動 dispatch
   </p>
   <p style="margin-top: 6px; color: var(--t3);">
-    agent-sweet-home · Tauri 2 + React 19 · runtime reads <code>agent-team.workflow.yaml</code>
+    接口點：kind:workpackage + agent:worker + status:approved &nbsp;·&nbsp;
+    interval_sec: 30 &nbsp;·&nbsp; max_in_flight: 1
   </p>
 </footer>
 
