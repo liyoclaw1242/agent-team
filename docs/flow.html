@@ -261,6 +261,88 @@ code {
 .section-divider.pty { border-left-color: var(--hermes); color: var(--hermes); }
 .section-divider.wf  { border-left-color: var(--accent);  color: var(--accent); }
 
+/* ── Intro / digital twin ── */
+.intro {
+  padding: 40px 0 44px;
+  border-bottom: 1px solid var(--blo);
+  margin-bottom: 0;
+}
+.intro-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent);
+  margin-bottom: 14px;
+}
+.intro h1 { font-size: 28px; margin-bottom: 12px; }
+.intro-lead {
+  font-size: 15px; color: var(--t2); max-width: 680px; line-height: 1.7;
+  margin-bottom: 28px;
+}
+.intro-lead strong { color: var(--t1); }
+
+.twin-mirror {
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 28px;
+}
+.mirror-pane {
+  padding: 20px 18px;
+  background: var(--s1); border: 1px solid var(--blo);
+}
+.mirror-pane.is-fleet { border-right: none; }
+.mirror-pane.is-twin  { background: rgba(91,192,235,.04); border-left: 2px solid var(--accent); }
+.mirror-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--t3);
+  margin-bottom: 6px;
+}
+.mirror-pane.is-fleet .mirror-label { color: var(--hermes); }
+.mirror-pane.is-twin  .mirror-label { color: var(--accent); }
+.mirror-pane h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.mirror-pane p  { font-size: 12px; color: var(--t2); line-height: 1.6; }
+.mirror-arrow {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; color: var(--t3); font-size: 18px;
+  background: var(--s2); border-top: 1px solid var(--blo); border-bottom: 1px solid var(--blo);
+  height: 100%; min-height: 80px;
+}
+.mirror-arrow-label {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);
+}
+
+.signal-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 0;
+}
+.signal-card {
+  padding: 12px 13px;
+  background: var(--s1); border: 1px solid var(--blo);
+  border-top: 2px solid var(--accent);
+}
+.signal-key {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: var(--accent); margin-bottom: 4px; display: block;
+}
+.signal-desc { font-size: 11px; color: var(--t3); line-height: 1.5; }
+
+.properties-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-bottom: 24px;
+}
+.prop {
+  padding: 12px 13px; background: var(--s2); border: 1px solid var(--blo);
+}
+.prop-name {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--t3); margin-bottom: 4px;
+}
+.prop-value { font-size: 12px; color: var(--t1); }
+
 .footer {
   margin-top: 72px; padding: 24px 0;
   border-top: 1px solid var(--blo);
@@ -275,19 +357,129 @@ code {
   .timeline { padding-left: 28px; }
   .stage-dot { left: -28px; }
   .grid-2 { grid-template-columns: 1fr; }
+  .twin-mirror { grid-template-columns: 1fr; }
+  .mirror-arrow { display: none; }
+  .signal-row { grid-template-columns: 1fr 1fr; }
+  .properties-row { grid-template-columns: 1fr 1fr; }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+<!-- ======================================================== INTRO: TWIN -->
+<section class="intro">
+  <div class="intro-eyebrow">Software Engineering Digital Twin</div>
+  <h1>軟體工程孿生</h1>
+  <p class="intro-lead">
+    傳統的數位孿生把<strong>物理系統</strong>（工廠、引擎、建築）映射成可即時查詢的虛擬副本。
+    軟體工程孿生做同一件事，但對象是<strong>自主 AI 代理艦隊</strong>——
+    每一個 dispatch 決策、每一次 tool call、每一個 thinking block、每一分燒掉的錢，
+    都在另一個系統裡留下完整的可查記錄。
+  </p>
+
+  <!-- Mirror diagram -->
+  <div class="twin-mirror">
+    <div class="mirror-pane is-fleet">
+      <div class="mirror-label">真實系統 · agent-team</div>
+      <h3>AI 代理艦隊</h3>
+      <p>
+        多個 claude -p spawn 協作完成從商業意圖到可部署代碼的全流程。
+        無長駐進程；狀態在 GitHub label / issue / PR 上；
+        每個 spawn 是一次性 stateless function。
+      </p>
+      <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="b b-hermes">hermes</span>
+        <span class="b b-worker">worker</span>
+        <span class="b b-white">whitebox</span>
+        <span class="b b-black">blackbox</span>
+        <span class="b b-arbiter">arbiter</span>
+      </div>
+    </div>
+    <div class="mirror-arrow">
+      <span>⇄</span>
+      <span class="mirror-arrow-label">mirrors</span>
+    </div>
+    <div class="mirror-pane is-twin">
+      <div class="mirror-label">孿生體 · agent-sweet-home</div>
+      <h3>桌面觀測工作站</h3>
+      <p>
+        Tauri 2 桌面 app。以 SQLite 持久化觀測記憶，Tauri events 即時推送，
+        GitHub API 同步 issue/PR 狀態。
+        每個 dispatch 決策、call chain、cost，全部可查詢可回放。
+      </p>
+      <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="b b-twin">dispatch log</span>
+        <span class="b b-twin">call chain</span>
+        <span class="b b-twin">thinking</span>
+        <span class="b b-twin">live cost</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Properties -->
+  <div class="properties-row">
+    <div class="prop">
+      <div class="prop-name">即時性</div>
+      <div class="prop-value">dispatch:logged event 在決策發生後 &lt;1ms 推送到 UI</div>
+    </div>
+    <div class="prop">
+      <div class="prop-name">持久性</div>
+      <div class="prop-value">SQLite 保存所有 run / log / dispatch 記錄，App 重啟仍在</div>
+    </div>
+    <div class="prop">
+      <div class="prop-name">因果追蹤</div>
+      <div class="prop-value">dispatch_log 把 issue → rule → role → run_id 串成完整因果鏈</div>
+    </div>
+    <div class="prop">
+      <div class="prop-name">可回放</div>
+      <div class="prop-value">run_events 重現完整 call chain：thinking → tool_use → tool_result → structured output</div>
+    </div>
+  </div>
+
+  <!-- Signal sources -->
+  <p style="font-size: 11px; color: var(--t3); margin-bottom: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">孿生接收的信號來源</p>
+  <div class="signal-row">
+    <div class="signal-card">
+      <span class="signal-key">dispatch_log</span>
+      <div class="signal-desc">每次 issue 被評估的決策：rule index、directive type、role、reason、matched_at。workflow engine emit <code>dispatch:logged</code> event。</div>
+    </div>
+    <div class="signal-card">
+      <span class="signal-key">run_events</span>
+      <div class="signal-desc">從 stream-json log 解析的結構化事件：thinking / tool_use / tool_result / result，含完整 input/output JSON。</div>
+    </div>
+    <div class="signal-card">
+      <span class="signal-key">one_shot_runs</span>
+      <div class="signal-desc">每個 spawn 的 metadata：role（從 dispatch_log 或 argv --name 反推）、issue#、status、cost、duration。</div>
+    </div>
+    <div class="signal-card">
+      <span class="signal-key">graph_edges</span>
+      <div class="signal-desc">issue→issue blocked_by 邊（<code>&lt;!-- deps: --&gt;</code>）；issue→run dispatched_to 邊。構成 blocking graph。</div>
+    </div>
+  </div>
+
+  <!-- Honest dark zones -->
+  <div style="margin-top: 16px; padding: 12px 15px; background: rgba(124,138,160,.06); border: 1px solid rgba(124,138,160,.2); font-size: 12px; color: var(--t3);">
+    <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3);">當前暗區（v1 孿生看不到）</span>
+    <span style="margin-left: 14px;">on_result steps 執行結果</span>
+    <span style="margin: 0 10px; color: var(--bhi);">·</span>
+    <span>pre_spawn Abort/Reroute</span>
+    <span style="margin: 0 10px; color: var(--bhi);">·</span>
+    <span>push_branch_and_pr 成效</span>
+    <span style="margin: 0 10px; color: var(--bhi);">·</span>
+    <span>unblock_pass 執行細節</span>
+    <span style="margin: 0 10px; color: var(--bhi);">·</span>
+    <span>Discord enqueue 成功失敗</span>
+  </div>
+</section>
+
 <!-- ============================================================== HERO -->
 <header class="hero">
   <div class="eyebrow">agent-team · 當前工作流 · v1</div>
-  <h1>兩層架構</h1>
+  <h1>兩層架構 · 工作流細節</h1>
   <p class="tagline">
-    Intake &amp; Design 跑在 sweet-home 的 <strong>Persistent terminal</strong>（手動 slash commands）；
-    Delivery Pipeline 由 <strong>workflow.yaml</strong> 自動 dispatch。兩層分開運作，以 GitHub label 作交接點。
+    <strong>Intake &amp; Design</strong>（Layer 1）跑在 sweet-home 的 Persistent terminal，手動 slash commands 驅動；
+    <strong>Delivery Pipeline</strong>（Layer 2）由 workflow.yaml 自動 dispatch，GitHub label 作交接點。
   </p>
 
   <!-- Architecture split card -->
